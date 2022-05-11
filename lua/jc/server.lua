@@ -23,7 +23,7 @@ end
 function M.jdtls_setup(config)
     local paths = resolve_path()
     require('lspconfig').jdtls.setup{
-        on_attach = M.on_attach,
+        on_attach = config.on_attach,
         cmd = {
             config.java_exec,
             '-Declipse.application=org.eclipse.jdt.ls.core.id1',

@@ -1,14 +1,16 @@
-local init = require("jc.init")
+local lsp = require("jc.lsp")
+local server = require("jc.server")
 
 M = {}
 
 local config = {
-    java_exec = 'java'
+    java_exec = 'java',
+    on_attach = lsp.on_attach
 }
 
 M.setup = function(args)
     config = vim.tbl_deep_extend("keep", args, config)
-    init.jdtls_setup(config)
+    server.jdtls_setup(config)
 end
 
 return M
