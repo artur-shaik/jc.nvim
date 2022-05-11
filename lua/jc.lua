@@ -8,7 +8,7 @@ local config = {
 
 M.setup = function(args)
     config = vim.tbl_deep_extend("keep", args, config)
-    init.jdtls(config)
+    init.jdtls_setup(config)
 end
 
 return M
