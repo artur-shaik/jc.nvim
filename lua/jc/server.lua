@@ -1,5 +1,6 @@
 local M = {}
-local project_name = vim.fn.fnamemodify(vim.fn.getcwd(), ':p:h:t')
+local project_name = vim.fn.substitute(
+                        vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
 
 local function download_jdtls()
     local servers = require("nvim-lsp-installer.servers")
@@ -45,7 +46,7 @@ local function resolve_path()
         return false
     end
     return {
-        workspace_dir = '/tmp/workspace-root/' .. project_name,
+        workspace_dir = vim.fn['project_root#get_basedir']('workspaces') .. project_name,
         jdtls = jdtls_path,
         java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar"),
     }
@@ -55,23 +56,27 @@ local function lspconfig_setup(paths)
     if not paths then
         return
     end
+
+    local cmd = {
+        M.config.java_exec,
+        '-Declipse.application=org.eclipse.jdt.ls.core.id1',
+        '-Dosgi.bundles.defaultStartLevel=4',
+        '-Declipse.product=org.eclipse.jdt.ls.core.product',
+        '-Dlog.protocol=true',
+        '-Dlog.level=ALL',
+        '-Xms1g',
+        '--add-modules=ALL-SYSTEM',
+        '--add-opens', 'java.base/java.util=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
+        '-jar', paths.jdtls.jar,
+        '-configuration', paths.jdtls.config,
+        '-data', paths.workspace_dir
+    }
+    vim.notify("jdtls execution command: " .. vim.inspect(cmd), vim.log.levels.DEBUG)
+
     require('lspconfig').jdtls.setup{
         on_attach = M.config.on_attach,
-        cmd = {
-            M.config.java_exec,
-            '-Declipse.application=org.eclipse.jdt.ls.core.id1',
-            '-Dosgi.bundles.defaultStartLevel=4',
-            '-Declipse.product=org.eclipse.jdt.ls.core.product',
-            '-Dlog.protocol=true',
-            '-Dlog.level=ALL',
-            '-Xms1g',
-            '--add-modules=ALL-SYSTEM',
-            '--add-opens', 'java.base/java.util=ALL-UNNAMED',
-            '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
-            '-jar', paths.jdtls.jar,
-            '-configuration', paths.jdtls.config,
-            '-data', paths.workspace_dir
-        },
+        cmd = cmd,
         settings = {
             java = {
             }

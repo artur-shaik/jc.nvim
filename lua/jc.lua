@@ -9,6 +9,7 @@ local config = {
 }
 
 M.setup = function(args)
+    print(vim.inspect())
     config = vim.tbl_deep_extend("keep", args, config)
     server.jdtls_setup(config)
 end
