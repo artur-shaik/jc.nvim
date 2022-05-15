@@ -1,6 +1,8 @@
+local Job = require("jc.jobs")
 local M = {}
 local project_name = vim.fn.substitute(
-                        vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
+vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
+local vendor_dir = vim.fn['project_root#get_basedir']('vendor')
 
 local function download_jdtls()
     local servers = require("nvim-lsp-installer.servers")
@@ -20,6 +22,57 @@ local function download_jdtls()
             end, 100)
         end
     end)
+end
+
+local function build_java_debug_plugin()
+    local mvn_exec = {'mvn', '-f', vendor_dir .. 'java-debug', 'clean', 'install'}
+    local env = vim.loop.os_environ()
+    env["LC_CTYPE"] = "C"
+    Job:new(
+        {exec = mvn_exec, title = "COMPILING java-debug plugin"},
+        {env = env, cwd = vendor_dir .. 'java-debug'},
+        function (_)
+            vim.notify("java-debug successfully installed")
+            M.jdtls_setup(M.config)
+        end,
+        function (job, ec)
+            job.output:append("JC ERROR: couldn't build java-debug plugin. Exit code: " .. ec)
+            job.output:append("JC ERROR: consider to report an issue, please.")
+        end):execute()
+end
+
+local function install_java_debug_plugin(command)
+    if not command then
+        command = 'clone'
+    end
+
+    local git_exec = function ()
+        if command == 'clone' then
+            return {'git', command, 'https://github.com/microsoft/java-debug/', vendor_dir .. 'java-debug'}
+        else
+            return {'git', 'pull'}
+        end
+    end
+
+    local cwd = function ()
+        if command == 'pull' then return vendor_dir .. 'java-debug' end
+        return vendor_dir
+    end
+
+    Job:new(
+        {exec = git_exec(), title = command:upper() .. " java-debug repository"},
+        {env = vim.loop.os_environ(), cwd = cwd()},
+        function (_)
+            vim.defer_fn(build_java_debug_plugin, 0)
+        end,
+        function (job, exit_code)
+            if exit_code == 128 then
+                install_java_debug_plugin('pull')
+            else
+                job.output:append("JC ERROR: couldn't clone java-debug plugin. Exit code: " .. exit_code)
+                job.output:append("JC ERROR: consider to report an issue, please.")
+            end
+        end):execute()
 end
 
 local function resolve_jdtls()
@@ -45,10 +98,18 @@ local function resolve_path()
     if not jdtls_path then
         return false
     end
+    local java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar")
+    if vim.fn.filereadable(java_debug) == 0 then
+        local answer = vim.fn.input("No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: ")
+        if answer == "1" then
+            install_java_debug_plugin()
+            return false
+        end
+    end
     return {
         workspace_dir = vim.fn['project_root#get_basedir']('workspaces') .. project_name,
         jdtls = jdtls_path,
-        java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar"),
+        java_debug = java_debug
     }
 end
 
@@ -72,7 +133,10 @@ local function lspconfig_setup(paths)
         '-configuration', paths.jdtls.config,
         '-data', paths.workspace_dir
     }
-    vim.notify("jdtls execution command: " .. vim.inspect(cmd), vim.log.levels.DEBUG)
+
+    local bundles = {
+        paths.java_debug
+    }
 
     require('lspconfig').jdtls.setup{
         on_attach = M.config.on_attach,
@@ -82,9 +146,7 @@ local function lspconfig_setup(paths)
             }
         },
         init_options = {
-            bundles = {
-                paths.java_debug
-            }
+            bundles = bundles
         },
     }
 end

@@ -16,9 +16,7 @@ endfunction
 
 function! project_root#find()
     if !get(g:, 'JavaComplete_MavenRepositoryDisabled', 0)
-            echo "maven"
         if !exists('g:JavaComplete_PomPath')
-            echo "maven2"
             let g:JavaComplete_PomPath = project_root#find_file('pom.xml')
             if g:JavaComplete_PomPath != ""
                 return fnamemodify(g:JavaComplete_PomPath, ':p')
