@@ -35,7 +35,7 @@ function Output:open()
 end
 
 function Output:append(data)
-    if data then
+    if data and self.output_window then
         vim.api.nvim_set_current_win(self.output_window)
         vim.fn.appendbufline(self.output_buffer, vim.fn.line('$'), data)
         vim.fn.cursor(vim.fn.line('$'), vim.fn.col("$"))
@@ -53,10 +53,11 @@ function Output:close()
     self.output_window = nil
 end
 
+local output
 return function ()
-    if _G.output then
-        return _G.output
+    if output then
+        return output
     end
-    _G.output = Output:new()
-    return _G.output
+    output = Output:new()
+    return output
 end
