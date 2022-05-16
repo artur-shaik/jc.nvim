@@ -2,6 +2,7 @@ local Job = require("jc.jobs")
 local M = {}
 local project_name = vim.fn.substitute(
 vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
+local data_dir = vim.fn['project_root#get_basedir']('data')
 local vendor_dir = vim.fn['project_root#get_basedir']('vendor')
 
 local function download_jdtls()
@@ -99,11 +100,14 @@ local function resolve_path()
         return false
     end
     local java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar")
-    if vim.fn.filereadable(java_debug) == 0 then
+    local skip_flag = data_dir .. '.skip-java-debug'
+    if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
         local answer = vim.fn.input("No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: ")
         if answer == "1" then
             install_java_debug_plugin()
             return false
+        elseif answer == "2" then
+            io.open(skip_flag, 'w'):close()
         end
     end
     return {

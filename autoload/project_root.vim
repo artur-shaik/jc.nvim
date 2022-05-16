@@ -11,7 +11,9 @@ else
 endif
 
 function! project_root#get_basedir(extra)
-    return get(g:, 'jc_basedir', expand('~'. g:FILE_SEP. '.cache')). g:FILE_SEP. 'jc.nvim'. g:FILE_SEP. a:extra. g:FILE_SEP
+    let dir = get(g:, 'jc_basedir', expand('~'. g:FILE_SEP. '.cache')). g:FILE_SEP. 'jc.nvim'. g:FILE_SEP. a:extra. g:FILE_SEP
+    call mkdir(dir, "p")
+    return dir
 endfunction
 
 function! project_root#find()
