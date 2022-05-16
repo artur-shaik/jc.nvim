@@ -1,29 +1,10 @@
 local Job = require("jc.jobs")
 local M = {}
-local project_name = vim.fn.substitute(
-vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
 local data_dir = vim.fn['project_root#get_basedir']('data')
 local vendor_dir = vim.fn['project_root#get_basedir']('vendor')
-
-local function download_jdtls()
-    local servers = require("nvim-lsp-installer.servers")
-    local installer = require("nvim-lsp-installer")
-
-    vim.notify("Installing JDTLS language server...", vim.log.levels.INFO)
-    installer.install('jdtls')
-
-    local timer = vim.loop.new_timer()
-    timer:start(2000, 750, function()
-        if servers.is_server_installed('jdtls') then
-            timer:close()
-            installer.info_window.close()
-            vim.defer_fn(function()
-                M.jdtls_setup(M.config)
-                vim.notify("JDTLS language server installed, completion should work now", vim.log.levels.INFO)
-            end, 100)
-        end
-    end)
-end
+local project_name = vim.fn.substitute(
+        vim.fn['project_root#find'](), '[\\/:;.]', '_', 'g')
+local workspace_dir = vim.fn['project_root#get_basedir']('workspaces') .. project_name
 
 local function build_java_debug_plugin()
     local mvn_exec = {'mvn', '-f', vendor_dir .. 'java-debug', 'clean', 'install'}
@@ -76,6 +57,26 @@ local function install_java_debug_plugin(command)
         end):execute()
 end
 
+local function download_jdtls()
+    local servers = require("nvim-lsp-installer.servers")
+    local installer = require("nvim-lsp-installer")
+
+    vim.notify("Installing JDTLS language server...", vim.log.levels.INFO)
+    installer.install('jdtls')
+
+    local timer = vim.loop.new_timer()
+    timer:start(2000, 1500, function()
+        if servers.is_server_installed('jdtls') then
+            timer:close()
+            installer.info_window.close()
+            vim.defer_fn(function()
+                M.jdtls_setup(M.config)
+                vim.notify("JDTLS language server installed, completion should work now", vim.log.levels.INFO)
+            end, 100)
+        end
+    end)
+end
+
 local function resolve_jdtls()
     local ok, servers = pcall(require, "nvim-lsp-installer.servers")
     assert(ok, 'nvim-lsp-installer is not installed')
@@ -87,11 +88,24 @@ local function resolve_jdtls()
             config = vim.fn.expand(jdtls_path .. '/config_linux'),
         }
     else
-        vim.loop.new_timer():start(1000, 0, vim.schedule_wrap(function()
-            download_jdtls()
-        end))
+        vim.defer_fn(download_jdtls, 1)
         return false
     end
+end
+
+local function resolve_java_debug()
+    local java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar")
+    local skip_flag = data_dir .. '.skip-java-debug'
+    if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
+        local answer = vim.fn.input("No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: ")
+        if answer == "1" then
+            install_java_debug_plugin()
+        elseif answer == "2" then
+            io.open(skip_flag, 'w'):close()
+        end
+        return false
+    end
+    return java_debug
 end
 
 local function resolve_path()
@@ -99,21 +113,14 @@ local function resolve_path()
     if not jdtls_path then
         return false
     end
-    local java_debug = vim.fn.expand("~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar")
-    local skip_flag = data_dir .. '.skip-java-debug'
-    if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
-        local answer = vim.fn.input("No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: ")
-        if answer == "1" then
-            install_java_debug_plugin()
-            return false
-        elseif answer == "2" then
-            io.open(skip_flag, 'w'):close()
-        end
+    local java_debug_path = resolve_java_debug()
+    if not java_debug_path then
+        return false
     end
     return {
-        workspace_dir = vim.fn['project_root#get_basedir']('workspaces') .. project_name,
+        workspace_dir = workspace_dir,
         jdtls = jdtls_path,
-        java_debug = java_debug
+        java_debug = java_debug_path
     }
 end
 
