@@ -21,6 +21,10 @@ function! project_root#get_name()
     return substitute(project_root, '[\\/:;.]', '_', 'g')
 endfunction
 
+function! project_root#get_project_name()
+    return fnamemodify(project_root#find(), ':p:h:t')
+endfunction
+
 function! project_root#find()
     if !get(g:, 'JavaComplete_MavenRepositoryDisabled', 0)
         if !exists('g:JavaComplete_PomPath')
@@ -57,7 +61,7 @@ function! project_root#find()
         endif
     endif
 
-    return ''
+    return getcwd()
 endfunction
 
 function! project_root#find_file(what, ...) abort

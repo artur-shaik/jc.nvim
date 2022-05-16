@@ -19,7 +19,7 @@ function M.on_attach(_, bufnr)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>F', '<cmd>lua vim.lsp.buf.formatting()<CR>', opts)
 end
 
-function M.executeCommand(command, callback)
+function M.executeCommand(command, callback, on_failure)
     local clients = vim.lsp.buf_get_clients()
     local capableClient = nil
 
@@ -38,7 +38,17 @@ function M.executeCommand(command, callback)
     if not capableClient then
         callback({ error = "No capable client found for this command" }, nil)
     else
-        capableClient.request("workspace/executeCommand", command, callback)
+        capableClient.request("workspace/executeCommand", command, function (error, response)
+            if error then
+                if on_failure then
+                    on_failure()
+                else
+                    vim.notify(vim.inspect(error), vim.log.levels.ERROR)
+                end
+            else
+                callback(response)
+            end
+        end)
     end
 end
 
