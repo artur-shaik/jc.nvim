@@ -1,7 +1,7 @@
 local M = {}
 local opts = { noremap=true, silent=true }
 
-function M.on_attach(client, bufnr)
+function M.on_attach(_, bufnr)
     vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
 
     vim.api.nvim_buf_set_keymap(bufnr, 'n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<CR>', opts)
@@ -17,6 +17,29 @@ function M.on_attach(client, bufnr)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>F', '<cmd>lua vim.lsp.buf.formatting()<CR>', opts)
+end
+
+function M.executeCommand(command, callback)
+    local clients = vim.lsp.buf_get_clients()
+    local capableClient = nil
+
+    for _, client in ipairs(clients) do
+        for _, serverCommand in ipairs(client.server_capabilities.executeCommandProvider.commands) do
+            if serverCommand == command.command then
+                capableClient = client
+                break
+            end
+        end
+        if capableClient then
+            break
+        end
+    end
+
+    if not capableClient then
+        callback({ error = "No capable client found for this command" }, nil)
+    else
+        capableClient.request("workspace/executeCommand", command, callback)
+    end
 end
 
 return M
