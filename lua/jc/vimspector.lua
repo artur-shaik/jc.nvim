@@ -94,4 +94,18 @@ function M.debug_attach()
     end)
 end
 
+function M.debug_choose_configuration()
+    local prompt = "Choose vimspector configuration:\n"
+    local configs = vim.fn['vimspector#GetConfigurations']()
+    for i, config in ipairs(configs) do
+        prompt = prompt .. i .. '. ' .. config .. '\n'
+    end
+    prompt = prompt .. 'Your choice: '
+    local choice = tonumber(vim.fn.input(prompt))
+    lsp.executeCommand({command = 'vscode.java.startDebugSession'}, function (response)
+        vim.fn['vimspector#LaunchWithSettings'](
+            {configuration = configs[choice], AdapterPort = response})
+    end)
+end
+
 return M
