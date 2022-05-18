@@ -17,6 +17,9 @@ function M.on_attach(_, bufnr)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>F', '<cmd>lua vim.lsp.buf.formatting()<CR>', opts)
+
+    vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jI', '<cmd>lua require("jc.jdtls").organizeImports()<CR>', opts)
+    vim.api.nvim_buf_set_keymap(bufnr, 'i', '<C-j>I', '<cmd>lua require("jc.jdtls").organizeImports()<CR>', opts)
 end
 
 function M.executeCommand(command, callback, on_failure)
