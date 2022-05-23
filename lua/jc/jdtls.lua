@@ -11,6 +11,11 @@ local function choose_imports(params, ctx)
     return {params.arguments[2][1].candidates[choice]}
 end
 
+local function set_configuration(settings)
+    vim.lsp.buf_request(0, 'workspace/didChangeConfiguration', {
+        settings = settings}, function () end)
+end
+
 local client_commands = {
     ['java.action.organize_imports.chooseImports'] = choose_imports
 }
@@ -33,9 +38,9 @@ function M.generate_toString(fields, code_style)
             end
         end)
     else
-        vim.lsp.buf_request(0, 'workspace/didChangeConfiguration', {
-            settings = {['java.codeGeneration.toString.codeStyle'] = code_style, ['java.codeGeneration.insertionLocation'] = 'lastMember' }},
-            function () end)
+        set_configuration({
+            ['java.codeGeneration.toString.codeStyle'] = code_style,
+            ['java.codeGeneration.insertionLocation'] = 'lastMember' })
 
         local params = vim.lsp.util.make_range_params()
         vim.lsp.buf_request(0, 'java/generateToString', {context = params, fields = fields}, function (e, r)
