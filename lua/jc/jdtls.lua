@@ -28,7 +28,34 @@ vim.lsp.handlers['workspace/executeClientCommand'] = function(_, params, ctx)
     return ''
 end
 
-function M.generate_toString(fields, code_style)
+function M.generate_hashCodeAndEquals(fields)
+    if not fields then
+        vim.lsp.buf_request(0, 'java/checkHashCodeEqualsStatus', vim.lsp.util.make_range_params(), function (e, r)
+            if r then
+                vim.fn['generators#GenerateHashCodeAndEquals'](r.fields)
+            else
+                vim.log(vim.inspect(e), vim.log.levels.ERROR)
+            end
+        end)
+    else
+        set_configuration({
+            ['java.codeGeneration.insertionLocation'] = 'lastMember' })
+
+        vim.lsp.buf_request(0, 'java/generateHashCodeEquals', {
+            context = vim.lsp.util.make_range_params(),
+            fields = fields,
+            regenerate = true},
+            function (e, r)
+                if not e then
+                    vim.lsp.util.apply_workspace_edit(r, 'utf-16')
+                else
+                    vim.log(vim.inspect(e), vim.log.levels.ERROR)
+                end
+            end)
+    end
+end
+
+function M.generate_toString(fields, params)
     if not fields then
         vim.lsp.buf_request(0, 'java/checkToStringStatus', vim.lsp.util.make_range_params(), function (e, r)
             if r then
@@ -39,17 +66,19 @@ function M.generate_toString(fields, code_style)
         end)
     else
         set_configuration({
-            ['java.codeGeneration.toString.codeStyle'] = code_style,
+            ['java.codeGeneration.toString.codeStyle'] = params.code_style,
             ['java.codeGeneration.insertionLocation'] = 'lastMember' })
 
-        local params = vim.lsp.util.make_range_params()
-        vim.lsp.buf_request(0, 'java/generateToString', {context = params, fields = fields}, function (e, r)
-            if not e then
-                vim.lsp.util.apply_workspace_edit(r, 'utf-16')
-            else
-                vim.log(vim.inspect(e), vim.log.levels.ERROR)
-            end
-        end)
+        vim.lsp.buf_request(0, 'java/generateToString', {
+            context = vim.lsp.util.make_range_params(),
+            fields = fields},
+            function (e, r)
+                if not e then
+                    vim.lsp.util.apply_workspace_edit(r, 'utf-16')
+                else
+                    vim.log(vim.inspect(e), vim.log.levels.ERROR)
+                end
+            end)
     end
 end
 

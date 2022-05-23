@@ -8,3 +8,4 @@ command! JCdebugWithConfig lua require('jc.vimspector').debug_choose_configurati
 command! JCdebugWithConfig lua require('jc.vimspector').debug_choose_configuration()
 command! JCimportsOrganize lua require('jc.jdtls').organize_imports()
 command! JCgenerateToString lua require('jc.jdtls').generate_toString()
+command! JCgenerateHashCodeAndEquals lua require('jc.jdtls').generate_hashCodeAndEquals()

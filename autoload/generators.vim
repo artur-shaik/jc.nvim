@@ -1,10 +1,16 @@
+function! generators#GenerateHashCodeAndEquals(fields)
+  let commands = [
+        \ {'key': '1', 'desc': 'generate `hashCode and equals`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_hashCodeAndEquals', 'params': {}},
+        \ ]
+  call s:FieldsListBuffer(commands, a:fields)
+endfunction
 
 function! generators#GenerateToString(fields)
   let commands = [
-        \ {'key': '1', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'code_style': 'STRING_CONCATENATION'},
-        \ {'key': '2', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'code_style': 'STRING_BUILDER'},
-        \ {'key': '3', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'code_style': 'STRING_BUILDER_CHAINED'},
-        \ {'key': '4', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'code_style': 'STRING_FORMAT'},
+        \ {'key': '1', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'params': {'code_style' : 'STRING_CONCATENATION'}},
+        \ {'key': '2', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'params': {'code_style': 'STRING_BUILDER'}},
+        \ {'key': '3', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'params': {'code_style': 'STRING_BUILDER_CHAINED'}},
+        \ {'key': '4', 'desc': 'generate `toString`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_toString', 'params': {'code_style': 'STRING_FORMAT'}},
         \ ]
   call s:FieldsListBuffer(commands, a:fields)
 endfunction
@@ -49,9 +55,10 @@ function! s:CreateBuffer(name, title, commands)
   put = '\" '
   put = '\" q                      - close this window'
   for command in a:commands
-    put = '\" '. command.key . '                      - '. command.desc. ' ('. command.code_style. ')'
+    let params = get(command, 'params', {})
+    put = '\" '. command.key . '                      - '. command.desc. ' '. get(params, 'code_style', '')
     if has_key(command, 'call')
-      exec "nnoremap <buffer> <silent> ". command.key . " :call ". command.call . "(". string(command). ", '". command.code_style. "')<CR>"
+      exec "nnoremap <buffer> <silent> ". command.key . " :call ". command.call . "(". string(command). ", ". string(command.params). ")<CR>"
     endif
   endfor
   put = '\"-----------------------------------------------------'
@@ -59,7 +66,7 @@ function! s:CreateBuffer(name, title, commands)
   return line(".") + 1
 endfunction
 
-function! <SID>generate(command, code_style)
+function! <SID>generate(command, params)
   let command = a:command
   if !has_key(command, 'fields')
     let command['fields'] = []
@@ -79,5 +86,5 @@ function! <SID>generate(command, code_style)
     execute "bwipeout!"
   endif
 
-  execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), "'. a:code_style. '")')
+  execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), vim.api.nvim_eval("'. string(a:params). '"))')
 endfunction

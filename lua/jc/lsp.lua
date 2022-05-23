@@ -21,6 +21,7 @@ function M.on_attach(_, bufnr)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jI', '<cmd>lua require("jc.jdtls").organize_imports()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'i', '<C-j>I', '<cmd>lua require("jc.jdtls").organize_imports()<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jts', '<cmd>lua require("jc.jdtls").generate_toString()<CR>', opts)
+    vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jeq', '<cmd>lua require("jc.jdtls").generate_hashCodeAndEquals()<CR>', opts)
 end
 
 function M.executeCommand(command, callback, on_failure)
