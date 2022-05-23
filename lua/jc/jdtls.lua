@@ -34,7 +34,7 @@ function M.generate_toString(fields, code_style)
         end)
     else
         vim.lsp.buf_request(0, 'workspace/didChangeConfiguration', {
-            settings = {['java.codeGeneration.toString.codeStyle'] = code_style }},
+            settings = {['java.codeGeneration.toString.codeStyle'] = code_style, ['java.codeGeneration.insertionLocation'] = 'lastMember' }},
             function () end)
 
         local params = vim.lsp.util.make_range_params()
