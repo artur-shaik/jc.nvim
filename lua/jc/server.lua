@@ -150,6 +150,9 @@ local function lspconfig_setup(paths)
     }
 
     require('lspconfig').jdtls.setup{
+        root_dir = function ()
+            return vim.fn.getcwd()
+        end,
         on_attach = M.config.on_attach,
         cmd = cmd,
         settings = {
