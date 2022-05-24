@@ -1,6 +1,6 @@
 local M = {}
 
-local function choose_imports(params, ctx)
+local function choose_imports(params, _)
     local prompt = "Choose candidate:\n"
     for i, candidate in ipairs(params.arguments[2][1].candidates) do
         print(vim.inspect(candidate))
