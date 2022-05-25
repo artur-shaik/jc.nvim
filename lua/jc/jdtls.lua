@@ -79,6 +79,41 @@ function M.generate_accessors(fields)
     end
 end
 
+function M.generate_constructor(fields, params, opts)
+    if fields == nil then
+        vim.lsp.buf_request(0, 'java/checkConstructorsStatus', vim.lsp.util.make_range_params(), function (e, r)
+            if r then
+                vim.fn['generators#GenerateConstructor'](r.fields, r.constructors, opts)
+            else
+                vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+            end
+        end)
+    else
+        set_configuration({
+            ['java.codeGeneration.insertionLocation'] = 'lastMember' })
+
+        if params.default_constructor then
+            fields = {}
+        end
+        local context = vim.lsp.util.make_range_params()
+        context.context = {
+            diagnostics = {},
+            only = nil
+        }
+        vim.lsp.buf_request(0, 'java/generateConstructors', {
+            context = context,
+            fields = fields,
+            constructors = params.constructors},
+            function (e, r)
+                if r then
+                    vim.lsp.util.apply_workspace_edit(r, 'utf-16')
+                elseif e then
+                    vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+                end
+            end)
+    end
+end
+
 function M.generate_hashCodeAndEquals(fields)
     if not fields then
         vim.lsp.buf_request(0, 'java/checkHashCodeEqualsStatus', vim.lsp.util.make_range_params(), function (e, r)

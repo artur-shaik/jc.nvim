@@ -44,6 +44,32 @@ function! generators#GenerateAccessor(symbols, accessor)
     call <SID>generateAccessors({'command': 'lua require("jc.jdtls").generate_accessors'}, {'symbols': a:symbols, 'accessor': a:accessor})
 endfunction
 
+function! generators#GenerateConstructor(fields, constructors, options)
+    let defaultConstructor = {
+                \ 'key': '1', 'desc': 'generate default constructor',
+                \ 'call': '<SID>generate',
+                \ 'command': 'lua require("jc.jdtls").generate_constructor',
+                \ 'params': {
+                    \ 'default_constructor': v:true, 
+                    \'constructors': a:constructors}}
+    if a:options.default == v:false
+        let commands = [
+                    \ defaultConstructor,
+                    \ {
+                        \ 'key': '2',
+                        \ 'desc': 'generate constructor',
+                        \ 'call': '<SID>generate',
+                        \ 'command': 'lua require("jc.jdtls").generate_constructor',
+                        \ 'params': {
+                            \ 'default_constructor': v:false,
+                            \ 'constructors': a:constructors}}
+                    \ ]
+        call s:FieldsListBuffer(commands, a:fields)
+    else
+        execute(defaultConstructor.command . '({}, vim.api.nvim_eval("'. string(defaultConstructor.params). '"))')
+    endif
+endfunction
+
 function! s:FieldsListBuffer(commands, fields)
     let s:savedCursorPosition = getpos('.')
     let contentLine = s:CreateBuffer("__FieldsListBuffer__", "remove unnecessary fields", a:commands)
@@ -171,20 +197,20 @@ function! <SID>generateAccessors(command, params)
                         let field = { 'fieldName': d.name }
                         if stridx(cmd, 's') >= 0
                             let field.generateSetter = v:true
-                            end
-                            if stridx(cmd, 'g') >= 0
-                                let field.generateGetter = v:true
-                                end
-                                call add(command['fields'], field)
-                            endif
-                        endfor
+                        end
+                        if stridx(cmd, 'g') >= 0
+                            let field.generateGetter = v:true
+                        end
+                        call add(command['fields'], field)
                     endif
                 endfor
-                unlet a:params.symbols
-                unlet a:params.accessor
-
             endif
+        endfor
+        unlet a:params.symbols
+        unlet a:params.accessor
 
-            execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), vim.api.nvim_eval("'. string(a:params). '"))')
-        endfunction
+    endif
+
+    execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), vim.api.nvim_eval("'. string(a:params). '"))')
+endfunction
 
