@@ -33,6 +33,9 @@ function M.on_attach(_, bufnr)
 
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jc', '<cmd>lua require("jc.jdtls").generate_constructor(nil, nil, {default = false})<CR>', opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jcc', '<cmd>lua require("jc.jdtls").generate_constructor(nil, nil, {default = true})<CR>', opts)
+
+    vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>jam', '<cmd>lua require("jc.jdtls").generate_abstractMethods()<CR>', opts)
+    vim.api.nvim_buf_set_keymap(bufnr, 'i', '<C-j>am', '<cmd>lua require("jc.jdtls").generate_abstractMethods()<CR>', opts)
 end
 
 function M.executeCommand(command, callback, on_failure)

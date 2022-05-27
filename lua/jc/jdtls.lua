@@ -79,6 +79,53 @@ function M.generate_accessors(fields)
     end
 end
 
+function M.generate_abstractMethods()
+    local diagnostics = {}
+    for _, diagnostic in ipairs(vim.diagnostic.get()) do
+        if diagnostic.code == "67109264" then
+            diagnostic.range = {
+                start = {
+                    character = diagnostic.col,
+                    line = diagnostic.lnum
+                },
+                ['end'] = {
+                    character = diagnostic.end_col,
+                    line = diagnostic.end_lnum
+                }
+            }
+            table.insert(diagnostics, diagnostic)
+        end
+    end
+    if diagnostics then
+        local params = vim.lsp.util.make_range_params()
+        params.context = {
+            diagnostics = diagnostics,
+        }
+        vim.lsp.buf_request(0, 'textDocument/codeAction', params, function (e, actions)
+            if actions then
+                local add_method_action = nil
+                for _, action in ipairs(actions) do
+                    if action.title == "Add unimplemented methods" then
+                        add_method_action = action
+                        break
+                    end
+                end
+                if add_method_action then
+                    vim.lsp.buf_request(0, 'codeAction/resolve', add_method_action, function (resolve_error, r)
+                        if r then
+                            vim.lsp.util.apply_workspace_edit(r.edit, 'utf-16')
+                        elseif resolve_error then
+                            vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+                        end
+                    end)
+                end
+            elseif e then
+                vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+            end
+        end)
+    end
+end
+
 function M.generate_constructor(fields, params, opts)
     if fields == nil then
         vim.lsp.buf_request(0, 'java/checkConstructorsStatus', vim.lsp.util.make_range_params(), function (e, r)
