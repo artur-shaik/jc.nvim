@@ -4,13 +4,13 @@ local server = require("jc.server")
 M = {}
 
 local config = {
-    java_exec = 'java',
-    on_attach = lsp.on_attach
+  java_exec = "java",
+  on_attach = lsp.on_attach,
 }
 
 M.setup = function(args)
-    config = vim.tbl_deep_extend("keep", args, config)
-    server.jdtls_setup(config)
+  config = vim.tbl_deep_extend("keep", args, config)
+  server.jdtls_setup(config)
 end
 
 return M
