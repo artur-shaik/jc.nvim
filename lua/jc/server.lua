@@ -86,6 +86,7 @@ local function resolve_jdtls()
         return {
             jar = vim.fn.expand(jdtls_path .. '/plugins/org.eclipse.equinox.launcher_*.jar'),
             config = vim.fn.expand(jdtls_path .. '/config_linux'),
+            lombok = vim.fn.expand(jdtls_path .. '/lombok.jar'),
         }
     else
         vim.defer_fn(download_jdtls, 1)
@@ -129,8 +130,11 @@ local function lspconfig_setup(paths)
         return
     end
 
+    print(vim.inspect(paths))
     local cmd = {
         M.config.java_exec,
+        '-Xbootclasspath/a:' .. paths.jdtls.lombok,
+        '-javaagent:' .. paths.jdtls.lombok,
         '-Declipse.application=org.eclipse.jdt.ls.core.id1',
         '-Dosgi.bundles.defaultStartLevel=4',
         '-Declipse.product=org.eclipse.jdt.ls.core.product',
