@@ -143,7 +143,6 @@ local function lspconfig_setup(paths)
 
   local cmd = {
     M.config.java_exec,
-    "-Xbootclasspath/a:" .. paths.jdtls.lombok,
     "-javaagent:" .. paths.jdtls.lombok,
     "-Declipse.application=org.eclipse.jdt.ls.core.id1",
     "-Dosgi.bundles.defaultStartLevel=4",
