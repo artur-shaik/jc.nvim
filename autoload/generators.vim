@@ -1,3 +1,12 @@
+let g:JavaComplete_Templates = {}
+let g:JavaComplete_Generators = {}
+
+function! generators#GenerateClass(options, ...)
+  let template = a:0 > 0 && !empty(a:1) ? '_'. a:1 : ''
+  let classCommand = {'template': 'class'. template, 'options': a:options, 'position_type' : 1}
+  call <SID>generateByTemplate(classCommand)
+endfunction
+
 function! generators#GenerateHashCodeAndEquals(fields)
     let commands = [
                 \ {'key': '1', 'desc': 'generate `hashCode and equals`', 'call': '<SID>generate', 'command': 'lua require("jc.jdtls").generate_hashCodeAndEquals'},
@@ -214,3 +223,154 @@ function! <SID>generateAccessors(command, params)
     execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), vim.api.nvim_eval("'. string(a:params). '"))')
 endfunction
 
+function! s:FieldsListBuffer(commands)
+  let s:savedCursorPosition = getpos('.')
+  let contentLine = s:CreateBuffer("__FieldsListBuffer__", "remove unnecessary fields", a:commands)
+
+  let b:currentFileVars = s:CollectVars()
+
+  let lines = ""
+  let idx = 0
+  while idx < len(b:currentFileVars)
+    let var = b:currentFileVars[idx]
+    let lines = lines. "\n". "f". idx. " --> ". var.type . " ". var.name
+    let idx += 1
+  endwhile
+  silent put = lines
+
+  call cursor(contentLine + 1, 0)
+endfunction
+
+function! generators#GenerateByTemplate(command)
+  call <SID>generateByTemplate(a:command)
+endfunction
+
+" a:1 - method declaration to replace
+function! <SID>generateByTemplate(command)
+  let command = a:command
+  if !has_key(command, 'fields')
+    let command['fields'] = []
+  endif
+
+  if bufname('%') == "__FieldsListBuffer__"
+
+    let currentBuf = getline(1,'$')
+    for line in currentBuf
+      if line =~ '^f[0-9]\+.*'
+        let cmd = line[0]
+        let idx = line[1:stridx(line, ' ')-1]
+        let var = b:currentFileVars[idx]
+        call add(command['fields'], var)
+      endif
+    endfor
+
+    execute "bwipeout!"
+  endif
+
+  let result = []
+  let templates = type(command.template) != type([]) ? [command.template] : command.template
+  let class = {}
+  if has_key(s:, 'ti')
+    let class['name'] = s:ti.name
+  endif
+  let class['fields'] = command['fields']
+  for template in templates
+    call s:CheckAndLoadTemplate(template)
+    if has_key(g:JavaComplete_Generators, template)
+      execute g:JavaComplete_Generators[template]['data']
+
+      let arguments = [class]
+      if has_key(command, 'options')
+        call add(arguments, command.options)
+      endif
+      let TemplateFunction = function('s:__'. template)
+      for line in split(call(TemplateFunction, arguments), '\n')
+        call add(result, line)
+      endfor
+      call add(result, '')
+    endif
+  endfor
+
+  if len(result) > 0
+    if has_key(command, 'replace')
+      let toReplace = []
+      if command.replace.type == 'same'
+        let defs = s:GetNewMethodsDefinitions(result)
+        for def in defs
+          call add(toReplace, def.d)
+        endfor
+      elseif command.replace.type == 'similar'
+        let defs = s:GetNewMethodsDefinitions(result)
+        for def in defs
+          let m = s:FindMethod(s:ti.methods, def)
+          if !empty(m)
+            call add(toReplace, m.d)
+          endif
+        endfor
+      endif
+
+      let idx = 0
+      while idx < len(s:ti.defs)
+        let def = s:ti.defs[idx]
+        if get(def, 'tag', '') == 'METHODDEF' 
+          \ && index(toReplace, get(def, 'd', '')) > -1
+          \ && has_key(def, 'body') && has_key(def.body, 'endpos')
+
+          let startline = java_parser#DecodePos(def.pos).line
+          if !empty(getline(startline))
+            let startline += 1
+          endif
+          let endline = java_parser#DecodePos(def.body.endpos).line + 1
+          silent! execute startline.','.endline. 'delete _'
+
+          call setpos('.', s:savedCursorPosition)
+          let s:ti = javacomplete#collector#DoGetClassInfo('this')
+          let idx = 0
+        else
+          let idx += 1
+        endif
+      endwhile
+    endif
+    if has_key(command, 'position_type')
+      call s:InsertResults(result, command['position_type'])
+    else
+      call s:InsertResults(result)
+    endif
+    if has_key(s:, 'savedCursorPosition')
+      call setpos('.', s:savedCursorPosition)
+    endif
+  endif
+endfunction
+
+function! s:CheckAndLoadTemplate(template)
+  let filenames = []
+  if exists('g:JavaComplete_CustomTemplateDirectory')
+    if isdirectory(g:JavaComplete_CustomTemplateDirectory)
+      call add(filenames, expand(g:JavaComplete_CustomTemplateDirectory). '/gen__'. a:template. '.tpl')
+    endif
+  endif
+  call add(filenames, g:JavaComplete_Home. '/plugin/res/gen__'. a:template. '.tpl')
+  for filename in filenames
+    if filereadable(filename)
+      if has_key(g:JavaComplete_Generators, a:template)
+        if getftime(filename) > g:JavaComplete_Generators[a:template]['file_time']
+          let g:JavaComplete_Generators[a:template]['data'] = join(readfile(filename), "\n")
+          let g:JavaComplete_Generators[a:template]['file_time'] = getftime(filename)
+        endif
+      else
+        let g:JavaComplete_Generators[a:template] = {}
+        let g:JavaComplete_Generators[a:template]['data'] = join(readfile(filename), "\n")
+        let g:JavaComplete_Generators[a:template]['file_time'] = getftime(filename)
+      endif
+      break
+    endif
+  endfor
+endfunction
+
+function! s:InsertResults(result, ...)
+  if len(a:result) > 0
+    call append(0, a:result)
+    silent execute "normal! dd"
+    silent execute "normal! =G"
+  endif
+endfunction
