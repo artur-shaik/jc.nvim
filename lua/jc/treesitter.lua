@@ -6,11 +6,11 @@ local function get_text(node)
   local result = nil
   if #lines > 0 then
     if line == line_end then
-      result = string.sub(lines[1], row, row_end)
+      result = vim.trim(string.sub(lines[1], row, row_end))
     else
       for i, _ in ipairs(lines) do
         if i == 1 then
-          lines[i] = vim.fn.trim(string.sub(lines[i], row + 1, #lines[i]))
+          lines[i] = vim.trim(string.sub(lines[i], row + 1, #lines[i]))
         elseif i == #lines then
           lines[i] = vim.trim(string.sub(lines[i], 1, row_end))
         else

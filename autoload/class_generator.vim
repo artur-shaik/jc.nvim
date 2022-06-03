@@ -73,12 +73,15 @@ function! s:FetchAvailablePackages(command, completed, isRelative)
   let result = []
   let currentPath = split(expand('%:p:h'), g:FILE_SEP)
   if a:isRelative == 0
-    echom s:GetPackage()
     let currentPackage = split(s:GetPackage(), '\.')
-    echo currentPackage
+    echom currentPath
+    echom currentPackage
+    echom currentPackage[0]
     let sameSubpackageIdx = index(currentPath, currentPackage[0])
+    echom sameSubpackageIdx
     if sameSubpackageIdx >= 0
       let currentPath = currentPath[:sameSubpackageIdx - 1]
+      echom currentPath
       if empty(a:command)
         for p in currentPackage
           call add(result, a:completed. '/'. p)

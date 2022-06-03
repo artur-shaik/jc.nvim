@@ -223,24 +223,6 @@ function! <SID>generateAccessors(command, params)
     execute(command.command . '(vim.api.nvim_eval("'. string(command['fields']). '"), vim.api.nvim_eval("'. string(a:params). '"))')
 endfunction
 
-function! s:FieldsListBuffer(commands)
-  let s:savedCursorPosition = getpos('.')
-  let contentLine = s:CreateBuffer("__FieldsListBuffer__", "remove unnecessary fields", a:commands)
-
-  let b:currentFileVars = s:CollectVars()
-
-  let lines = ""
-  let idx = 0
-  while idx < len(b:currentFileVars)
-    let var = b:currentFileVars[idx]
-    let lines = lines. "\n". "f". idx. " --> ". var.type . " ". var.name
-    let idx += 1
-  endwhile
-  silent put = lines
-
-  call cursor(contentLine + 1, 0)
-endfunction
-
 function! generators#GenerateByTemplate(command)
   call <SID>generateByTemplate(a:command)
 endfunction

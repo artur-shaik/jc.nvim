@@ -3,7 +3,7 @@ let g:loaded_jc_nvim = v:true
 
 let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:FILE_SEP. '?')
 
-echom g:JavaComplete_Home
+autocmd FileType java autocmd BufWrite * lua vim.lsp.buf.format({ async = false })
 
 command! JCdebugAttach lua require('jc.vimspector').debug_attach()
 command! JCdebugLaunch lua require('jc.vimspector').debug_launch()
