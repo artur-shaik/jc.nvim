@@ -1,6 +1,6 @@
 # jc.nvim
 
-jc.nvim – successor of [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2) which use built-in LSP client in neovim and [Eclipse JDT Language Server](https://github.com/eclipse/eclipse.jdt.ls).
+jc.nvim – successor of [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2) which use neovim's built-in LSP client and [Eclipse JDT Language Server](https://github.com/eclipse/eclipse.jdt.ls).
 
 Main goal of this project is to migrate functionallty of jc2.
 
@@ -36,20 +36,20 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 
 ## Commands
 
-`JCdebugAttach` – start debug session with vimspector attaching to debug port;
-`JCdebugLaunch` – start debug session with vimspector executing main class;
-`JCdebugWithConfig` – start debug session using predefined vimspector's configuration;
-`JCimportsOrganize` – automatically organize imports;
-`JCgenerateToString` – choose fields and method to generate `toString`;
-`JCgenerateHashCodeAndEquals` – choose fields to generate `hashCode` and `equals`;
-`JCgenerateAccessors` – choose fields for accessors generation;
-`JCgenerateAccessorGetter` – generate getter for a field;
-`JCgenerateAccessorSetter` – generate setter for a field;
-`JCgenerateAccessorSetterGetter` – generate getter and setter for a field;
-`JCgenerateConstructorDefault` – generate constructor with no arguments;
-`JCgenerateConstructor` – choose fields for constructor;
-`JCgenerateAbstractMethods` – generate abstract methods;
-`JCgenerateClass` – generate new class.
+- `JCdebugAttach` – start debug session with vimspector attaching to debug port;
+- `JCdebugLaunch` – start debug session with vimspector executing main class;
+- `JCdebugWithConfig` – start debug session using predefined vimspector's configuration;
+- `JCimportsOrganize` – automatically organize imports;
+- `JCgenerateToString` – choose fields and method to generate `toString`;
+- `JCgenerateHashCodeAndEquals` – choose fields to generate `hashCode` and `equals`;
+- `JCgenerateAccessors` – choose fields for accessors generation;
+- `JCgenerateAccessorGetter` – generate getter for a field;
+- `JCgenerateAccessorSetter` – generate setter for a field;
+- `JCgenerateAccessorSetterGetter` – generate getter and setter for a field;
+- `JCgenerateConstructorDefault` – generate constructor with no arguments;
+- `JCgenerateConstructor` – choose fields for constructor;
+- `JCgenerateAbstractMethods` – generate abstract methods;
+- `JCgenerateClass` – start class generation user input prompt.
 
 ## Default mappings
 
