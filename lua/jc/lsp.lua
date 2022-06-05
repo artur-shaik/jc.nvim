@@ -24,8 +24,8 @@ function M.on_attach(_, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>F", "<cmd>lua vim.lsp.buf.format { async = true }<CR>", opts)
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jI", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>I", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
   vim.api.nvim_buf_set_keymap(
     bufnr,
