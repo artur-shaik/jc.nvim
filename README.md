@@ -15,7 +15,7 @@ In addition to autocompletion it can:
 
 ## Installation
 
-Minimal setup:
+Minimal setup using `vim-plug`:
 
 ```
 call plug#begin('~/.vim/plugged')
@@ -31,6 +31,8 @@ call plug#end()
 
 lua require('jc').setup{}
 ```
+
+Execute `:PlugInstall` and restart neovim.
 
 For triggering autocompletion automatically consider [configure nvim-cmp](https://github.com/hrsh7th/nvim-cmp/#recommended-configuration).
 
