@@ -153,16 +153,11 @@ local function lspconfig_setup(paths)
     "-Dlog.level=ALL",
     "-Xms1g",
     "--add-modules=ALL-SYSTEM",
-    "--add-opens",
-    "java.base/java.util=ALL-UNNAMED",
-    "--add-opens",
-    "java.base/java.lang=ALL-UNNAMED",
-    "-jar",
-    paths.jdtls.jar,
-    "-configuration",
-    paths.jdtls.config,
-    "-data",
-    paths.workspace_dir,
+    "--add-opens", "java.base/java.util=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+    "-jar", paths.jdtls.jar,
+    "-configuration", paths.jdtls.config,
+    "-data", paths.workspace_dir,
   }
 
   local bundles = {
