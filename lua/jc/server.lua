@@ -143,6 +143,7 @@ local function lspconfig_setup(paths)
     return
   end
 
+  -- stylua: ignore
   local cmd = {
     M.config.java_exec,
     "-javaagent:" .. paths.jdtls.lombok,
