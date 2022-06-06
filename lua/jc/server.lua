@@ -65,8 +65,10 @@ local function install_java_debug_plugin(command)
 end
 
 local function download_jdtls()
+  local ok, installer = pcall(require, "nvim-lsp-installer")
+  assert(ok, "nvim-lsp-installer is not installed")
+
   local servers = require("nvim-lsp-installer.servers")
-  local installer = require("nvim-lsp-installer")
 
   vim.notify("Installing JDTLS language server...", vim.log.levels.INFO)
   installer.install("jdtls")
