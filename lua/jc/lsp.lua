@@ -67,14 +67,14 @@ function M.on_attach(_, bufnr)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jam",
+    "<leader>jm",
     "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "i",
-    "<C-j>am",
+    "<C-j>m",
     "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>",
     opts
   )
