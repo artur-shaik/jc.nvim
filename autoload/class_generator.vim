@@ -270,6 +270,8 @@ function! s:CreateClass(data)
     silent execute "normal! gg=G"
     call search(a:data['class'])
     silent execute "normal! j"
+    silent execute "w"
+    silent execute "e"
     " call javacomplete#imports#AddMissing()
     if !isInterfaceTemplate
       " call javacomplete#generators#AbstractDeclaration()
