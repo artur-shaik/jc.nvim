@@ -119,7 +119,7 @@ function M.apply_edit(err, response)
   elseif err then
     vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
-  vim.defer_fn(function ()
+  vim.defer_fn(function()
     chains:execute_next_if_exists()
   end, 600)
 end
