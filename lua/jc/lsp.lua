@@ -71,13 +71,7 @@ function M.on_attach(_, bufnr)
     "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>",
     opts
   )
-  vim.api.nvim_buf_set_keymap(
-    bufnr,
-    "i",
-    "<C-j>m",
-    "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>",
-    opts
-  )
+  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>m", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
 end
 
 function M.executeCommand(command, callback, on_failure)
@@ -110,6 +104,18 @@ function M.executeCommand(command, callback, on_failure)
         callback(response)
       end
     end)
+  end
+end
+
+function M.apply_edit(err, response)
+  if response then
+    local edit = response
+    if response.edit then
+      edit = response.edit
+    end
+    vim.lsp.util.apply_workspace_edit(edit, "utf-16")
+  elseif err then
+    vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
 end
 
