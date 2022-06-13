@@ -33,11 +33,11 @@ local function document_symbols(callback)
     0,
     "textDocument/documentSymbol",
     { textDocument = vim.lsp.util.make_text_document_params() },
-    function(e, r)
-      if r then
-        callback(r)
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+    function(err, resp)
+      if resp then
+        callback(resp)
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end
   )
@@ -62,11 +62,11 @@ end
 
 function M.generate_accessors(fields)
   if not fields then
-    vim.lsp.buf_request(0, "java/resolveUnimplementedAccessors", vim.lsp.util.make_range_params(), function(e, r)
-      if r then
-        vim.fn["generators#GenerateAccessors"](r)
+    vim.lsp.buf_request(0, "java/resolveUnimplementedAccessors", vim.lsp.util.make_range_params(), function(err, resp)
+      if resp then
+        vim.fn["generators#GenerateAccessors"](resp)
       else
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   else
@@ -77,11 +77,11 @@ function M.generate_accessors(fields)
     vim.lsp.buf_request(0, "java/generateAccessors", {
       context = vim.lsp.util.make_range_params(),
       accessors = fields,
-    }, function(e, r)
-      if r then
-        vim.lsp.util.apply_workspace_edit(r, "utf-16")
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+    }, function(err, resp)
+      if resp then
+        vim.lsp.util.apply_workspace_edit(resp, "utf-16")
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   end
@@ -109,7 +109,7 @@ function M.generate_abstractMethods()
     params.context = {
       diagnostics = diagnostics,
     }
-    vim.lsp.buf_request(0, "textDocument/codeAction", params, function(e, actions)
+    vim.lsp.buf_request(0, "textDocument/codeAction", params, function(err, actions)
       if actions then
         local add_method_action = nil
         for _, action in ipairs(actions) do
@@ -119,16 +119,16 @@ function M.generate_abstractMethods()
           end
         end
         if add_method_action then
-          vim.lsp.buf_request(0, "codeAction/resolve", add_method_action, function(resolve_error, r)
-            if r then
-              vim.lsp.util.apply_workspace_edit(r.edit, "utf-16")
+          vim.lsp.buf_request(0, "codeAction/resolve", add_method_action, function(resolve_error, resp)
+            if resp then
+              vim.lsp.util.apply_workspace_edit(resp.edit, "utf-16")
             elseif resolve_error then
-              vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+              vim.notify(vim.inspect(err), vim.log.levels.ERROR)
             end
           end)
         end
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   end
@@ -136,11 +136,11 @@ end
 
 function M.generate_constructor(fields, params, opts)
   if fields == nil then
-    vim.lsp.buf_request(0, "java/checkConstructorsStatus", vim.lsp.util.make_range_params(), function(e, r)
-      if r then
-        vim.fn["generators#GenerateConstructor"](r.fields, r.constructors, opts)
+    vim.lsp.buf_request(0, "java/checkConstructorsStatus", vim.lsp.util.make_range_params(), function(err, resp)
+      if resp then
+        vim.fn["generators#GenerateConstructor"](resp.fields, resp.constructors, opts)
       else
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   else
@@ -160,11 +160,11 @@ function M.generate_constructor(fields, params, opts)
       context = context,
       fields = fields,
       constructors = params.constructors,
-    }, function(e, r)
-      if r then
-        vim.lsp.util.apply_workspace_edit(r, "utf-16")
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+    }, function(err, resp)
+      if resp then
+        vim.lsp.util.apply_workspace_edit(resp, "utf-16")
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   end
@@ -172,11 +172,11 @@ end
 
 function M.generate_hashCodeAndEquals(fields)
   if not fields then
-    vim.lsp.buf_request(0, "java/checkHashCodeEqualsStatus", vim.lsp.util.make_range_params(), function(e, r)
-      if r then
-        vim.fn["generators#GenerateHashCodeAndEquals"](r.fields)
+    vim.lsp.buf_request(0, "java/checkHashCodeEqualsStatus", vim.lsp.util.make_range_params(), function(err, resp)
+      if resp then
+        vim.fn["generators#GenerateHashCodeAndEquals"](resp.fields)
       else
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   else
@@ -188,11 +188,11 @@ function M.generate_hashCodeAndEquals(fields)
       context = vim.lsp.util.make_range_params(),
       fields = fields,
       regenerate = true,
-    }, function(e, r)
-      if r then
-        vim.lsp.util.apply_workspace_edit(r, "utf-16")
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+    }, function(err, resp)
+      if resp then
+        vim.lsp.util.apply_workspace_edit(resp, "utf-16")
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   end
@@ -200,11 +200,11 @@ end
 
 function M.generate_toString(fields, params)
   if not fields then
-    vim.lsp.buf_request(0, "java/checkToStringStatus", vim.lsp.util.make_range_params(), function(e, r)
-      if r then
-        vim.fn["generators#GenerateToString"](r.fields)
+    vim.lsp.buf_request(0, "java/checkToStringStatus", vim.lsp.util.make_range_params(), function(err, resp)
+      if resp then
+        vim.fn["generators#GenerateToString"](resp.fields)
       else
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   else
@@ -216,22 +216,22 @@ function M.generate_toString(fields, params)
     vim.lsp.buf_request(0, "java/generateToString", {
       context = vim.lsp.util.make_range_params(),
       fields = fields,
-    }, function(e, r)
-      if r then
-        vim.lsp.util.apply_workspace_edit(r, "utf-16")
-      elseif e then
-        vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+    }, function(err, resp)
+      if resp then
+        vim.lsp.util.apply_workspace_edit(resp, "utf-16")
+      elseif err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
     end)
   end
 end
 
 function M.organize_imports()
-  vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), function(e, r)
-    if r then
-      vim.lsp.util.apply_workspace_edit(r, "utf-16")
-    elseif e then
-      vim.notify(vim.inspect(e), vim.log.levels.ERROR)
+  vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), function(err, resp)
+    if resp then
+      vim.lsp.util.apply_workspace_edit(resp, "utf-16")
+    elseif err then
+      vim.notify(vim.inspect(err), vim.log.levels.ERROR)
     end
   end)
 end
