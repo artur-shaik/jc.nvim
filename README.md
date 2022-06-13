@@ -80,7 +80,7 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 
 Prompt scheme, for class creation:
 
-    template:[subdirectory]:/package.ClassName extends SuperClass implements Interface(String str, public Integer i):contructor(*):toString(1)
+    template:[subdirectory]:/package.ClassName extends SuperClass implements Interface(String str, public Integer i):contructor:toString:equals
 
 A: (optional) template - which will be used to create class boilerplate. Some existed templates: junit, interface, exception, servlet, etc;
 
@@ -92,9 +92,7 @@ D: (optional) extends and implements classes will be automatically imported;
 
 E: (optional) private str variable, and public i variable will be added to class;
 
-F: (optional) contructor using all fields and toString override method with only `str` field will be created. Also hashCode and equals can be used.
-
-There is autocompletion in command prompt that will try to help you. Your current opened file shouldn't have dirty changes or `hidden` should be set.
+F: (optional) contructor using all fields and toString will be created. Also hashCode and equals can be used.
 
 ## Troubleshooting
 
