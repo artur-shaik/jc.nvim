@@ -1,3 +1,5 @@
+local chains = require("jc.chains")()
+
 local M = {}
 local opts = { noremap = true, silent = true }
 
@@ -117,6 +119,9 @@ function M.apply_edit(err, response)
   elseif err then
     vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
+  vim.defer_fn(function ()
+    chains:execute_next_if_exists()
+  end, 600)
 end
 
 return M

@@ -7,7 +7,7 @@ function! s:__class(class, options)
     if has_key(a:options, 'implements')
         let result .= " implements ". a:options['implements']
     endif
-    let result .= " {\n"
+    let result .= " {\n\n"
     for fieldKey in keys(get(a:options, 'fields', {}))
         let field = a:options['fields'][fieldKey]
         let result .= field['mod']. " ". field['type']. " ". field['name']. ";\n"

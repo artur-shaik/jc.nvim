@@ -64,7 +64,9 @@ end
 
 function M.generate_accessors(fields)
   if not fields then
-    vim.lsp.buf_request(0, "java/resolveUnimplementedAccessors", vim.lsp.util.make_range_params(), function(err, resp)
+    local params = vim.lsp.util.make_range_params()
+    params.kind = 2
+    vim.lsp.buf_request(0, "java/resolveUnimplementedAccessors", params, function(err, resp)
       if resp then
         vim.fn["generators#GenerateAccessors"](resp)
       else

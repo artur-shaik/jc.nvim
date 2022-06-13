@@ -1,3 +1,11 @@
+let g:RE_BRACKETS	= '\%(\s*\[\s*\]\)'
+let g:RE_IDENTIFIER	= '[a-zA-Z_$][a-zA-Z0-9_$]*'
+let g:RE_ANNOTATION	= '@[a-zA-Z_][a-zA-Z0-9_$]*'
+let g:RE_QUALID		= g:RE_IDENTIFIER. '\%(\s*\.\s*' .g:RE_IDENTIFIER. '\)*'
+let g:RE_REFERENCE_TYPE	= g:RE_QUALID . g:RE_BRACKETS . '*'
+let g:RE_TYPE		= g:RE_REFERENCE_TYPE
+let g:RE_TYPE_MODS	= '\%(public\|protected\|private\|abstract\|static\|final\|strictfp\)'
+
 function! s:GetPackage()
   return v:lua.require('jc.treesitter').get_package()
 endfunction
@@ -133,7 +141,7 @@ function! s:FetchAvailableSubDirectories(command, completed)
 endfunction
 
 function! s:ClassMethods(command, completed)
-  let keywords = ['constructor(', 'toString(', 'hashCode(', 'equals(']
+  let keywords = ['constructor', 'toString', 'hashCode', 'equals']
   let result = []
   for kw in keywords
     if kw !~ '\<'. a:command. '*'
@@ -272,48 +280,24 @@ function! s:CreateClass(data)
     silent execute "normal! j"
     silent execute "w"
     silent execute "e"
-    " call javacomplete#imports#AddMissing()
-    if !isInterfaceTemplate
-      " call javacomplete#generators#AbstractDeclaration()
+    lua require('jc.chains')():add("require('jc.jdtls').organize_imports()")
+    let methods = get(a:data, 'methods', {})
+    if has_key(methods, 'constructor')
+      lua require('jc.chains')():add("require('jc.jdtls').generate_constructor(nil, nil, {default = false})")
     endif
-    if has_key(a:data, 'methods')
-      let methods = a:data['methods']
-      let vars = s:GetVariables(get(a:data, 'fields', {}))
-      if has_key(methods, 'constructor')
-        " let command = {'template': 'constructor', 'replace': {'type': 'same'}, 'fields' : []}
-        " call s:InsertVars(command, methods['constructor'], vars)
-        " call generators#GenerateByTemplate(command)
-      endif
-      if has_key(methods, 'toString')
-        " let command = {'template': 'toString_StringBuilder', 'replace': {'type': 'similar'}, 'fields' : []}
-        " if empty(methods['toString'])
-        "   call add(methods['toString'], '*')
-        " endif
-        " call s:InsertVars(command, methods['toString'], vars)
-        " call generators#GenerateByTemplate(command)
-      endif
-      if has_key(methods, 'equals')
-        " let command = {'template': 'equals', 'replace': {'type': 'similar'}, 'fields' : []}
-        " if empty(methods['equals'])
-        "   call add(methods['equals'], '*')
-        " endif
-        " call s:InsertVars(command, methods['equals'], vars)
-        " call generators#GenerateByTemplate(command)
-      endif
-      if has_key(methods, 'hashCode')
-        " let command = {'template': 'hashCode', 'replace': {'type': 'similar'}, 'fields' : []}
-        " if empty(methods['hashCode'])
-        "   call add(methods['hashCode'], '*')
-        " endif
-        " call s:InsertVars(command, methods['hashCode'], vars)
-        " call generators#GenerateByTemplate(command)
-      endif
-    endif
+    lua require('jc.chains')():add("require('jc.jdtls').generate_abstractMethods()")
     if !isInterfaceTemplate
       if has_key(a:data, 'fields')
-        " call generators#Accessors()
+        lua require('jc.chains')():add("require('jc.jdtls').generate_accessors()")
       endif
     endif
+    if or(has_key(methods, 'equals'), has_key(methods, 'hashCode'))
+      lua require('jc.chains')():add("require('jc.jdtls').generate_hashCodeAndEquals()")
+    endif
+    if has_key(methods, 'toString')
+      lua require('jc.chains')():add("require('jc.jdtls').generate_toString()")
+    endif
+    lua require('jc.chains')():execute_next_if_exists()
   endif
 endfunction
 
@@ -404,7 +388,7 @@ function! s:ParseMethods(methods)
 endfunction
 
 function! s:ParseFields(fields)
-  let fields = javacomplete#util#Trim(a:fields[1:-2])
+  let fields = utils#trim(a:fields[1:-2])
   if !empty(fields)
     let fieldsList = split(fields, ',')
     let fieldsMap = {}
@@ -414,7 +398,7 @@ function! s:ParseFields(fields)
       if !empty(fieldMatch)
         let fieldMap = {}
         let fieldMap['mod'] = empty(fieldMatch[1]) ? 
-              \ 'private' : javacomplete#util#Trim(fieldMatch[1])
+              \ 'private' : utils#trim(fieldMatch[1])
         let fieldMap['type'] = fieldMatch[2]
         let fieldMap['name'] = fieldMatch[3]
         let fieldsMap[string(idx)] = fieldMap
