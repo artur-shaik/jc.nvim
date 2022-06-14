@@ -1,3 +1,4 @@
+local lsp = require("jc.lsp")
 local apply_edit = require("jc.lsp").apply_edit
 
 local M = {}
@@ -204,6 +205,30 @@ end
 
 function M.organize_imports()
   vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), apply_edit)
+end
+
+function M.read_class_content(params, handler)
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("LSP client not found", vim.log.levels.ERROR)
+    handler(nil, params.result, params.ctx, params.config)
+    return
+  end
+
+  local uri = params.result[1].uri
+  local bufnr = vim.uri_to_bufnr(uri)
+  client.request("java/classFileContents", { uri = uri }, function(err, resp)
+    if resp then
+      vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(resp, "\n"))
+      vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
+      vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+
+      handler(nil, params.result, params.ctx, params.config)
+    elseif err then
+      vim.notify(err, vim.log.levels.ERROR)
+    end
+  end, bufnr)
 end
 
 return M

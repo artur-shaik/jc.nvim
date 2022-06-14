@@ -176,6 +176,9 @@ local function lspconfig_setup(paths)
     },
     init_options = {
       bundles = bundles,
+      extendedClientCapabilities = {
+        classFileContentsSupport = true,
+      },
     },
   })
 end

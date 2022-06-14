@@ -109,6 +109,16 @@ function M.executeCommand(command, callback, on_failure)
   end
 end
 
+function M.get_jdtls_client()
+  local clients = vim.lsp.buf_get_clients()
+  for _, client in ipairs(clients) do
+    if client.name == "jdtls" then
+      return client
+    end
+  end
+  return nil
+end
+
 function M.apply_edit(err, response)
   if response then
     local edit = response
