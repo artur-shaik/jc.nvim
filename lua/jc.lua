@@ -15,12 +15,16 @@ M.setup = function(args)
 end
 
 local definitions_handler = vim.lsp.handlers["textDocument/definition"]
-vim.lsp.handlers["textDocument/definition"] = function(_, result, ctx, config)
+
+local function custom_def_handler(_, result, ctx, conf)
   if vim.startswith(result[1].uri, "jdt:/") then
-    jdtls.read_class_content({ result = result, ctx = ctx, config = config }, definitions_handler)
+    jdtls.read_class_content({ result = result, ctx = ctx, config = conf }, definitions_handler)
   else
-    definitions_handler(nil, result, ctx, config)
+    definitions_handler(nil, result, ctx, conf)
   end
 end
+vim.lsp.handlers["textDocument/definition"] = custom_def_handler
+vim.lsp.handlers["textDocument/declaration"] = custom_def_handler
+vim.lsp.handlers["textDocument/implementation"] = custom_def_handler
 
 return M
