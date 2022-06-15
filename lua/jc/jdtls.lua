@@ -216,20 +216,22 @@ function M.read_class_content(params, handler)
   end
 
   local uri = params.result[1].uri
-  local bufnr = vim.uri_to_bufnr(uri)
   client.request("java/classFileContents", { uri = uri }, function(err, resp)
     if resp then
+      local bufnr = vim.uri_to_bufnr(uri)
       vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
       vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(resp, "\n"))
       vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
       vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
       vim.api.nvim_buf_set_option(bufnr, "modified", false)
 
-      handler(nil, params.result, params.ctx, params.config)
+      vim.defer_fn(function()
+        handler(nil, params.result, params.ctx, params.config)
+      end, 200)
     elseif err then
       vim.notify(err, vim.log.levels.ERROR)
     end
-  end, bufnr)
+  end)
 end
 
 return M
