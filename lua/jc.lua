@@ -3,13 +3,20 @@ local server = require("jc.server")
 local jdtls = require("jc.jdtls")
 
 M = {}
+local user_on_attach = function(_, _) end
 
 local config = {
   java_exec = "java",
-  on_attach = lsp.on_attach,
+  jc_on_attach = function(client, bufnr)
+    lsp.on_attach(client, bufnr)
+    user_on_attach(client, bufnr)
+  end
 }
 
 M.setup = function(args)
+  if args.on_attach then
+    user_on_attach = args.on_attach
+  end
   config = vim.tbl_deep_extend("keep", args, config)
   server.jdtls_setup(config)
 end

@@ -169,7 +169,7 @@ local function lspconfig_setup(paths)
     root_dir = function()
       return vim.fn.getcwd()
     end,
-    on_attach = M.config.on_attach,
+    on_attach = M.config.jc_on_attach,
     cmd = cmd,
     settings = {
       java = {},

@@ -19,3 +19,7 @@ command! JCgenerateConstructorDefault lua require('jc.jdtls').generate_construct
 command! JCgenerateConstructor lua require('jc.jdtls').generate_constructor(nil, nil, {default = false})
 command! JCgenerateAbstractMethods lua require('jc.jdtls').generate_abstractMethods()
 command! JCgenerateClass lua require('jc.class_generator').generate_class()
+
+if !exists('g:jc_default_mappings')
+  let g:jc_default_mappings = v:true
+endif
