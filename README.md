@@ -93,9 +93,3 @@ D: (optional) extends and implements classes will be automatically imported;
 E: (optional) private str variable, and public i variable will be added to class;
 
 F: (optional) contructor using all fields and toString will be created. Also hashCode and equals can be used.
-
-## Troubleshooting
-
-### java-debug compilation may fail
-
-You need `JDK-11` in your `$JAVA_HOME` to compile java-debug. Consider using [sdkman](https://sdkman.io/) to switch your runtime java version or set it manually on first run.
