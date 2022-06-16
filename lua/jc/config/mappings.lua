@@ -51,6 +51,7 @@ function M.install_mappings(bufnr)
     opts
   )
   vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>m", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<Leader>jn", "<cmd>lua require('jc.class_generator').generate_class()<CR>", opts)
 end
 
 return M
