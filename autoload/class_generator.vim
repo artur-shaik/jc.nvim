@@ -79,7 +79,7 @@ endfunction
 
 function! s:FetchAvailablePackages(command, completed, isRelative)
   let result = []
-  let currentPath = split(expand('%:p:h'), g:FILE_SEP)
+  let currentPath = split(expand('%:p:h'), g:utils#FILE_SEP)
   if a:isRelative == 0
     let currentPackage = split(s:GetPackage(), '\.')
     echom currentPath
@@ -97,10 +97,10 @@ function! s:FetchAvailablePackages(command, completed, isRelative)
       endif
     endif
   endif
-  let command = substitute(a:command, '\.', g:FILE_SEP, 'g')
-  let cutLength = len(join(currentPath, g:FILE_SEP)) + 2
-  for path in glob(g:FILE_SEP. join(currentPath, g:FILE_SEP). g:FILE_SEP. '**'. g:FILE_SEP. command. '*'. g:FILE_SEP, 1, 1)
-    let p = substitute(path[cutLength:], g:FILE_SEP, '.', 'g')
+  let command = substitute(a:command, '\.', g:utils#FILE_SEP, 'g')
+  let cutLength = len(join(currentPath, g:utils#FILE_SEP)) + 2
+  for path in glob(g:utils#FILE_SEP. join(currentPath, g:utils#FILE_SEP). g:utils#FILE_SEP. '**'. g:utils#FILE_SEP. command. '*'. g:utils#FILE_SEP, 1, 1)
+    let p = substitute(path[cutLength:], g:utils#FILE_SEP, '.', 'g')
     if a:isRelative == 0
       let p = '/'. p
     endif
@@ -119,7 +119,7 @@ function! s:FetchKeywords(command, completed, isRelative)
   let completed = completed. join(tokens[:-2], ' ')
   let result = []
   for kw in keywords
-    if a:command =~ '\<'. kw. '\>' 
+    if a:command =~ '\<'. kw. '\>'
           \ || kw !~ '\<'. tokens[-1]. '*'
       continue
     endif
@@ -130,11 +130,11 @@ endfunction
 
 function! s:FetchAvailableSubDirectories(command, completed)
   let result = []
-  let currentPath = split(expand('%:p:h'), g:FILE_SEP)
+  let currentPath = split(expand('%:p:h'), g:utils#FILE_SEP)
   let currentPath = currentPath[:index(currentPath, 'src')]
-  let prePath = g:FILE_SEP. join(currentPath, g:FILE_SEP). g:FILE_SEP
+  let prePath = g:utils#FILE_SEP. join(currentPath, g:utils#FILE_SEP). g:utils#FILE_SEP
   let cutLength = len(prePath)
-  for path in glob(prePath. a:command. '*'. g:FILE_SEP, 0, 1)
+  for path in glob(prePath. a:command. '*'. g:utils#FILE_SEP, 0, 1)
     call add(result, a:completed. '['. path[cutLength:-2]. ']')
   endfor
   return result
@@ -166,7 +166,7 @@ function! class_generator#CreateInFile()
   let message .= "\nenter template name [default]: "
   let userinput = input(message, '', 'customlist,class_generator#TemplatesCompletion')
 
-  let currentPath = split(expand('%:p:h'), g:FILE_SEP)
+  let currentPath = split(expand('%:p:h'), g:utils#FILE_SEP)
   call filter(currentPath, 'empty(v:val) == 0')
   if has('win32') && currentPath[0][-1:] ==':'
     let currentPath = currentPath[1:]
@@ -174,7 +174,7 @@ function! class_generator#CreateInFile()
 
   let data = {}
   let data['path'] = ''
-  let data['current_path'] = g:FILE_SEP. join(currentPath, g:FILE_SEP)
+  let data['current_path'] = g:utils#FILE_SEP. join(currentPath, g:utils#FILE_SEP)
   let data['class'] = expand('%:t:r')
   let data['package'] = s:DeterminePackage(currentPath)
   if !empty(userinput)
@@ -222,7 +222,7 @@ function! class_generator#CreateClass()
   endif
 
   let currentPackage = split(s:GetPackage(), '\.')
-  let currentPath = split(expand('%:p:h'), g:FILE_SEP)
+  let currentPath = split(expand('%:p:h'), g:utils#FILE_SEP)
   call filter(currentPath, 'empty(v:val) == 0')
   if has('win32') && currentPath[0][-1:] ==':'
     let currentPath = currentPath[1:]
@@ -234,18 +234,18 @@ function! class_generator#CreateClass()
     echoerr "Error: could not parse input line"
     return
   endif
-  let data['current_path'] = g:FILE_SEP. join(currentPath, g:FILE_SEP). g:FILE_SEP
+  let data['current_path'] = g:utils#FILE_SEP. join(currentPath, g:utils#FILE_SEP). g:utils#FILE_SEP
   call s:CreateClass(data)
 endfunction
 
 function! s:CreateClass(data)
   let path = a:data['current_path']
-        \ . g:FILE_SEP
+        \ . g:utils#FILE_SEP
         \ . a:data['path']
   if filewritable(path) != 2
     call mkdir(path, 'p')
   endif
-  let fileName = fnamemodify(path. g:FILE_SEP. a:data['class'], ":p")
+  let fileName = fnamemodify(path. g:utils#FILE_SEP. a:data['class'], ":p")
   let bufname = bufname('')
   if getbufvar(bufname, "&mod") == 1 && getbufvar(bufname, "&hidden") == 0
     execute ':vs'
@@ -254,8 +254,8 @@ function! s:CreateClass(data)
   let fileSize = getfsize(fileName. '.java')
   if (fileSize <= 0 && fileSize > -2) || (line('$') == 1 && getline(1) == '')
     let options = {
-          \ 'name' : a:data['class'], 
-          \ 'package' : a:data['package'] 
+          \ 'name' : a:data['class'],
+          \ 'package' : a:data['package']
           \ }
     if has_key(a:data, 'fields')
       let options['fields'] = a:data['fields']
@@ -397,7 +397,7 @@ function! s:ParseFields(fields)
       let fieldMatch = matchlist(field, '^\s*\(\%('. g:RE_TYPE_MODS. '\s\+\)\+\)\=\('. g:RE_TYPE. '\)\s\+\('. g:RE_IDENTIFIER. '\).*$')
       if !empty(fieldMatch)
         let fieldMap = {}
-        let fieldMap['mod'] = empty(fieldMatch[1]) ? 
+        let fieldMap['mod'] = empty(fieldMatch[1]) ?
               \ 'private' : utils#trim(fieldMatch[1])
         let fieldMap['type'] = fieldMatch[2]
         let fieldMap['name'] = fieldMatch[3]
@@ -413,9 +413,9 @@ endfunction
 function! s:BuildPathData(path, subdir, currentPath, currentPackage)
   if !empty(a:subdir)
     let idx = index(a:currentPath, 'src')
-    let newPath = repeat('..'. g:FILE_SEP, idx)
-    let newPath .= a:subdir. g:FILE_SEP. 'java'. g:FILE_SEP
-    let newPath .= join(a:currentPackage, g:FILE_SEP). g:FILE_SEP
+    let newPath = repeat('..'. g:utils#FILE_SEP, idx)
+    let newPath .= a:subdir. g:utils#FILE_SEP. 'java'. g:utils#FILE_SEP
+    let newPath .= join(a:currentPackage, g:utils#FILE_SEP). g:utils#FILE_SEP
   else
     let newPath = ''
   endif
@@ -434,22 +434,22 @@ function! s:BuildPathData(path, subdir, currentPath, currentPackage)
     let currentPath = a:currentPath[:sameSubpackageIdx]
     let idx = index(currentPath, path[0])
     if idx < 0
-      let newPath .= repeat('..'. g:FILE_SEP, len(currentPath))
-      let newPath .= join(path[:-2], g:FILE_SEP)
+      let newPath .= repeat('..'. g:utils#FILE_SEP, len(currentPath))
+      let newPath .= join(path[:-2], g:utils#FILE_SEP)
       let newPackage = path[:-2]
     else
-      let newPath .= idx > 0 ? 
-            \ repeat('..'. g:FILE_SEP, 
-            \ len(currentPath[:idx-1])) 
-            \ : 
+      let newPath .= idx > 0 ?
+            \ repeat('..'. g:utils#FILE_SEP,
+            \ len(currentPath[:idx-1]))
+            \ :
             \ ''
-      let newPath .= join(path[1:-2], g:FILE_SEP)
+      let newPath .= join(path[1:-2], g:utils#FILE_SEP)
       let newPackage = path[1:-2]
       call extend(newPackage, reverse(currentPath)[:-idx-1], 0)
     endif
     return {
-          \ 'path' : newPath, 
-          \ 'class' : path[-1], 
+          \ 'path' : newPath,
+          \ 'class' : path[-1],
           \ 'package' : join(newPackage, '.')
           \ }
   else
@@ -460,8 +460,8 @@ endfunction
 function! s:RelativePath(path, newPath, currentPath, currentPackage)
   let newPackage = join(a:currentPackage + a:path[:-2], '.')
   return {
-        \ 'path' : a:newPath. join(a:path[:-2], g:FILE_SEP), 
-        \ 'class' : a:path[-1], 
+        \ 'path' : a:newPath. join(a:path[:-2], g:utils#FILE_SEP),
+        \ 'class' : a:path[-1],
         \ 'package' : newPackage
         \ }
 endfunction
