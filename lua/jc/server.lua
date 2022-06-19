@@ -158,6 +158,7 @@ local function lspconfig_setup(paths)
   -- stylua: ignore
   local cmd = {
     M.config.java_exec,
+    --'-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=4004',
     "-javaagent:" .. paths.jdtls.lombok,
     "-Declipse.application=org.eclipse.jdt.ls.core.id1",
     "-Dosgi.bundles.defaultStartLevel=4",

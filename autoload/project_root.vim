@@ -1,3 +1,18 @@
+let g:project_root#patterns = get(g:, 'project_root#patterns',  ['mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.xml'])
+
+function! s:find_root_pattern(p)
+  let root_files = findfile(a:p, escape(expand('%:p'), '*[]?{}, ').';', -1)->map('fnamemodify(v:val, ":p")')
+  let shortest = 999999
+  let root_file = ''
+  for f in root_files
+    if len(f) < shortest
+      let root_file = f
+      let shortest = len(f)
+    endif
+  endfor
+  return root_file
+endfunction
+
 function! project_root#get_basedir(extra)
     let dir = get(g:, 'jc_basedir', expand('~'. g:utils#FILE_SEP. '.local'. g:utils#FILE_SEP. 'share')). g:utils#FILE_SEP. 'jc.nvim'. g:utils#FILE_SEP. a:extra. g:utils#FILE_SEP
     call mkdir(dir, "p")
@@ -15,52 +30,35 @@ endfunction
 
 function! project_root#find()
     if !get(g:, 'JavaComplete_MavenRepositoryDisabled', 0)
-        if !exists('g:JavaComplete_PomPath')
-            if filereadable(getcwd() . g:utils#FILE_SEP . "pom.xml")
-                let g:JavaComplete_PomPath = getcwd() . g:utils#FILE_SEP . "pom.xml"
-            else
-                let g:JavaComplete_PomPath = project_root#find_file('pom.xml')
-            endif
-        endif
-        if g:JavaComplete_PomPath != ""
-            let g:JavaComplete_PomPath = fnamemodify(g:JavaComplete_PomPath, ':p')
-            return g:JavaComplete_PomPath
-        else
-            unlet g:JavaComplete_PomPath
+        let rootfile = s:find_root_pattern('pom.xml')
+        if rootfile != ""
+           let g:JavaComplete_PomPath = rootfile
+           return rootfile
         endif
     endif
 
     if !get(g:, 'JavaComplete_GradleRepositoryDisabled', 0)
-        if !exists('g:JavaComplete_GradlePath')
-            if filereadable(getcwd() . g:utils#FILE_SEP . "build.gradle")
-                let g:JavaComplete_GradlePath = getcwd() . g:utils#FILE_SEP . "build.gradle"
-            else
-                let g:JavaComplete_GradlePath = project_root#find_file('build.gradle')
-            endif
-        endif
-        if g:JavaComplete_GradlePath != ""
-            let g:JavaComplete_GradlePath = fnamemodify(g:JavaComplete_GradlePath, ':p')
-            return g:JavaComplete_GradlePath
-        else
-            unlet g:JavaComplete_GradlePath
+        let rootfile = s:find_root_pattern("build.gradle")
+        if rootfile != ""
+          let g:JavaComplete_GradlePath = rootfile
+          return rootfile
         endif
     endif
 
     if !get(g:, 'JavaComplete_AntRepositoryDisabled', 0)
-        if !exists('g:JavaComplete_AntPath')
-            if filereadable(getcwd() . g:utils#FILE_SEP . "build.xml")
-                let g:JavaComplete_AntPath = getcwd() . g:utils#FILE_SEP . "build.xml"
-            else
-                let g:JavaComplete_AntPath = project_root#find_file('build.xml')
-            endif
-        endif
-        if g:JavaComplete_AntPath != ""
-            let g:JavaComplete_AntPath = fnamemodify(g:JavaComplete_AntPath, ':p')
-            return g:JavaComplete_AntPath
-        else
-            unlet g:JavaComplete_AntPath
+        let rootfile = s:find_root_pattern('build.xml')
+        if rootfile != ""
+          let g:JavaComplete_AntPath = rootfile
+          return rootfile
         endif
     endif
+
+    for p in g:project_root#patterns
+      let rootfile = s:find_root_pattern(p)
+      if rootfile != ''
+        return rootfile
+      endif
+    endfor
 
     return getcwd()
 endfunction
