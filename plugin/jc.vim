@@ -1,7 +1,8 @@
 if exists('g:loaded_jc_nvim') | finish | endif
+
 let g:loaded_jc_nvim = v:true
 
-let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:FILE_SEP. '?')
+let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:utils#FILE_SEP. '?')
 
 autocmd FileType java autocmd BufWrite <buffer> lua vim.lsp.buf.format({ async = false })
 

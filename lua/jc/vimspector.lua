@@ -16,26 +16,26 @@ end
 local function resolve_main_class(callback)
   lsp.executeCommand({ command = "vscode.java.resolveMainClass" }, function(response)
     if #response > 0 then
-      callback(response[1].mainClass)
+      callback(response[1].mainClass, response[1].projectName)
     else
       callback()
     end
   end)
 end
 
-local function resolve_classpaths(main_class, callback)
+local function resolve_classpaths(main_class, project_name, callback)
   lsp.executeCommand({
     command = "vscode.java.resolveClasspath",
     arguments = {
       main_class,
-      vim.fn["project_root#get_project_name"](),
+      project_name,
     },
   }, callback, callback)
 end
 
 function M.debug_launch()
-  resolve_main_class(function(main_class)
-    resolve_classpaths(main_class, function(classpaths)
+  resolve_main_class(function(main_class, project_name)
+    resolve_classpaths(main_class, project_name, function(classpaths)
       if not classpaths then
         classpaths = { "${workspaceRoot}/" }
       else

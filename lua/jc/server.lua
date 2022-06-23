@@ -2,7 +2,11 @@ local Job = require("jc.jobs")
 local M = {}
 local data_dir = vim.fn["project_root#get_basedir"]("data")
 local vendor_dir = vim.fn["project_root#get_basedir"]("vendor")
-local project_name = vim.fn.substitute(vim.fn["project_root#find"](), "[\\/:;.]", "_", "g")
+local project_root_file = vim.fn["project_root#find"]()
+if vim.fn.filereadable(project_root_file) == 1 then
+    vim.cmd('lcd ' .. vim.fn.fnamemodify(project_root_file, ':h'))
+end
+local project_name = vim.fn.substitute(project_root_file, "[\\/:;.]", "_", "g")
 local workspace_dir = vim.fn["project_root#get_basedir"]("workspaces") .. project_name
 
 local function build_java_debug_plugin()
@@ -94,7 +98,7 @@ local function resolve_jdtls()
     local jdtls_path = servers.get_server_install_path("jdtls")
     return {
       jar = vim.fn.expand(jdtls_path .. "/plugins/org.eclipse.equinox.launcher_*.jar"),
-      config = vim.fn.expand(jdtls_path .. "/config_linux"),
+      config = vim.fn.expand(jdtls_path .. "/config_" .. vim.g['utils#OS']),
       lombok = vim.fn.expand(jdtls_path .. "/lombok.jar"),
     }
   else
@@ -143,6 +147,14 @@ local function lspconfig_setup(paths)
     return
   end
 
+  local settings = {
+    java = {}
+  }
+
+  if M.config['settings'] ~= nil then
+    settings = M.config['settings']
+  end
+
   -- stylua: ignore
   local cmd = {
     M.config.java_exec,
@@ -171,9 +183,7 @@ local function lspconfig_setup(paths)
     end,
     on_attach = M.config.jc_on_attach,
     cmd = cmd,
-    settings = {
-      java = {},
-    },
+    settings = settings,
     init_options = {
       bundles = bundles,
       extendedClientCapabilities = {
