@@ -38,9 +38,9 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 
 ## Configurations
 
-`jc_default_mappings` – apply default mappings (default: 1)
+`g:jc_default_mappings` – apply default mappings (default: 1)
 
-`jc_autoformat_on_save` – execute code autoformatting on file save (default: 1)
+`g:jc_autoformat_on_save` – execute code autoformatting on file save (default: 1)
 
 ## Commands
 
