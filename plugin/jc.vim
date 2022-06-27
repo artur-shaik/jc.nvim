@@ -4,7 +4,9 @@ let g:loaded_jc_nvim = v:true
 
 let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:utils#FILE_SEP. '?')
 
-autocmd FileType java autocmd BufWrite <buffer> lua vim.lsp.buf.format({ async = false })
+if has('nvim-0.8.0')->and(get(g:, 'jc_autoformat_on_save', 1))
+  autocmd FileType java autocmd BufWrite <buffer> lua vim.lsp.buf.format({ async = false })
+endif
 
 command! JCdebugAttach lua require('jc.vimspector').debug_attach()
 command! JCdebugLaunch lua require('jc.vimspector').debug_launch()

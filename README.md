@@ -36,6 +36,12 @@ Execute `:PlugInstall` and restart neovim.
 
 For triggering autocompletion automatically consider [configure nvim-cmp](https://github.com/hrsh7th/nvim-cmp/#recommended-configuration).
 
+## Configurations
+
+`jc_default_mappings` – apply default mappings (default: 1)
+
+`jc_autoformat_on_save` – execute code autoformatting on file save (default: 1)
+
 ## Commands
 
 - `JCdebugAttach` – start debug session with vimspector attaching to debug port;
