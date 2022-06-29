@@ -1,4 +1,4 @@
-local mappings = require('jc.config.mappings')
+local mappings = require("jc.config.mappings")
 
 local M = {}
 

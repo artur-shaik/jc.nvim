@@ -90,7 +90,7 @@ local function resolve_jdtls()
     local jdtls_path = servers.get_server_install_path("jdtls")
     return {
       jar = vim.fn.expand(jdtls_path .. "/plugins/org.eclipse.equinox.launcher_*.jar"),
-      config = vim.fn.expand(jdtls_path .. "/config_" .. vim.g['utils#OS']),
+      config = vim.fn.expand(jdtls_path .. "/config_" .. vim.g["utils#OS"]),
       lombok = vim.fn.expand(jdtls_path .. "/lombok.jar"),
     }
   else
@@ -124,7 +124,7 @@ local function find_project_path()
   local project_root_file = vim.fn["project_root#find"]()
 
   if vim.fn.filereadable(project_root_file) == 1 then
-      vim.cmd('lcd ' .. vim.fn.fnamemodify(project_root_file, ':h'))
+    vim.cmd("lcd " .. vim.fn.fnamemodify(project_root_file, ":h"))
   end
 
   local project_name = vim.fn.substitute(project_root_file, "[\\/:;.]", "_", "g")
@@ -154,11 +154,11 @@ local function lspconfig_setup(paths)
   end
 
   local settings = {
-    java = {}
+    java = {},
   }
 
-  if M.config['settings'] ~= nil then
-    settings = M.config['settings']
+  if M.config["settings"] ~= nil then
+    settings = M.config["settings"]
   end
 
   -- stylua: ignore
@@ -197,7 +197,7 @@ local function lspconfig_setup(paths)
       },
     },
   })
-  require('lspconfig.configs')['jdtls'].launch()
+  require("lspconfig.configs")["jdtls"].launch()
 end
 
 function M.jdtls_setup(config)

@@ -10,7 +10,7 @@ local config = {
   jc_on_attach = function(client, bufnr)
     lsp.on_attach(client, bufnr)
     user_on_attach(client, bufnr)
-  end
+  end,
 }
 
 M.setup = function(args)
