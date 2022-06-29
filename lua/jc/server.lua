@@ -1,22 +1,14 @@
 local Job = require("jc.jobs")
 local M = {}
-local data_dir = vim.fn["project_root#get_basedir"]("data")
-local vendor_dir = vim.fn["project_root#get_basedir"]("vendor")
-local project_root_file = vim.fn["project_root#find"]()
-if vim.fn.filereadable(project_root_file) == 1 then
-    vim.cmd('lcd ' .. vim.fn.fnamemodify(project_root_file, ':h'))
-end
-local project_name = vim.fn.substitute(project_root_file, "[\\/:;.]", "_", "g")
-local workspace_dir = vim.fn["project_root#get_basedir"]("workspaces") .. project_name
 
 local function build_java_debug_plugin()
-  local mvn_exec = { "mvn", "-f", vendor_dir .. "java-debug", "clean", "install" }
+  local mvn_exec = { "mvn", "-f", M.vendor_dir .. "java-debug", "clean", "install" }
   local env = vim.loop.os_environ()
   env["LC_CTYPE"] = "C"
   Job
     :new(
       { exec = mvn_exec, title = "COMPILING java-debug plugin" },
-      { env = env, cwd = vendor_dir .. "java-debug" },
+      { env = env, cwd = M.vendor_dir .. "java-debug" },
       function(_)
         vim.notify("java-debug successfully installed")
         M.jdtls_setup(M.config)
@@ -36,7 +28,7 @@ local function install_java_debug_plugin(command)
 
   local git_exec = function()
     if command == "clone" then
-      return { "git", command, "https://github.com/microsoft/java-debug/", vendor_dir .. "java-debug" }
+      return { "git", command, "https://github.com/microsoft/java-debug/", M.vendor_dir .. "java-debug" }
     else
       return { "git", "pull" }
     end
@@ -44,9 +36,9 @@ local function install_java_debug_plugin(command)
 
   local cwd = function()
     if command == "pull" then
-      return vendor_dir .. "java-debug"
+      return M.vendor_dir .. "java-debug"
     end
-    return vendor_dir
+    return M.vendor_dir
   end
 
   Job
@@ -111,7 +103,7 @@ local function resolve_java_debug()
   local java_debug = vim.fn.expand(
     "~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar"
   )
-  local skip_flag = data_dir .. ".skip-java-debug"
+  local skip_flag = M.data_dir .. ".skip-java-debug"
   if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
     local answer = vim.fn.input(
       "No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: "
@@ -126,7 +118,21 @@ local function resolve_java_debug()
   return java_debug
 end
 
+local function find_project_path()
+  M.data_dir = vim.fn["project_root#get_basedir"]("data")
+  M.vendor_dir = vim.fn["project_root#get_basedir"]("vendor")
+  local project_root_file = vim.fn["project_root#find"]()
+
+  if vim.fn.filereadable(project_root_file) == 1 then
+      vim.cmd('lcd ' .. vim.fn.fnamemodify(project_root_file, ':h'))
+  end
+
+  local project_name = vim.fn.substitute(project_root_file, "[\\/:;.]", "_", "g")
+  M.workspace_dir = vim.fn["project_root#get_basedir"]("workspaces") .. project_name
+end
+
 local function resolve_path()
+  find_project_path()
   local jdtls_path = resolve_jdtls()
   if not jdtls_path then
     return false
@@ -136,7 +142,7 @@ local function resolve_path()
     return false
   end
   return {
-    workspace_dir = workspace_dir,
+    workspace_dir = M.workspace_dir,
     jdtls = jdtls_path,
     java_debug = java_debug_path,
   }
@@ -191,6 +197,7 @@ local function lspconfig_setup(paths)
       },
     },
   })
+  require('lspconfig.configs')['jdtls'].launch()
 end
 
 function M.jdtls_setup(config)

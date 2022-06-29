@@ -17,8 +17,12 @@ M.setup = function(args)
   if args.on_attach then
     user_on_attach = args.on_attach
   end
-  config = vim.tbl_deep_extend("keep", args, config)
-  server.jdtls_setup(config)
+  M.config = vim.tbl_deep_extend("keep", args, config)
+  -- server.jdtls_setup(config)
+end
+
+function M.run_setup()
+  server.jdtls_setup(M.config)
 end
 
 local definitions_handler = vim.lsp.handlers["textDocument/definition"]

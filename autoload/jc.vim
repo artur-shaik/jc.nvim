@@ -9,4 +9,6 @@ function! jc#Autoload()
   if !exists('g:jc_default_mappings')
     let g:jc_default_mappings = v:true
   endif
+
+  lua require('jc').run_setup()
 endfunction
