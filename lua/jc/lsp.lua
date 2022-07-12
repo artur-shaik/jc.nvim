@@ -41,7 +41,7 @@ function M.executeCommand(command, callback, on_failure)
 end
 
 function M.get_jdtls_client()
-  local clients = vim.lsp.buf_get_clients()
+  local clients = vim.lsp.get_active_clients()
   for _, client in ipairs(clients) do
     if client.name == "jdtls" then
       return client
