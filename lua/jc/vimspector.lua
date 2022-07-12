@@ -15,8 +15,17 @@ end
 
 local function resolve_main_class(callback)
   lsp.executeCommand({ command = "vscode.java.resolveMainClass" }, function(response)
-    if #response > 0 then
+    if #response == 1 then
       callback(response[1].mainClass, response[1].projectName)
+    elseif #response > 1 then
+      vim.ui.select(response, {
+        prompt = 'Select the main class to be launched:',
+        format_item = function(cls)
+          return cls.mainClass
+        end
+      }, function(cls)
+        callback(cls.mainClass, cls.projectName)
+      end)
     else
       callback()
     end
