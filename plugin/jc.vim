@@ -5,6 +5,7 @@ let g:loaded_jc_nvim = v:true
 let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:utils#FILE_SEP. '?')
 
 autocmd FileType java call jc#Autoload()
+au BufReadCmd,FileReadCmd,SourceCmd jdt://* lua require('jc.jdtls').read_class_content(vim.fn.expand("<amatch>"))
 
 command! JCdebugAttach lua require('jc.vimspector').debug_attach()
 command! JCdebugLaunch lua require('jc.vimspector').debug_launch()

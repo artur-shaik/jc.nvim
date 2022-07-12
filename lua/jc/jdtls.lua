@@ -207,31 +207,20 @@ function M.organize_imports()
   vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), apply_edit)
 end
 
-function M.read_class_content(params, handler)
+function M.read_class_content(uri)
   local client = lsp.get_jdtls_client()
   if not client then
     vim.notify("LSP client not found", vim.log.levels.ERROR)
-    handler(nil, params.result, params.ctx, params.config)
     return
   end
 
-  local uri = params.result[1].uri
-  client.request("java/classFileContents", { uri = uri }, function(err, resp)
-    if resp then
-      local bufnr = vim.uri_to_bufnr(uri)
-      vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
-      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(resp, "\n"))
-      vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
-      vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
-      vim.api.nvim_buf_set_option(bufnr, "modified", false)
-
-      vim.defer_fn(function()
-        handler(nil, params.result, params.ctx, params.config)
-      end, 200)
-    elseif err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
-  end)
+  resp = client.request_sync("java/classFileContents", { uri = uri })
+  local bufnr = vim.uri_to_bufnr(uri)
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(resp.result, "\n"))
+  vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+  vim.api.nvim_buf_set_option(bufnr, "modified", false)
 end
 
 return M
