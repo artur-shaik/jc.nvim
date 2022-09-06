@@ -193,7 +193,17 @@ local function lspconfig_setup(paths)
     init_options = {
       bundles = bundles,
       extendedClientCapabilities = {
-        classFileContentsSupport = true,
+        progressReportProvider = true;
+        classFileContentsSupport = true;
+        generateToStringPromptSupport = true;
+        hashCodeEqualsPromptSupport = true;
+        advancedExtractRefactoringSupport = true;
+        advancedOrganizeImportsSupport = true;
+        generateConstructorsPromptSupport = true;
+        generateDelegateMethodsPromptSupport = true;
+        moveRefactoringSupport = true;
+        overrideMethodsPromptSupport = true;
+        inferSelectionSupport = {"extractMethod", "extractVariable", "extractConstant"};
       },
     },
   })
