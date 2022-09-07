@@ -21,3 +21,4 @@ command! JCgenerateConstructorDefault lua require('jc.jdtls').generate_construct
 command! JCgenerateConstructor lua require('jc.jdtls').generate_constructor(nil, nil, {default = false})
 command! JCgenerateAbstractMethods lua require('jc.jdtls').generate_abstractMethods()
 command! JCgenerateClass lua require('jc.class_generator').generate_class()
+command! JCtoggleAutoformat call jc#toggleAutoformat() 
