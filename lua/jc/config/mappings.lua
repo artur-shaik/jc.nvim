@@ -58,6 +58,12 @@ function M.install_mappings(bufnr)
     "<cmd>lua require('jc.class_generator').generate_class()<CR>",
     opts
   )
+
+  if pcall(require, "jdtls") then
+    vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jre", "<Esc><Cmd>lua require('jdtls').extract_variable(true)<CR>", opts)
+    vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jre", "<Cmd>lua require('jdtls').extract_variable()<CR>", opts)
+    vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jrm", "<Esc><Cmd>lua require('jdtls').extract_method(true)<CR>", opts)
+  end
 end
 
 return M

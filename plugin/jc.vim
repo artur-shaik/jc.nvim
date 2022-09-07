@@ -22,3 +22,15 @@ command! JCgenerateConstructor lua require('jc.jdtls').generate_constructor(nil,
 command! JCgenerateAbstractMethods lua require('jc.jdtls').generate_abstractMethods()
 command! JCgenerateClass lua require('jc.class_generator').generate_class()
 command! JCtoggleAutoformat call jc#toggleAutoformat() 
+
+if luaeval("pcall(require, 'jdtls')")
+  command! JCrefactorExtractVar lua require('jdtls').extract_variable()
+  command! -range=% JCrefactorExtractMethod lua require('jdtls').extract_method(true)
+
+  command! JCutilUpdateConfig lua require('jdtls').update_project_config()
+  command! JCutilJol lua require('jdtls').jol()
+  command! JCutilBytecode lua require('jdtls').javap()
+  command! JCutilJshell lua require('jdtls').jshell()
+else
+  echom "Install jdtls to have additional commands"
+endif

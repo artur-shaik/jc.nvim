@@ -11,7 +11,7 @@ In addition to autocompletion it can:
 - add abstract methods to implementing class;
 - execute [vimspector](https://github.com/puremourning/vimspector) debug session;
 - automatic installation of jdt.ls and java-debug extension;
-- class creation methods from `jc2` (WIP).
+- class creation methods from `jc2`.
 
 ## Installation
 
@@ -25,6 +25,7 @@ Plug 'hrsh7th/nvim-cmp'
 Plug 'hrsh7th/cmp-nvim-lsp'
 Plug 'williamboman/nvim-lsp-installer'
 Plug 'puremourning/vimspector'
+Plug 'mfussenegger/nvim-jdtls'
 Plug 'artur-shaik/jc.nvim'
 
 call plug#end()
@@ -57,7 +58,17 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 - `JCgenerateConstructorDefault` – generate constructor with no arguments;
 - `JCgenerateConstructor` – choose fields for constructor;
 - `JCgenerateAbstractMethods` – generate abstract methods;
-- `JCgenerateClass` – start class generation user input prompt.
+- `JCgenerateClass` – start class generation user input prompt;
+- `JCtoggleAutoformat` – enable/disable autoformat file on save;
+
+Using `nvim-jdtls`:
+
+- `JCrefactorExtractVar` – extract variable;
+- `JCrefactorExtractMethod` – extract method;
+- `JCutilJshell` – execute java shell;
+- `JCutilBytecode` – extract bytecode for class;
+- `JCutilJol` – analyze object layout scheme using `jol.jar`;
+- `JCutilUpdateConfig` – update current project's configuration.
 
 ## Default mappings
 
@@ -80,6 +91,11 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jam", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>am", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
+  
+-- using `jdtls`
+  vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jre", "<Esc><Cmd>lua require('jdtls').extract_variable(true)<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jre", "<Cmd>lua require('jdtls').extract_variable()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jrm", "<Esc><Cmd>lua require('jdtls').extract_method(true)<CR>", opts)
 ```
 
 ## Class creation
