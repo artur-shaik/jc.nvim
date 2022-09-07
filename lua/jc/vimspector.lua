@@ -19,10 +19,10 @@ local function resolve_main_class(callback)
       callback(response[1].mainClass, response[1].projectName)
     elseif #response > 1 then
       vim.ui.select(response, {
-        prompt = 'Select the main class to be launched:',
+        prompt = "Select the main class to be launched:",
         format_item = function(cls)
           return cls.mainClass
-        end
+        end,
       }, function(cls)
         callback(cls.mainClass, cls.projectName)
       end)
