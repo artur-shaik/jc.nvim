@@ -1,34 +1,34 @@
 local Job = require("jc.jobs")
 local M = {}
 
-local function build_java_debug_plugin()
-  local mvn_exec = { "mvn", "-f", M.vendor_dir .. "java-debug", "clean", "install" }
+local function build_plugin(name)
+  local mvn_exec = { "mvn", "-Dmaven.test.skip=true", "-f", M.vendor_dir .. name, "clean", "install" }
   local env = vim.loop.os_environ()
   env["LC_CTYPE"] = "C"
   Job
     :new(
-      { exec = mvn_exec, title = "COMPILING java-debug plugin" },
-      { env = env, cwd = M.vendor_dir .. "java-debug" },
+      { exec = mvn_exec, title = "COMPILING " .. name .. " plugin" },
+      { env = env, cwd = M.vendor_dir .. name },
       function(_)
-        vim.notify("java-debug successfully installed")
+        vim.notify(name .. " successfully installed")
         M.jdtls_setup(M.config)
       end,
       function(job, ec)
-        job.output:append("JC ERROR: couldn't build java-debug plugin. Exit code: " .. ec)
+        job.output:append("JC ERROR: couldn't build " .. name .. " plugin. Exit code: " .. ec)
         job.output:append("JC ERROR: consider to report an issue, please.")
       end
     )
     :execute()
 end
 
-local function install_java_debug_plugin(command)
+local function install_from_git(command, name, url)
   if not command then
     command = "clone"
   end
 
   local git_exec = function()
     if command == "clone" then
-      return { "git", command, "https://github.com/microsoft/java-debug/", M.vendor_dir .. "java-debug" }
+      return { "git", command, url, M.vendor_dir .. name }
     else
       return { "git", "pull" }
     end
@@ -36,23 +36,25 @@ local function install_java_debug_plugin(command)
 
   local cwd = function()
     if command == "pull" then
-      return M.vendor_dir .. "java-debug"
+      return M.vendor_dir .. name
     end
     return M.vendor_dir
   end
 
   Job
     :new(
-      { exec = git_exec(), title = command:upper() .. " java-debug repository" },
+      { exec = git_exec(), title = command:upper() .. " " .. name .. " repository" },
       { env = vim.loop.os_environ(), cwd = cwd() },
       function(_)
-        vim.defer_fn(build_java_debug_plugin, 0)
+        vim.defer_fn(function()
+          build_plugin(name)
+        end, 0)
       end,
       function(job, exit_code)
         if exit_code == 128 then
-          install_java_debug_plugin("pull")
+          install_from_git("pull", name, url)
         else
-          job.output:append("JC ERROR: couldn't clone java-debug plugin. Exit code: " .. exit_code)
+          job.output:append("JC ERROR: couldn't clone " .. name .. " plugin. Exit code: " .. exit_code)
           job.output:append("JC ERROR: consider to report an issue, please.")
         end
       end
@@ -109,13 +111,28 @@ local function resolve_java_debug()
       "No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: "
     )
     if answer == "1" then
-      install_java_debug_plugin()
+      install_from_git(nil, "java-debug", "https://github.com/microsoft/java-debug/")
     elseif answer == "2" then
       io.open(skip_flag, "w"):close()
     end
     return false
   end
   return java_debug
+end
+
+local function resolve_jol()
+  local jol_path = vim.fn.expand("~/.m2/repository/org/openjdk/jol/jol-cli/*/jol-cli-*-full.jar")
+  local skip_flag = M.data_dir .. ".skip-jol"
+  if vim.fn.filereadable(jol_path) == 0 and vim.fn.filereadable(skip_flag) == 0 then
+    local answer = vim.fn.input("Jol is not installed. Would you like to install it?\n1: Yes\n2: No\nYour answer: ")
+    if answer == "1" then
+      install_from_git(nil, "jol", "https://github.com/openjdk/jol")
+    elseif answer == "2" then
+      io.open(skip_flag, "w"):close()
+    end
+    return false
+  end
+  return jol_path
 end
 
 local function find_project_path()
@@ -140,6 +157,12 @@ local function resolve_path()
   local java_debug_path = resolve_java_debug()
   if not java_debug_path then
     return false
+  end
+  local jol_path = resolve_jol()
+  if not jol_path then
+    return false
+  elseif pcall(require, "jdtls") then
+    require("jdtls").jol_path = jol_path
   end
   return {
     workspace_dir = M.workspace_dir,
