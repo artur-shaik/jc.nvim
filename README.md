@@ -2,6 +2,8 @@
 
 jc.nvim – successor of [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2) which use neovim's built-in LSP client and [Eclipse JDT Language Server](https://github.com/eclipse/eclipse.jdt.ls).
 
+Read my [blog post](https://shaik.link/posts/javacomplete-to-jc.nvim/) about it.
+
 Main goal of this project is to migrate functionallty of jc2.
 
 In addition to autocompletion it can:
