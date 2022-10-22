@@ -214,10 +214,10 @@ function M.read_class_content(uri)
     return
   end
 
-  resp = client.request_sync("java/classFileContents", { uri = uri })
+  local response = client.request_sync("java/classFileContents", { uri = uri })
   local bufnr = vim.uri_to_bufnr(uri)
   vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
-  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(resp.result, "\n"))
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(response.result, "\n"))
   vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
   vim.api.nvim_buf_set_option(bufnr, "modified", false)
