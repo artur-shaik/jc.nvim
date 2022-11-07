@@ -3,7 +3,14 @@ local M = {}
 function M.install_mappings(bufnr)
   local opts = { noremap = true, silent = true }
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports(true)<CR>", opts)
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    "<leader>jI",
+    "<cmd>lua require('jc.jdtls').organize_imports(false)<CR>",
+    opts
+  )
   vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
   vim.api.nvim_buf_set_keymap(

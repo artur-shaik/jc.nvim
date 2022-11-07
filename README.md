@@ -8,7 +8,7 @@ Main goal of this project is to migrate functionallty of jc2.
 
 In addition to autocompletion it can:
 
-- organize imports;
+- organize imports with smart selection regular classes;
 - generate code (`toString`, `hashCode`, `equals`, constructors, accessors) with field selection;
 - add abstract methods to implementing class;
 - execute [vimspector](https://github.com/puremourning/vimspector) debug session;
@@ -50,7 +50,8 @@ For triggering autocompletion automatically consider [configure nvim-cmp](https:
 - `JCdebugAttach` – start debug session with vimspector attaching to debug port;
 - `JCdebugLaunch` – start debug session with vimspector executing main class;
 - `JCdebugWithConfig` – start debug session using predefined vimspector's configuration;
-- `JCimportsOrganize` – automatically organize imports;
+- `JCimportsOrganizeSmart` – automatically organize imports using regular classes list;
+- `JCimportsOrganize` – automatically organize imports choosing from available classes list;
 - `JCgenerateToString` – choose fields and method to generate `toString`;
 - `JCgenerateHashCodeAndEquals` – choose fields to generate `hashCode` and `equals`;
 - `JCgenerateAccessors` – choose fields for accessors generation;
@@ -75,7 +76,8 @@ Using `nvim-jdtls`:
 ## Default mappings
 
 ```lua
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports(true)<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jI", "<cmd>lua require('jc.jdtls').organize_imports(false)<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jeq", "<cmd>lua require('jc.jdtls').generate_hashCodeAndEquals()<CR>", opts)

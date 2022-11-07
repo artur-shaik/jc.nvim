@@ -1,4 +1,5 @@
 local lsp = require("jc.lsp")
+local regular_imports = require("jc.regular_imports")
 local apply_edit = require("jc.lsp").apply_edit
 
 local M = {}
@@ -7,9 +8,21 @@ local function choose_imports(params, _)
   local prompt = "Choose candidate:\n"
   for i, candidate in ipairs(params.arguments[2][1].candidates) do
     prompt = prompt .. i .. ". " .. candidate.fullyQualifiedName .. "\n"
+    for _, value in pairs(regular_imports():load()) do
+      if value == candidate.fullyQualifiedName then
+        if M.organize_imports_smart then
+          return { candidate }
+        else
+          regular_imports():remove(candidate.fullyQualifiedName)
+        end
+      end
+    end
   end
   local choice = tonumber(vim.fn.input(prompt .. "Your choice: "))
 
+  if params.arguments[2][1].candidates[choice] ~= nil then
+    regular_imports():add(params.arguments[2][1].candidates[choice].fullyQualifiedName)
+  end
   return { params.arguments[2][1].candidates[choice] }
 end
 
@@ -203,7 +216,8 @@ function M.generate_toString(fields, params)
   end
 end
 
-function M.organize_imports()
+function M.organize_imports(smart)
+  M.organize_imports_smart = smart
   vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), apply_edit)
 end
 
