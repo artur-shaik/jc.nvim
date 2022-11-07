@@ -1,14 +1,15 @@
 local Job = require("jc.jobs")
+local path = require("jc.path")
 local M = {}
 
 local function build_plugin(name)
-  local mvn_exec = { "mvn", "-Dmaven.test.skip=true", "-f", M.vendor_dir .. name, "clean", "install" }
+  local mvn_exec = { "mvn", "-Dmaven.test.skip=true", "-f", path.get_vendor_dir() .. name, "clean", "install" }
   local env = vim.loop.os_environ()
   env["LC_CTYPE"] = "C"
   Job
     :new(
       { exec = mvn_exec, title = "COMPILING " .. name .. " plugin" },
-      { env = env, cwd = M.vendor_dir .. name },
+      { env = env, cwd = path.get_vendor_dir() .. name },
       function(_)
         vim.notify(name .. " successfully installed")
         M.jdtls_setup(M.config)
@@ -28,7 +29,7 @@ local function install_from_git(command, name, url)
 
   local git_exec = function()
     if command == "clone" then
-      return { "git", command, url, M.vendor_dir .. name }
+      return { "git", command, url, path.get_vendor_dir() .. name }
     else
       return { "git", "pull" }
     end
@@ -36,9 +37,9 @@ local function install_from_git(command, name, url)
 
   local cwd = function()
     if command == "pull" then
-      return M.vendor_dir .. name
+      return path.get_vendor_dir() .. name
     end
-    return M.vendor_dir
+    return path.get_vendor_dir()
   end
 
   Job
@@ -105,7 +106,7 @@ local function resolve_java_debug()
   local java_debug = vim.fn.expand(
     "~/.m2/repository/com/microsoft/java/com.microsoft.java.debug.plugin/*/com.microsoft.java.debug.plugin-*.jar"
   )
-  local skip_flag = M.data_dir .. ".skip-java-debug"
+  local skip_flag = path.get_workspace_dir() .. ".skip-java-debug"
   if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
     local answer = vim.fn.input(
       "No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: "
@@ -122,7 +123,7 @@ end
 
 local function resolve_jol()
   local jol_path = vim.fn.expand("~/.m2/repository/org/openjdk/jol/jol-cli/*/jol-cli-*-full.jar")
-  local skip_flag = M.data_dir .. ".skip-jol"
+  local skip_flag = path.get_workspace_dir() .. ".skip-jol"
   if vim.fn.filereadable(jol_path) == 0 and vim.fn.filereadable(skip_flag) == 0 then
     local answer = vim.fn.input("Jol is not installed. Would you like to install it?\n1: Yes\n2: No\nYour answer: ")
     if answer == "1" then
@@ -135,21 +136,7 @@ local function resolve_jol()
   return jol_path
 end
 
-local function find_project_path()
-  M.data_dir = vim.fn["project_root#get_basedir"]("data")
-  M.vendor_dir = vim.fn["project_root#get_basedir"]("vendor")
-  local project_root_file = vim.fn["project_root#find"]()
-
-  if vim.fn.filereadable(project_root_file) == 1 then
-    vim.cmd("lcd " .. vim.fn.fnamemodify(project_root_file, ":h"))
-  end
-
-  local project_name = vim.fn.substitute(project_root_file, "[\\/:;.]", "_", "g")
-  M.workspace_dir = vim.fn["project_root#get_basedir"]("workspaces") .. project_name
-end
-
 local function resolve_path()
-  find_project_path()
   local jdtls_path = resolve_jdtls()
   if not jdtls_path then
     return false
@@ -165,7 +152,7 @@ local function resolve_path()
     require("jdtls").jol_path = jol_path
   end
   return {
-    workspace_dir = M.workspace_dir,
+    workspace_dir = path.get_project_dirs().workspace_dir,
     jdtls = jdtls_path,
     java_debug = java_debug_path,
   }
@@ -228,6 +215,7 @@ local function lspconfig_setup(paths)
         overrideMethodsPromptSupport = true,
         inferSelectionSupport = { "extractMethod", "extractVariable", "extractConstant" },
       },
+      workspace = path.get_project_dirs().workspace_dir,
     },
   })
   require("lspconfig.configs")["jdtls"].launch()
