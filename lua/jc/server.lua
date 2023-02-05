@@ -3,7 +3,7 @@ local path = require("jc.path")
 local M = {}
 
 local function build_plugin(name)
-  local mvn_exec = { "mvn", "-Dmaven.test.skip=true", "-f", path.get_vendor_dir() .. name, "clean", "install" }
+  local mvn_exec = { "mvn", "-Dmaven.javadoc.skip=true", "-Dmaven.test.skip=true", "-f", path.get_vendor_dir() .. name, "clean", "install" }
   local env = vim.loop.os_environ()
   env["LC_CTYPE"] = "C"
   Job
