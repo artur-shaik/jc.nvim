@@ -79,25 +79,29 @@ end
 
 function M.debug_attach()
   lsp.executeCommand({ command = "vscode.java.startDebugSession" }, function(response)
-    vim.fn["vimspector#LaunchWithConfigurations"]({
-      attach = {
-        adapter = {
-          name = "vscode-java",
-          port = response,
-        },
-        configuration = {
-          request = "attach",
-          host = ask_for("host", "127.0.0.1"),
-          port = ask_for("port", "9000"),
-        },
-        breakpoints = {
-          exception = {
-            caught = "N",
-            uncaught = "N",
+    if type(response) == 'number' then
+      vim.fn["vimspector#LaunchWithConfigurations"]({
+        attach = {
+          adapter = {
+            name = "vscode-java",
+            port = response,
+          },
+          configuration = {
+            request = "attach",
+            host = ask_for("host", "127.0.0.1"),
+            port = ask_for("port", "9000"),
+          },
+          breakpoints = {
+            exception = {
+              caught = "N",
+              uncaught = "N",
+            },
           },
         },
-      },
-    })
+      })
+    else
+      vim.notify(vim.inspect(response), vim.log.levels.WARN)
+    end
   end)
 end
 

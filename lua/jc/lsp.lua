@@ -11,7 +11,7 @@ function M.executeCommand(command, callback, on_failure)
   local clients = vim.lsp.buf_get_clients()
   local capableClient = nil
 
-  for _, client in ipairs(clients) do
+  for _, client in pairs(clients) do
     for _, serverCommand in ipairs(client.server_capabilities.executeCommandProvider.commands) do
       if serverCommand == command.command then
         capableClient = client
