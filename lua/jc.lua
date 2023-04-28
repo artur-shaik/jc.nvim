@@ -18,7 +18,6 @@ M.setup = function(args)
     user_on_attach = args.on_attach
   end
   M.config = vim.tbl_deep_extend("keep", args, config)
-  -- server.jdtls_setup(config)
 end
 
 function M.run_setup()
