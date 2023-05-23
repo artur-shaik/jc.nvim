@@ -101,7 +101,7 @@ end
 
 function M.generate_abstractMethods()
   local diagnostics = {}
-  for _, diagnostic in ipairs(vim.diagnostic.get()) do
+  for _, diagnostic in ipairs(vim.diagnostic.get(0)) do
     if diagnostic.code == "67109264" then
       diagnostic.range = {
         start = {
