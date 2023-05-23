@@ -5,7 +5,8 @@ let g:loaded_jc_nvim = v:true
 let g:JavaComplete_Home = fnamemodify(expand('<sfile>'), ':p:h:h:gs?\\?'. g:utils#FILE_SEP. '?')
 
 autocmd FileType java call jc#Autoload()
-au BufReadCmd,FileReadCmd,SourceCmd jdt://* lua require('jc.jdtls').read_class_content(vim.fn.expand("<amatch>"))
+autocmd! BufReadCmd
+autocmd BufReadCmd,FileReadCmd,SourceCmd jdt://* lua require('jc.jdtls').read_class_content(vim.fn.expand("<amatch>"))
 
 command! JCdebugAttach lua require('jc.vimspector').debug_attach()
 command! JCdebugLaunch lua require('jc.vimspector').debug_launch()
@@ -33,5 +34,5 @@ if luaeval("pcall(require, 'jdtls')")
   command! JCutilBytecode lua require('jdtls').javap()
   command! JCutilJshell lua require('jdtls').jshell()
 else
-  echom "Install jdtls to have additional commands"
+  echom "Install nvim-jdtls to have additional commands"
 endif

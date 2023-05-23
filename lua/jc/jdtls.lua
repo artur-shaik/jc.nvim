@@ -235,6 +235,7 @@ function M.read_class_content(uri)
   vim.api.nvim_buf_set_option(bufnr, "filetype", "java")
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
   vim.api.nvim_buf_set_option(bufnr, "modified", false)
+  vim.lsp.buf_attach_client(bufnr, client.id)
 end
 
 return M

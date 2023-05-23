@@ -194,6 +194,7 @@ local function lspconfig_setup(paths)
   }
 
   require("lspconfig").jdtls.setup({
+    name = "jdtls",
     root_dir = function()
       return vim.fn.getcwd()
     end,
