@@ -19,7 +19,7 @@ In addition to autocompletion it can:
 
 Minimal setup using `LazyVim`:
 
-```
+```lua
 return {
   {
     "mfussenegger/nvim-jdtls",
@@ -51,7 +51,7 @@ return {
     },
     ft = { "java" },
     opts = {
-      java_exec = "/home/ash/.sdkman/candidates/java/17.0.7-oracle/bin/java",
+      java_exec = "/path/to/candidates/java/17.0.7-oracle/bin/java",
       keys_prefix = "'j",
       settings = {
         java = {
@@ -59,7 +59,7 @@ return {
             runtimes = {
               {
                 name = "JavaSE-11",
-                path = "/home/ash/.sdkman/candidates/java/11.0.12-open/",
+                path = "/path/to/candidates/java/11.0.12-open/",
                 default = true,
               },
             },
