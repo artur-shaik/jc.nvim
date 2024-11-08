@@ -79,7 +79,7 @@ end
 
 function M.debug_attach()
   lsp.executeCommand({ command = "vscode.java.startDebugSession" }, function(response)
-    if type(response) == 'number' then
+    if type(response) == "number" then
       vim.fn["vimspector#LaunchWithConfigurations"]({
         attach = {
           adapter = {
