@@ -3,12 +3,12 @@ local chains = require("jc.chains")()
 
 local M = {}
 
-function M.on_attach(_, bufnr)
-  config.initialize_configuration(bufnr)
+function M.on_attach(conf, _, bufnr)
+  config.initialize_configuration(conf, bufnr)
 end
 
 function M.executeCommand(command, callback, on_failure)
-  local clients = vim.lsp.buf_get_clients()
+  local clients = vim.lsp.get_clients()
   local capableClient = nil
 
   for _, client in pairs(clients) do
@@ -41,7 +41,7 @@ function M.executeCommand(command, callback, on_failure)
 end
 
 function M.get_jdtls_client()
-  local clients = vim.lsp.get_active_clients()
+  local clients = vim.lsp.get_clients()
   for _, client in ipairs(clients) do
     if client.name == "jdtls" then
       return client

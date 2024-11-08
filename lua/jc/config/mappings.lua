@@ -1,31 +1,50 @@
 local M = {}
 
-function M.install_mappings(bufnr)
+function M.install_mappings(conf, bufnr)
   local opts = { noremap = true, silent = true }
+  local prefix = conf.keys_prefix
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jda", "<cmd>lua require('jc.vimspector').debug_attach()<CR>", opts)
+  vim.api.nvim_set_keymap("n", prefix .. "da", "<cmd>lua require('jc.vimspector').debug_attach()<CR>", opts)
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports(true)<CR>", opts)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jI",
+    prefix .. "i",
+    "<cmd>lua require('jc.jdtls').organize_imports(true)<CR>",
+    opts
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "I",
     "<cmd>lua require('jc.jdtls').organize_imports(false)<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "ts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jeq",
+    prefix .. "eq",
     "<cmd>lua require('jc.jdtls').generate_hashCodeAndEquals()<CR>",
     opts
   )
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jA", "<cmd>lua require('jc.jdtls').generate_accessors()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>js", "<cmd>lua require('jc.jdtls').generate_accessor('s')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jg", "<cmd>lua require('jc.jdtls').generate_accessor('g')<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "A", "<cmd>lua require('jc.jdtls').generate_accessors()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "s",
+    "<cmd>lua require('jc.jdtls').generate_accessor('s')<CR>",
+    opts
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "g",
+    "<cmd>lua require('jc.jdtls').generate_accessor('g')<CR>",
+    opts
+  )
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
@@ -40,14 +59,14 @@ function M.install_mappings(bufnr)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jc",
+    prefix .. "c",
     "<cmd>lua require('jc.jdtls').generate_constructor(nil, nil, {default = false})<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jcc",
+    prefix .. "cc",
     "<cmd>lua require('jc.jdtls').generate_constructor(nil, nil, {default = true})<CR>",
     opts
   )
@@ -55,7 +74,7 @@ function M.install_mappings(bufnr)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<leader>jm",
+    prefix .. "m",
     "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>",
     opts
   )
@@ -63,7 +82,7 @@ function M.install_mappings(bufnr)
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<Leader>jn",
+    prefix .. "n",
     "<cmd>lua require('jc.class_generator').generate_class()<CR>",
     opts
   )
@@ -72,7 +91,7 @@ function M.install_mappings(bufnr)
     vim.api.nvim_buf_set_keymap(
       bufnr,
       "v",
-      "<leader>jre",
+      prefix .. "re",
       "<Esc><Cmd>lua require('jdtls').extract_variable(true)<CR>",
       opts
     )
@@ -80,7 +99,7 @@ function M.install_mappings(bufnr)
     vim.api.nvim_buf_set_keymap(
       bufnr,
       "v",
-      "<leader>jrm",
+      prefix .. "rm",
       "<Esc><Cmd>lua require('jdtls').extract_method(true)<CR>",
       opts
     )

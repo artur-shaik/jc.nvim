@@ -100,20 +100,30 @@ function M.generate_accessors(fields)
 end
 
 function M.generate_abstractMethods()
+  local curbuf = vim.api.nvim_get_current_buf()
   local diagnostics = {}
+  local line = 0
   for _, diagnostic in ipairs(vim.diagnostic.get(0)) do
     if diagnostic.code == "67109264" then
-      diagnostic.range = {
-        start = {
-          character = diagnostic.col,
-          line = diagnostic.lnum,
+      if line == 0 then
+        line = diagnostic.lnum
+      end
+      table.insert(diagnostics, {
+        code = diagnostic.code,
+        message = diagnostic.message,
+        severity = 1,
+        source = "Java",
+        range = {
+          start = {
+            character = diagnostic.col,
+            line = diagnostic.lnum,
+          },
+          ["end"] = {
+            character = diagnostic.end_col,
+            line = diagnostic.end_lnum,
+          },
         },
-        ["end"] = {
-          character = diagnostic.end_col,
-          line = diagnostic.end_lnum,
-        },
-      }
-      table.insert(diagnostics, diagnostic)
+      })
     end
   end
   if diagnostics then
@@ -121,7 +131,18 @@ function M.generate_abstractMethods()
     params.context = {
       diagnostics = diagnostics,
     }
-    vim.lsp.buf_request(0, "textDocument/codeAction", params, function(err, actions)
+    params.range = {
+      start = {
+        character = 0,
+        line = line,
+      },
+      ["end"] = {
+        character = 0,
+        line = line,
+      },
+    }
+    vim.notify(vim.print(params), vim.log.levels.DEBUG)
+    vim.lsp.buf_request(curbuf, "textDocument/codeAction", params, function(err, actions)
       if actions then
         local add_method_action = nil
         for _, action in ipairs(actions) do
@@ -131,7 +152,8 @@ function M.generate_abstractMethods()
           end
         end
         if add_method_action then
-          vim.lsp.buf_request(0, "codeAction/resolve", add_method_action, apply_edit)
+          vim.notify(vim.print(add_method_action), vim.log.levels.DEBUG)
+          vim.lsp.buf_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
         else
           vim.notify("No action found", vim.log.levels.INFO)
         end

@@ -17,25 +17,77 @@ In addition to autocompletion it can:
 
 ## Installation
 
-Minimal setup using `vim-plug`:
+Minimal setup using `LazyVim`:
 
 ```
-call plug#begin('~/.vim/plugged')
-
-Plug 'neovim/nvim-lspconfig'
-Plug 'hrsh7th/nvim-cmp' 
-Plug 'hrsh7th/cmp-nvim-lsp'
-Plug 'williamboman/nvim-lsp-installer'
-Plug 'puremourning/vimspector'
-Plug 'mfussenegger/nvim-jdtls'
-Plug 'artur-shaik/jc.nvim'
-
-call plug#end()
-
-lua require('jc').setup{}
+return {
+  {
+    "mfussenegger/nvim-jdtls",
+    config = function() end,
+  },
+  {
+    "puremourning/vimspector",
+    keys = {
+      {
+        "<leader>vr",
+        "<Cmd>VimspectorReset<cr>",
+      },
+      {
+        "<leader>vb",
+        "<Cmd>VimspectorBreakpoints<cr>",
+      },
+    },
+    init = function()
+      vim.g.vimspector_enable_mappings = "HUMAN"
+    end,
+  },
+  {
+    dir = "artur-shaik/jc.nvim",
+    name = "jc.nvim",
+    dependencies = {
+      "puremourning/vimspector",
+      "mfussenegger/nvim-jdtls",
+      "williamboman/mason.nvim",
+    },
+    ft = { "java" },
+    opts = {
+      java_exec = "/home/ash/.sdkman/candidates/java/17.0.7-oracle/bin/java",
+      keys_prefix = "'j",
+      settings = {
+        java = {
+          configuration = {
+            runtimes = {
+              {
+                name = "JavaSE-11",
+                path = "/home/ash/.sdkman/candidates/java/11.0.12-open/",
+                default = true,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+}
 ```
 
-Execute `:PlugInstall` and restart neovim.
+lspconfig:
+
+```lua
+return {
+  {
+    "neovim/nvim-lspconfig",
+    opts = {
+      servers = {
+        jdtls = {},
+      },
+      setup = {
+        jdtls = function()
+          return true
+        end,
+      },
+    },
+```
 
 For triggering autocompletion automatically consider [configure nvim-cmp](https://github.com/hrsh7th/nvim-cmp/#recommended-configuration).
 

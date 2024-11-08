@@ -1,16 +1,19 @@
 local lsp = require("jc.lsp")
 local server = require("jc.server")
-local jdtls = require("jc.jdtls")
 
 M = {}
 local user_on_attach = function(_, _) end
 
 local config = {
   java_exec = "java",
-  jc_on_attach = function(client, bufnr)
-    lsp.on_attach(client, bufnr)
-    user_on_attach(client, bufnr)
+  jc_on_attach = function(args)
+    if args.data then
+      local client = vim.lsp.get_client_by_id(args.data.client_id)
+      lsp.on_attach(M.config, client, args.buf)
+      user_on_attach(client, args.buf)
+    end
   end,
+  keys_prefix = "<leader>j",
 }
 
 M.setup = function(args)

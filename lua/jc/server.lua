@@ -3,23 +3,29 @@ local path = require("jc.path")
 local M = {}
 
 local function build_plugin(name)
-  local mvn_exec = { "mvn", "-Dmaven.javadoc.skip=true", "-Dmaven.test.skip=true", "-f", path.get_vendor_dir() .. name, "clean", "install" }
+  local mvn_exec = {
+    "mvn",
+    "-Dmaven.javadoc.skip=true",
+    "-Dmaven.test.skip=true",
+    "-f",
+    path.get_vendor_dir() .. name,
+    "clean",
+    "install",
+  }
   local env = vim.loop.os_environ()
   env["LC_CTYPE"] = "C"
-  Job
-    :new(
-      { exec = mvn_exec, title = "COMPILING " .. name .. " plugin" },
-      { env = env, cwd = path.get_vendor_dir() .. name },
-      function(_)
-        vim.notify(name .. " successfully installed")
-        M.jdtls_setup(M.config)
-      end,
-      function(job, ec)
-        job.output:append("JC ERROR: couldn't build " .. name .. " plugin. Exit code: " .. ec)
-        job.output:append("JC ERROR: consider to report an issue, please.")
-      end
-    )
-    :execute()
+  Job:new(
+    { exec = mvn_exec, title = "COMPILING " .. name .. " plugin" },
+    { env = env, cwd = path.get_vendor_dir() .. name },
+    function(_)
+      vim.notify(name .. " successfully installed")
+      M.jdtls_setup(M.config)
+    end,
+    function(job, ec)
+      job.output:append("JC ERROR: couldn't build " .. name .. " plugin. Exit code: " .. ec)
+      job.output:append("JC ERROR: consider to report an issue, please.")
+    end
+  ):execute()
 end
 
 local function install_from_git(command, name, url)
@@ -42,55 +48,60 @@ local function install_from_git(command, name, url)
     return path.get_vendor_dir()
   end
 
-  Job
-    :new(
-      { exec = git_exec(), title = command:upper() .. " " .. name .. " repository" },
-      { env = vim.loop.os_environ(), cwd = cwd() },
-      function(_)
-        vim.defer_fn(function()
-          build_plugin(name)
-        end, 0)
-      end,
-      function(job, exit_code)
-        if exit_code == 128 then
-          install_from_git("pull", name, url)
-        else
-          job.output:append("JC ERROR: couldn't clone " .. name .. " plugin. Exit code: " .. exit_code)
-          job.output:append("JC ERROR: consider to report an issue, please.")
-        end
+  Job:new(
+    { exec = git_exec(), title = command:upper() .. " " .. name .. " repository" },
+    { env = vim.loop.os_environ(), cwd = cwd() },
+    function(_)
+      vim.defer_fn(function()
+        build_plugin(name)
+      end, 0)
+    end,
+    function(job, exit_code)
+      if exit_code == 128 then
+        install_from_git("pull", name, url)
+      else
+        job.output:append("JC ERROR: couldn't clone " .. name .. " plugin. Exit code: " .. exit_code)
+        job.output:append("JC ERROR: consider to report an issue, please.")
       end
-    )
-    :execute()
+    end
+  ):execute()
 end
 
 local function download_jdtls()
-  local ok, installer = pcall(require, "nvim-lsp-installer")
-  assert(ok, "nvim-lsp-installer is not installed")
+  local ok, registry = pcall(require, "mason-registry")
+  assert(ok, "mason is not installed")
 
-  local servers = require("nvim-lsp-installer.servers")
+  local mason = require("mason.ui.instance")
+  local p = registry.get_package("jdtls")
+  if p then
+    vim.notify("Installing JDTLS language server...", vim.log.levels.INFO)
+    mason.window.open()
+    p:install()
+  end
 
-  vim.notify("Installing JDTLS language server...", vim.log.levels.INFO)
-  installer.install("jdtls")
-
-  local timer = vim.loop.new_timer()
-  timer:start(2000, 1500, function()
-    if servers.is_server_installed("jdtls") then
-      timer:close()
-      installer.info_window.close()
-      vim.defer_fn(function()
-        M.jdtls_setup(M.config)
-        vim.notify("JDTLS language server installed, completion should work now", vim.log.levels.INFO)
-      end, 100)
-    end
-  end)
+  local timer = vim.uv.new_timer()
+  timer:start(
+    2000,
+    1500,
+    vim.schedule_wrap(function()
+      if registry.is_installed("jdtls") then
+        timer:close()
+        mason.window.close()
+        vim.defer_fn(function()
+          M.jdtls_setup(M.config)
+          vim.notify("JDTLS language server installed, completion should work now", vim.log.levels.INFO)
+        end, 100)
+      end
+    end)
+  )
 end
 
 local function resolve_jdtls()
-  local ok, servers = pcall(require, "nvim-lsp-installer.servers")
-  assert(ok, "nvim-lsp-installer is not installed")
+  local ok, registry = pcall(require, "mason-registry")
+  assert(ok, "mason is not installed")
 
-  if servers.is_server_installed("jdtls") then
-    local jdtls_path = servers.get_server_install_path("jdtls")
+  if registry.is_installed("jdtls") then
+    local jdtls_path = registry.get_package("jdtls"):get_install_path()
     return {
       jar = vim.fn.expand(jdtls_path .. "/plugins/org.eclipse.equinox.launcher_*.jar"),
       config = vim.fn.expand(jdtls_path .. "/config_" .. vim.g["utils#OS"]),
@@ -108,9 +119,8 @@ local function resolve_java_debug()
   )
   local skip_flag = path.get_workspace_dir() .. ".skip-java-debug"
   if vim.fn.filereadable(java_debug) == 0 and vim.fn.filereadable(skip_flag) == 0 then
-    local answer = vim.fn.input(
-      "No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: "
-    )
+    local answer =
+      vim.fn.input("No java debug plugin installed. Would you like to install?\n1: Yes\n2: No\nYour answer: ")
     if answer == "1" then
       install_from_git(nil, "java-debug", "https://github.com/microsoft/java-debug/")
     elseif answer == "2" then
@@ -193,33 +203,72 @@ local function lspconfig_setup(paths)
     paths.java_debug,
   }
 
-  require("lspconfig").jdtls.setup({
-    name = "jdtls",
-    root_dir = function()
-      return vim.fn.getcwd()
-    end,
-    on_attach = M.config.jc_on_attach,
-    cmd = cmd,
-    settings = settings,
-    init_options = {
-      bundles = bundles,
-      extendedClientCapabilities = {
-        progressReportProvider = true,
-        classFileContentsSupport = true,
-        generateToStringPromptSupport = true,
-        hashCodeEqualsPromptSupport = true,
-        advancedExtractRefactoringSupport = true,
-        advancedOrganizeImportsSupport = true,
-        generateConstructorsPromptSupport = true,
-        generateDelegateMethodsPromptSupport = true,
-        moveRefactoringSupport = true,
-        overrideMethodsPromptSupport = true,
-        inferSelectionSupport = { "extractMethod", "extractVariable", "extractConstant" },
-      },
-      workspace = path.get_project_dirs().workspace_dir,
-    },
+  vim.api.nvim_create_autocmd("LspAttach", {
+    callback = M.config.jc_on_attach,
   })
-  require("lspconfig.configs")["jdtls"].launch()
+
+  local caps = vim.tbl_deep_extend(
+    "keep",
+    require("cmp_nvim_lsp").default_capabilities() or nil,
+    vim.lsp.protocol.make_client_capabilities(),
+    {
+      textDocument = {
+        codeAction = {
+          codeActionLiteralSupport = {
+            codeActionKind = {
+              valueSet = {
+                "textDocument",
+                "codeAction",
+                "codeActionLiteralSupport",
+                "codeActionKind",
+                "valueSet",
+              },
+            },
+          },
+        },
+      },
+    }
+  )
+
+  local function attach()
+    require("jdtls").start_or_attach({
+      name = "jdtls",
+      root_dir = vim.fn.getcwd(),
+      on_attach = M.config.jc_on_attach,
+      cmd = cmd,
+      settings = settings,
+      init_options = {
+        bundles = bundles,
+        extendedClientCapabilities = {
+          classFileContentsSupport = true,
+          generateToStringPromptSupport = true,
+          hashCodeEqualsPromptSupport = true,
+          advancedExtractRefactoringSupport = true,
+          advancedOrganizeImportsSupport = true,
+          generateConstructorsPromptSupport = true,
+          generateDelegateMethodsPromptSupport = true,
+          moveRefactoringSupport = true,
+          overrideMethodsPromptSupport = true,
+          executeClientCommandSupport = true,
+          inferSelectionSupport = {
+            "extractMethod",
+            "extractVariable",
+            "extractConstant",
+            "extractVariableAllOccurrence",
+          },
+        },
+        capabilities = caps,
+        workspace = path.get_project_dirs().workspace_dir,
+      },
+    })
+  end
+
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = { "java" },
+    callback = attach,
+  })
+
+  attach()
 end
 
 function M.jdtls_setup(config)

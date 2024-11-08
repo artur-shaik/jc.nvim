@@ -1,5 +1,5 @@
 function! s:OnSave()
-  if get(g:, 'jc_autoformat_on_save', 1)
+  if get(g:, 'jc_autoformat_on_save', 0)
     if has('nvim-0.8.0')
       lua vim.lsp.buf.format({ async = false })
     endif
