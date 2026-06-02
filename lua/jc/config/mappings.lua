@@ -4,13 +4,15 @@ function M.install_mappings(conf, bufnr)
   local opts = { noremap = true, silent = true }
   local prefix = conf.keys_prefix
 
-  vim.api.nvim_set_keymap("n", prefix .. "da", "<cmd>lua require('jc.vimspector').debug_attach()<CR>", opts)
+  -- routes to dap or vimspector (see jc.debug.backend / vim.g.jc_debug_backend)
+  vim.api.nvim_set_keymap("n", prefix .. "da", "<cmd>lua require('jc.debug').debug_attach()<CR>", opts)
+  vim.api.nvim_set_keymap("n", prefix .. "dl", "<cmd>lua require('jc.debug').debug_launch()<CR>", opts)
 
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     prefix .. "i",
-    "<cmd>lua require('jc.jdtls').organize_imports(true)<CR>",
+    "<cmd>lua require('jc.jdtls').organize_imports(" .. bufnr .. ", true)<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(

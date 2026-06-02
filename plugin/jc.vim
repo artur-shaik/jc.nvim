@@ -9,9 +9,11 @@ autocmd! BufReadCmd jdt://*
 autocmd! BufReadCmd *.class
 autocmd BufReadCmd,FileReadCmd,SourceCmd jdt://* lua require('jc.jdtls').read_class_content(vim.fn.expand("<amatch>"))
 
-command! JCdebugAttach lua require('jc.vimspector').debug_attach()
-command! JCdebugLaunch lua require('jc.vimspector').debug_launch()
+command! JCdebugAttach lua require('jc.debug').debug_attach()
+command! JCdebugLaunch lua require('jc.debug').debug_launch()
 command! JCdebugWithConfig lua require('jc.vimspector').debug_choose_configuration()
+command! JCdapAttach lua require('jc.dap').debug_attach()
+command! JCvimspectorAttach lua require('jc.vimspector').debug_attach()
 command! JCimportsOrganizeSmart lua require('jc.jdtls').organize_imports(true)
 command! JCimportsOrganize lua require('jc.jdtls').organize_imports(false)
 command! JCgenerateToString lua require('jc.jdtls').generate_toString()
