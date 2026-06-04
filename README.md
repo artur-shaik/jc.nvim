@@ -6,90 +6,51 @@ Read my [blog post](https://shaik.link/posts/javacomplete-to-jc.nvim/) about it.
 
 Main goal of this project is to migrate functionallty of jc2.
 
-In addition to autocompletion it can:
+jc.nvim is a **layer on top of an externally managed jdtls**: it never
+starts the language server itself. Run jdtls with
+[nvim-java](https://github.com/nvim-java/nvim-java),
+[nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls) or
+nvim-lspconfig — jc.nvim hooks into whatever `jdtls` client attaches and
+adds:
 
 - organize imports with smart selection regular classes;
 - generate code (`toString`, `hashCode`, `equals`, constructors, accessors) with field selection;
 - add abstract methods to implementing class;
-- execute [vimspector](https://github.com/puremourning/vimspector) debug session;
-- automatic installation of jdt.ls and java-debug extension;
+- debug attach/launch via [nvim-dap](https://github.com/mfussenegger/nvim-dap) or [vimspector](https://github.com/puremourning/vimspector), with per-project host/port memory;
+- decompiled `jdt://` class contents view;
 - class creation methods from `jc2`.
 
 ## Installation
 
-Minimal setup using `LazyVim`:
+Requirements:
+
+- a running `jdtls` managed by nvim-java, nvim-jdtls or lspconfig. The
+  server must be started with `extendedClientCapabilities` (notably
+  `executeClientCommandSupport` and `advancedOrganizeImportsSupport`) —
+  nvim-java and nvim-jdtls do this out of the box;
+- for debug attach: the [java-debug](https://github.com/microsoft/java-debug)
+  bundle loaded into jdtls (nvim-java bundles it; with nvim-jdtls add it to
+  `init_options.bundles`);
+- optional: [nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls) for
+  extract refactorings and `JCutil*` commands.
+
+Minimal setup using `lazy.nvim` (jdtls managed by nvim-java):
 
 ```lua
 return {
   {
-    "mfussenegger/nvim-jdtls",
-    config = function() end,
-  },
-  {
-    "puremourning/vimspector",
-    keys = {
-      {
-        "<leader>vr",
-        "<Cmd>VimspectorReset<cr>",
-      },
-      {
-        "<leader>vb",
-        "<Cmd>VimspectorBreakpoints<cr>",
-      },
-    },
-    init = function()
-      vim.g.vimspector_enable_mappings = "HUMAN"
-    end,
-  },
-  {
-    dir = "artur-shaik/jc.nvim",
-    name = "jc.nvim",
-    dependencies = {
-      "puremourning/vimspector",
-      "mfussenegger/nvim-jdtls",
-      "williamboman/mason.nvim",
-    },
+    "artur-shaik/jc.nvim",
     ft = { "java" },
+    dependencies = {
+      "nvim-java/nvim-java",
+      "mfussenegger/nvim-jdtls", -- optional, refactorings and JCutil*
+    },
     opts = {
-      java_exec = "/path/to/candidates/java/17.0.7-oracle/bin/java",
       keys_prefix = "'j",
-      settings = {
-        java = {
-          configuration = {
-            runtimes = {
-              {
-                name = "JavaSE-11",
-                path = "/path/to/candidates/java/11.0.12-open/",
-                default = true,
-              },
-            },
-          },
-        },
-      },
     },
   },
 }
 ```
-
-lspconfig:
-
-```lua
-return {
-  {
-    "neovim/nvim-lspconfig",
-    opts = {
-      servers = {
-        jdtls = {},
-      },
-      setup = {
-        jdtls = function()
-          return true
-        end,
-      },
-    },
-```
-
-For triggering autocompletion automatically consider [configure nvim-cmp](https://github.com/hrsh7th/nvim-cmp/#recommended-configuration).
 
 ## Configurations
 

@@ -6,6 +6,10 @@ function! s:OnSave()
   endif
 endfunction
 
+" jc.nvim never starts jdtls itself — it only hooks into an externally
+" managed jdtls client (nvim-java, nvim-jdtls, lspconfig, ...).
+" The g:jc_nvim_autoload guard is kept for backward compatibility with
+" configs that used it to suppress the old built-in server bootstrap.
 function! jc#Autoload()
   if exists('g:jc_nvim_autoload') | return | endif
   let g:jc_nvim_autoload = v:true
@@ -15,11 +19,7 @@ function! jc#Autoload()
     autocmd BufWrite *.java call s:OnSave()
   augroup END
 
-  if !exists('g:jc_default_mappings')
-    let g:jc_default_mappings = v:true
-  endif
-
-  lua require('jc').run_setup()
+  lua require('jc').ensure_setup()
 endfunction
 
 function! jc#toggleAutoformat()

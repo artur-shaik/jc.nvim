@@ -1,30 +1,75 @@
 local lsp = require("jc.lsp")
-local server = require("jc.server")
 
-M = {}
+local M = {}
 local user_on_attach = function(_, _) end
 
-local config = {
-  java_exec = "java",
-  jc_on_attach = function(args)
-    if args.data then
-      local client = vim.lsp.get_client_by_id(args.data.client_id)
-      lsp.on_attach(M.config, client, args.buf)
-      user_on_attach(client, args.buf)
-    end
-  end,
+local default_config = {
   keys_prefix = "<leader>j",
 }
 
-M.setup = function(args)
-  if args.on_attach then
-    user_on_attach = args.on_attach
+M.config = vim.deepcopy(default_config)
+
+local did_setup = false
+
+-- jol path for nvim-jdtls' :JCutilJol — best-effort lookup in the local
+-- maven repository, no installation attempted
+local function resolve_jol_path()
+  local ok, jdtls = pcall(require, "jdtls")
+  if not ok or jdtls.jol_path then
+    return
   end
-  M.config = vim.tbl_deep_extend("keep", args, config)
+  local jol = vim.fn.glob(vim.fn.expand("~/.m2/repository/org/openjdk/jol/jol-cli/*/jol-cli-*-full.jar"))
+  if jol ~= "" then
+    jdtls.jol_path = vim.split(jol, "\n")[1]
+  end
 end
 
-function M.run_setup()
-  server.jdtls_setup(M.config)
+local function on_jdtls_attach(client, bufnr)
+  lsp.on_attach(M.config, client, bufnr)
+  user_on_attach(client, bufnr)
+end
+
+-- jc.nvim is a layer over an externally managed jdtls (nvim-java,
+-- nvim-jdtls, lspconfig, ...): it never starts the server itself, only
+-- hooks into whatever jdtls client attaches.
+function M.setup(args)
+  args = args or {}
+  did_setup = true
+
+  if args.on_attach then
+    user_on_attach = args.on_attach
+    args.on_attach = nil
+  end
+  M.config = vim.tbl_deep_extend("keep", args, default_config)
+
+  resolve_jol_path()
+
+  local group = vim.api.nvim_create_augroup("jc_nvim_attach", { clear = true })
+  vim.api.nvim_create_autocmd("LspAttach", {
+    group = group,
+    callback = function(a)
+      local client = vim.lsp.get_client_by_id(a.data.client_id)
+      if client and client.name == "jdtls" then
+        on_jdtls_attach(client, a.buf)
+      end
+    end,
+  })
+
+  -- jdtls may already be attached when setup runs (lazy-loaded plugin,
+  -- session restore) — hook into the existing clients too
+  for _, client in ipairs(vim.lsp.get_clients({ name = "jdtls" })) do
+    for bufnr, _ in pairs(client.attached_buffers or {}) do
+      on_jdtls_attach(client, bufnr)
+    end
+  end
+end
+
+-- idempotent entry point for the FileType autocmd (autoload/jc.vim):
+-- doesn't clobber an explicit setup{} done by the user's plugin manager
+function M.ensure_setup()
+  if not did_setup then
+    M.setup()
+  end
 end
 
 return M

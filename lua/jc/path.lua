@@ -10,7 +10,6 @@ end
 local function find_project_path()
   local result = {
     data_dir = vim.fn["project_root#get_basedir"]("data"),
-    vendor_dir = vim.fn["project_root#get_basedir"]("vendor"),
     project_root_file = vim.fn["project_root#find"](),
   }
 
@@ -33,10 +32,6 @@ end
 
 function M.get_workspace_dir()
   return M.get_project_dirs().workspace_dir
-end
-
-function M.get_vendor_dir()
-  return M.get_project_dirs().vendor_dir
 end
 
 return M
