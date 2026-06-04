@@ -45,9 +45,8 @@ local function choose_imports(params, _)
 end
 
 local function set_configuration(settings)
-  vim.lsp.buf_request(0, "workspace/didChangeConfiguration", {
-    settings = settings,
-  }, function() end)
+  -- didChangeConfiguration is a notification, and only jdtls should get it
+  lsp.jdtls_notify("workspace/didChangeConfiguration", { settings = settings })
 end
 
 local client_commands = {
@@ -63,7 +62,7 @@ vim.lsp.handlers["workspace/executeClientCommand"] = function(_, params, ctx)
 end
 
 local function document_symbols(callback)
-  vim.lsp.buf_request(
+  lsp.jdtls_request(
     0,
     "textDocument/documentSymbol",
     { textDocument = vim.lsp.util.make_text_document_params() },
@@ -98,7 +97,7 @@ function M.generate_accessors(fields)
   if not fields then
     local params = make_range_params()
     params.kind = 2
-    vim.lsp.buf_request(0, "java/resolveUnimplementedAccessors", params, function(err, resp)
+    lsp.jdtls_request(0, "java/resolveUnimplementedAccessors", params, function(err, resp)
       if resp then
         vim.fn["generators#GenerateAccessors"](resp)
       else
@@ -110,7 +109,7 @@ function M.generate_accessors(fields)
       ["java.codeGeneration.insertionLocation"] = "lastMember",
     })
 
-    vim.lsp.buf_request(0, "java/generateAccessors", {
+    lsp.jdtls_request(0, "java/generateAccessors", {
       context = make_range_params(),
       accessors = fields,
     }, apply_edit)
@@ -159,7 +158,7 @@ function M.generate_abstractMethods()
         line = line,
       },
     }
-    vim.lsp.buf_request(curbuf, "textDocument/codeAction", params, function(err, actions)
+    lsp.jdtls_request(curbuf, "textDocument/codeAction", params, function(err, actions)
       if actions then
         local add_method_action = nil
         for _, action in ipairs(actions) do
@@ -169,7 +168,7 @@ function M.generate_abstractMethods()
           end
         end
         if add_method_action then
-          vim.lsp.buf_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
+          lsp.jdtls_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
         else
           vim.notify("No action found", vim.log.levels.INFO)
         end
@@ -182,7 +181,7 @@ end
 
 function M.generate_constructor(fields, params, opts)
   if fields == nil then
-    vim.lsp.buf_request(0, "java/checkConstructorsStatus", make_range_params(), function(err, resp)
+    lsp.jdtls_request(0, "java/checkConstructorsStatus", make_range_params(), function(err, resp)
       if resp then
         vim.fn["generators#GenerateConstructor"](resp.fields, resp.constructors, opts)
       else
@@ -202,7 +201,7 @@ function M.generate_constructor(fields, params, opts)
       diagnostics = {},
       only = nil,
     }
-    vim.lsp.buf_request(0, "java/generateConstructors", {
+    lsp.jdtls_request(0, "java/generateConstructors", {
       context = context,
       fields = fields,
       constructors = params.constructors,
@@ -212,7 +211,7 @@ end
 
 function M.generate_hashCodeAndEquals(fields)
   if not fields then
-    vim.lsp.buf_request(0, "java/checkHashCodeEqualsStatus", make_range_params(), function(err, resp)
+    lsp.jdtls_request(0, "java/checkHashCodeEqualsStatus", make_range_params(), function(err, resp)
       if resp then
         vim.fn["generators#GenerateHashCodeAndEquals"](resp.fields)
       else
@@ -224,7 +223,7 @@ function M.generate_hashCodeAndEquals(fields)
       ["java.codeGeneration.insertionLocation"] = "lastMember",
     })
 
-    vim.lsp.buf_request(0, "java/generateHashCodeEquals", {
+    lsp.jdtls_request(0, "java/generateHashCodeEquals", {
       context = make_range_params(),
       fields = fields,
       regenerate = true,
@@ -234,7 +233,7 @@ end
 
 function M.generate_toString(fields, params)
   if not fields then
-    vim.lsp.buf_request(0, "java/checkToStringStatus", make_range_params(), function(err, resp)
+    lsp.jdtls_request(0, "java/checkToStringStatus", make_range_params(), function(err, resp)
       if resp then
         vim.fn["generators#GenerateToString"](resp.fields)
       else
@@ -247,7 +246,7 @@ function M.generate_toString(fields, params)
       ["java.codeGeneration.insertionLocation"] = "lastMember",
     })
 
-    vim.lsp.buf_request(0, "java/generateToString", {
+    lsp.jdtls_request(0, "java/generateToString", {
       context = make_range_params(),
       fields = fields,
     }, apply_edit)
@@ -256,7 +255,7 @@ end
 
 function M.organize_imports(bn, smart)
   M.organize_imports_smart = smart
-  vim.lsp.buf_request(bn, "java/organizeImports", make_range_params(), apply_edit)
+  lsp.jdtls_request(bn, "java/organizeImports", make_range_params(), apply_edit)
 end
 
 -- jdt.ls declares java/projectConfigurationUpdate as a JsonNotification:

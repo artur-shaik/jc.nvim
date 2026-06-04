@@ -44,6 +44,25 @@ function M.executeCommand(command, callback, on_failure)
   end
 end
 
+-- send a request to the jdtls client only — vim.lsp.buf_request would
+-- broadcast java/* methods to every client attached to the buffer and
+-- non-jdtls ones (spring-boot LS, ...) answer with MethodNotFound errors
+function M.jdtls_request(bufnr, method, params, handler)
+  local client = M.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  client:request(method, params, handler, bufnr)
+end
+
+function M.jdtls_notify(method, params)
+  local client = M.get_jdtls_client()
+  if client then
+    client:notify(method, params)
+  end
+end
+
 function M.get_jdtls_client()
   local clients = vim.lsp.get_clients()
   for _, client in ipairs(clients) do
