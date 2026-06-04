@@ -3,6 +3,13 @@ local paths = require("jc.path")
 RegularImports = {}
 
 function RegularImports.new()
+  local workspace_dir = paths.get_workspace_dir()
+  if vim.fn.isdirectory(workspace_dir) ~= 1 then
+    local ok, err = pcall(vim.fn.mkdir, workspace_dir, "p")
+    if not ok then
+      vim.notify("jc: couldn't create workspace dir " .. workspace_dir .. ": " .. tostring(err), vim.log.levels.WARN)
+    end
+  end
   return setmetatable({}, { __index = RegularImports })
 end
 

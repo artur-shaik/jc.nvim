@@ -19,10 +19,16 @@ function M.install_mappings(conf, bufnr)
     bufnr,
     "n",
     prefix .. "I",
-    "<cmd>lua require('jc.jdtls').organize_imports(false)<CR>",
+    "<cmd>lua require('jc.jdtls').organize_imports(" .. bufnr .. ", false)<CR>",
     opts
   )
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "i",
+    "<C-j>i",
+    "<cmd>lua require('jc.jdtls').organize_imports(" .. bufnr .. ", false)<CR>",
+    opts
+  )
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "ts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
   vim.api.nvim_buf_set_keymap(
     bufnr,

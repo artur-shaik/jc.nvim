@@ -3,6 +3,9 @@ local chains = require("jc.chains")()
 
 local M = {}
 
+-- delay between chained code-gen commands (see apply_edit)
+M.chain_delay_ms = 600
+
 function M.on_attach(conf, _, bufnr)
   config.initialize_configuration(conf, bufnr)
 end
@@ -12,7 +15,8 @@ function M.executeCommand(command, callback, on_failure)
   local capableClient = nil
 
   for _, client in pairs(clients) do
-    for _, serverCommand in ipairs(client.server_capabilities.executeCommandProvider.commands) do
+    local provider = client.server_capabilities.executeCommandProvider
+    for _, serverCommand in ipairs(provider and provider.commands or {}) do
       if serverCommand == command.command then
         capableClient = client
         break
@@ -60,9 +64,11 @@ function M.apply_edit(err, response)
   elseif err then
     vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
+  -- jdtls needs time to apply the edit and refresh diagnostics before the
+  -- next chained command (e.g. generate_abstractMethods reads diagnostics)
   vim.defer_fn(function()
     chains:execute_next_if_exists()
-  end, 600)
+  end, M.chain_delay_ms)
 end
 
 return M

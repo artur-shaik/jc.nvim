@@ -5,25 +5,32 @@ local apply_edit = require("jc.lsp").apply_edit
 local M = {}
 
 local function choose_imports(params, _)
+  local candidates = params.arguments[2][1].candidates
+  local regulars = regular_imports()
+  local known = regulars:load()
+  local to_forget = {}
   local prompt = "Choose candidate:\n"
-  for i, candidate in ipairs(params.arguments[2][1].candidates) do
+  for i, candidate in ipairs(candidates) do
     prompt = prompt .. i .. ". " .. candidate.fullyQualifiedName .. "\n"
-    for _, value in pairs(regular_imports():load()) do
+    for _, value in ipairs(known) do
       if value == candidate.fullyQualifiedName then
         if M.organize_imports_smart then
           return { candidate }
         else
-          regular_imports():remove(candidate.fullyQualifiedName)
+          table.insert(to_forget, candidate.fullyQualifiedName)
         end
       end
     end
   end
+  for _, name in ipairs(to_forget) do
+    regulars:remove(name)
+  end
   local choice = tonumber(vim.fn.input(prompt .. "Your choice: "))
 
-  if params.arguments[2][1].candidates[choice] ~= nil then
-    regular_imports():add(params.arguments[2][1].candidates[choice].fullyQualifiedName)
+  if candidates[choice] ~= nil then
+    regulars:add(candidates[choice].fullyQualifiedName)
   end
-  return { params.arguments[2][1].candidates[choice] }
+  return { candidates[choice] }
 end
 
 local function set_configuration(settings)
@@ -126,7 +133,7 @@ function M.generate_abstractMethods()
       })
     end
   end
-  if diagnostics then
+  if #diagnostics > 0 then
     local params = vim.lsp.util.make_range_params()
     params.context = {
       diagnostics = diagnostics,
@@ -141,7 +148,6 @@ function M.generate_abstractMethods()
         line = line,
       },
     }
-    vim.notify(vim.print(params), vim.log.levels.DEBUG)
     vim.lsp.buf_request(curbuf, "textDocument/codeAction", params, function(err, actions)
       if actions then
         local add_method_action = nil
@@ -152,7 +158,6 @@ function M.generate_abstractMethods()
           end
         end
         if add_method_action then
-          vim.notify(vim.print(add_method_action), vim.log.levels.DEBUG)
           vim.lsp.buf_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
         else
           vim.notify("No action found", vim.log.levels.INFO)
@@ -238,9 +243,9 @@ function M.generate_toString(fields, params)
   end
 end
 
-function M.organize_imports(smart)
+function M.organize_imports(bn, smart)
   M.organize_imports_smart = smart
-  vim.lsp.buf_request(0, "java/organizeImports", vim.lsp.util.make_range_params(), apply_edit)
+  vim.lsp.buf_request(bn, "java/organizeImports", vim.lsp.util.make_range_params(), apply_edit)
 end
 
 function M.read_class_content(uri)
@@ -251,6 +256,10 @@ function M.read_class_content(uri)
   end
 
   local response = client.request_sync("java/classFileContents", { uri = uri })
+  if not response or response.err or not response.result then
+    vim.notify("jc: couldn't load class contents: " .. vim.inspect(response and response.err), vim.log.levels.ERROR)
+    return
+  end
   local bufnr = vim.uri_to_bufnr(uri)
   vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(response.result, "\n"))

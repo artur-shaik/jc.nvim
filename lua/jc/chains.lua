@@ -5,6 +5,7 @@ function Chains:new()
 end
 
 function Chains:add(command)
+  assert(type(command) == "function", "jc.chains: command must be a function")
   table.insert(self.queue, command)
 end
 
@@ -16,8 +17,10 @@ function Chains:execute_next_if_exists()
 end
 
 function Chains:execute(command)
-  print("executing command: " .. command)
-  vim.fn.luaeval(command)
+  local ok, err = pcall(command)
+  if not ok then
+    vim.notify("jc.chains: " .. tostring(err), vim.log.levels.ERROR)
+  end
 end
 
 local chains

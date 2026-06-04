@@ -280,22 +280,22 @@ function! s:CreateClass(data)
     silent execute "normal! j"
     silent execute "w"
     silent execute "e"
-    lua require('jc.chains')():add("require('jc.jdtls').organize_imports()")
+    lua require('jc.chains')():add(function() require('jc.jdtls').organize_imports(0, false) end)
     let methods = get(a:data, 'methods', {})
     if has_key(methods, 'constructor')
-      lua require('jc.chains')():add("require('jc.jdtls').generate_constructor(nil, nil, {default = false})")
+      lua require('jc.chains')():add(function() require('jc.jdtls').generate_constructor(nil, nil, {default = false}) end)
     endif
-    lua require('jc.chains')():add("require('jc.jdtls').generate_abstractMethods()")
+    lua require('jc.chains')():add(function() require('jc.jdtls').generate_abstractMethods() end)
     if !isInterfaceTemplate
       if has_key(a:data, 'fields')
-        lua require('jc.chains')():add("require('jc.jdtls').generate_accessors()")
+        lua require('jc.chains')():add(function() require('jc.jdtls').generate_accessors() end)
       endif
     endif
     if or(has_key(methods, 'equals'), has_key(methods, 'hashCode'))
-      lua require('jc.chains')():add("require('jc.jdtls').generate_hashCodeAndEquals()")
+      lua require('jc.chains')():add(function() require('jc.jdtls').generate_hashCodeAndEquals() end)
     endif
     if has_key(methods, 'toString')
-      lua require('jc.chains')():add("require('jc.jdtls').generate_toString()")
+      lua require('jc.chains')():add(function() require('jc.jdtls').generate_toString() end)
     endif
     lua require('jc.chains')():execute_next_if_exists()
   endif
