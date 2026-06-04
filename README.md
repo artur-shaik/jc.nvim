@@ -104,6 +104,7 @@ fallback when the corresponding option is not passed to `setup`.
 - `JCgenerateClass` – start class generation user input prompt;
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
 - `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
+- `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
 - `JCrefactorExtractVar` – extract variable;
 - `JCrefactorExtractMethod` – extract method (visual range);
 - `JCutilJshell` – execute java shell with project classpath;

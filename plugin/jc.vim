@@ -28,6 +28,7 @@ command! JCgenerateAbstractMethods lua require('jc.jdtls').generate_abstractMeth
 command! JCgenerateClass lua require('jc.class_generator').generate_class()
 command! JCtoggleAutoformat call jc#toggleAutoformat()
 command! JCutilUpdateConfig lua require('jc.jdtls').update_project_config()
+command! JCutilWipeWorkspace lua require('jc.jdtls').wipe_workspace()
 command! JCrefactorExtractVar lua require('jc.refactor').extract_variable()
 command! -range JCrefactorExtractMethod lua require('jc.refactor').extract_method(true)
 command! JCutilJol lua require('jc.tools').jol()

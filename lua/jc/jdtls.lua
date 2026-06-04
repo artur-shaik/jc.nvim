@@ -272,6 +272,121 @@ function M.update_project_config()
   vim.notify("jc: project configuration update requested", vim.log.levels.INFO)
 end
 
+local function data_dir_from_args(args)
+  for i, arg in ipairs(args) do
+    if arg == "-data" then
+      return args[i + 1]
+    end
+  end
+  return nil
+end
+
+local function data_dir_from_cmdline_string(s)
+  return s:match('%-data%s+"([^"]+)"') or s:match("%-data%s+(%S+)")
+end
+
+-- jdtls runs as a child process of nvim; its cmdline contains -data even
+-- when the client config builds the command with a function (nvim-java)
+local function data_dir_from_proc()
+  local my_pid = tostring(vim.fn.getpid())
+  if vim.fn.has("linux") == 1 then
+    -- /proc cmdline is NUL-separated, lossless even with spaces in paths
+    for _, pid in ipairs(vim.fn.systemlist({ "pgrep", "-P", my_pid })) do
+      local f = io.open("/proc/" .. pid .. "/cmdline", "r")
+      if f then
+        local cmdline = f:read("*a")
+        f:close()
+        local data_dir = data_dir_from_args(vim.split(cmdline, "\0"))
+        if data_dir then
+          return data_dir
+        end
+      end
+    end
+  elseif vim.fn.has("mac") == 1 or vim.fn.has("bsd") == 1 then
+    for _, pid in ipairs(vim.fn.systemlist({ "pgrep", "-P", my_pid })) do
+      local data_dir = data_dir_from_cmdline_string(vim.fn.system({ "ps", "-o", "command=", "-p", pid }))
+      if data_dir then
+        return data_dir
+      end
+    end
+  elseif vim.fn.has("win32") == 1 then
+    local out = vim.fn.system({
+      "powershell",
+      "-NoProfile",
+      "-Command",
+      "(Get-CimInstance Win32_Process -Filter 'ParentProcessId=" .. my_pid .. "').CommandLine",
+    })
+    return data_dir_from_cmdline_string(out)
+  end
+  return nil
+end
+
+-- nvim-java derives the workspace path from cwd deterministically; ask its
+-- util as a portable last resort (approximate: assumes cwd didn't change
+-- since the server started)
+local function data_dir_from_nvim_java()
+  local ok, java_lsp = pcall(require, "java-core.utils.lsp")
+  if ok and java_lsp.get_jdtls_cache_data_path then
+    return java_lsp.get_jdtls_cache_data_path(vim.fn.getcwd())
+  end
+  return nil
+end
+
+-- delete the jdtls workspace (-data dir, i.e. the eclipse index — the
+-- usual fix for a corrupted project state) and restart the server with
+-- the same configuration, whoever owns it (nvim-java, lspconfig, ...)
+function M.wipe_workspace()
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  local data_dir
+  if type(client.config.cmd) == "table" then
+    data_dir = data_dir_from_args(client.config.cmd)
+  end
+  data_dir = data_dir or data_dir_from_proc() or data_dir_from_nvim_java()
+  if not data_dir or vim.fn.isdirectory(data_dir) ~= 1 then
+    vim.notify("jc: couldn't determine jdtls workspace (-data) directory", vim.log.levels.ERROR)
+    return
+  end
+  vim.ui.select({ "Yes", "No" }, {
+    prompt = "Delete jdtls workspace " .. data_dir .. " and restart LSP?",
+  }, function(choice)
+    if choice ~= "Yes" then
+      return
+    end
+    local config = client.config
+    local client_id = client.id
+    local bufnr = vim.api.nvim_get_current_buf()
+    client:stop()
+    local tries = 0
+    local timer = vim.uv.new_timer()
+    timer:start(
+      100,
+      100,
+      vim.schedule_wrap(function()
+        tries = tries + 1
+        if not vim.lsp.get_client_by_id(client_id) then
+          timer:stop()
+          timer:close()
+          vim.fn.delete(data_dir, "rf")
+          vim.api.nvim_buf_call(bufnr, function()
+            vim.lsp.start(config)
+          end)
+          vim.notify("jc: workspace wiped, jdtls restarted", vim.log.levels.INFO)
+        elseif tries == 30 then
+          client:stop(true) -- graceful shutdown is taking too long
+        elseif tries > 50 then
+          timer:stop()
+          timer:close()
+          vim.notify("jc: jdtls didn't stop, workspace not deleted", vim.log.levels.ERROR)
+        end
+      end)
+    )
+  end)
+end
+
 function M.read_class_content(uri)
   local client = lsp.get_jdtls_client()
   if not client then

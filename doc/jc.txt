@@ -93,6 +93,7 @@ with defaults.
   :JCvimspectorAttach        attach via vimspector explicitly
   :JCdebugWithConfig         choose a vimspector configuration
   :JCutilUpdateConfig        re-read project configuration (pom/gradle)
+  :JCutilWipeWorkspace       delete jdtls workspace (index), restart LSP
   :JCrefactorExtractVar      extract variable
   :JCrefactorExtractMethod   extract method (visual range)
   :JCutilJshell              run java shell with project classpath
