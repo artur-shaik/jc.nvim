@@ -7,6 +7,16 @@ local default_config = {
   keys_prefix = "<leader>j",
 }
 
+-- setup(opts) is the single configuration entry point; these opts are
+-- bridged to the legacy g:jc_* variables that vimscript parts and older
+-- configs still read
+local g_bridge = {
+  default_mappings = "jc_default_mappings",
+  autoformat_on_save = "jc_autoformat_on_save",
+  debug_backend = "jc_debug_backend",
+  basedir = "jc_basedir",
+}
+
 M.config = vim.deepcopy(default_config)
 
 local did_setup = false
@@ -39,6 +49,12 @@ function M.setup(args)
   if args.on_attach then
     user_on_attach = args.on_attach
     args.on_attach = nil
+  end
+  for opt, gvar in pairs(g_bridge) do
+    if args[opt] ~= nil then
+      vim.g[gvar] = args[opt]
+      args[opt] = nil
+    end
   end
   M.config = vim.tbl_deep_extend("keep", args, default_config)
 

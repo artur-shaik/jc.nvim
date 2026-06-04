@@ -7,21 +7,10 @@
 -- `vscode.java.startDebugSession` and connect a plain `server` adapter, then
 -- send a JDWP attach (hostName/port = the running JVM).
 local M = {}
-local settings = require("jc.settings")
 local lsp = require("jc.lsp")
+local ui = require("jc.ui")
 
 local ADAPTER = "jc_java_attach"
-
-local function ask_for(name, default)
-  local default_result = settings.read_project("debug-" .. name, default)
-  local result = vim.fn.input("Debug " .. name .. " (" .. default_result .. "): ")
-  if #result == 0 then
-    result = default_result
-  elseif result ~= default_result then
-    settings.write_project("debug-" .. name, result)
-  end
-  return result
-end
 
 -- register an adapter that resolves the java-debug session port on demand
 local function ensure_adapter(dap)
@@ -37,6 +26,8 @@ local function ensure_adapter(dap)
     end)
   end
 end
+
+local do_attach
 
 -- best-effort project name (java-debug needs it to bind breakpoints/sources)
 local function resolve_project(callback)
@@ -58,12 +49,23 @@ function M.debug_attach()
     return
   end
   ensure_adapter(dap)
-  local host = ask_for("host", "127.0.0.1")
-  local port = tonumber(ask_for("port", "5005"))
-  if not port then
-    vim.notify("jc.dap: invalid port", vim.log.levels.ERROR)
-    return
-  end
+  ui.ask_for("host", "127.0.0.1", function(host)
+    if not host:match("^[%w%.%-_]+$") then
+      vim.notify("jc.dap: invalid host: " .. host, vim.log.levels.ERROR)
+      return
+    end
+    ui.ask_for("port", "5005", function(port_input)
+      local port = tonumber(port_input)
+      if not port or port < 1 or port > 65535 then
+        vim.notify("jc.dap: invalid port: " .. port_input, vim.log.levels.ERROR)
+        return
+      end
+      do_attach(dap, host, port)
+    end)
+  end)
+end
+
+function do_attach(dap, host, port)
   resolve_project(function(project_name)
     dap.run({
       type = ADAPTER,

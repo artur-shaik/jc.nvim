@@ -54,9 +54,23 @@ return {
 
 ## Configurations
 
-`g:jc_default_mappings` – apply default mappings (default: 1)
+All options go through `setup(opts)` (or the `opts` table of your plugin
+manager):
 
-`g:jc_autoformat_on_save` – execute code autoformatting on file save (default: 1)
+```lua
+require("jc").setup({
+  keys_prefix = "<leader>j",   -- prefix for the default mappings
+  default_mappings = true,     -- install default mappings on attach
+  autoformat_on_save = false,  -- format java buffers on save
+  debug_backend = nil,         -- "dap" | "vimspector" | nil (auto-detect)
+  basedir = nil,               -- data dir, default ~/.local/share/jc.nvim
+  on_attach = nil,             -- function(client, bufnr) extra hook
+})
+```
+
+The legacy `g:jc_default_mappings`, `g:jc_autoformat_on_save`,
+`g:jc_debug_backend` and `g:jc_basedir` variables still work as a
+fallback when the corresponding option is not passed to `setup`.
 
 ## Commands
 

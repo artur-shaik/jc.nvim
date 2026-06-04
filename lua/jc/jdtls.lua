@@ -33,6 +33,9 @@ local function choose_imports(params, _)
   for _, name in ipairs(to_forget) do
     regulars:remove(name)
   end
+  -- blocking input is intentional: this runs inside the synchronous
+  -- workspace/executeClientCommand handler and must return the chosen
+  -- candidate to jdtls; async vim.ui.select can't do that
   local choice = tonumber(vim.fn.input(prompt .. "Your choice: "))
 
   if candidates[choice] ~= nil then
