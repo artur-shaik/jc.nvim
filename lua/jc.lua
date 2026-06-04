@@ -21,19 +21,6 @@ M.config = vim.deepcopy(default_config)
 
 local did_setup = false
 
--- jol path for nvim-jdtls' :JCutilJol — best-effort lookup in the local
--- maven repository, no installation attempted
-local function resolve_jol_path()
-  local ok, jdtls = pcall(require, "jdtls")
-  if not ok or jdtls.jol_path then
-    return
-  end
-  local jol = vim.fn.glob(vim.fn.expand("~/.m2/repository/org/openjdk/jol/jol-cli/*/jol-cli-*-full.jar"))
-  if jol ~= "" then
-    jdtls.jol_path = vim.split(jol, "\n")[1]
-  end
-end
-
 local function on_jdtls_attach(client, bufnr)
   lsp.on_attach(M.config, client, bufnr)
   user_on_attach(client, bufnr)
@@ -57,8 +44,6 @@ function M.setup(args)
     end
   end
   M.config = vim.tbl_deep_extend("keep", args, default_config)
-
-  resolve_jol_path()
 
   local group = vim.api.nvim_create_augroup("jc_nvim_attach", { clear = true })
   vim.api.nvim_create_autocmd("LspAttach", {

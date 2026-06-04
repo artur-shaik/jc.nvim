@@ -95,23 +95,27 @@ function M.install_mappings(conf, bufnr)
     opts
   )
 
-  if pcall(require, "jdtls") then
-    vim.api.nvim_buf_set_keymap(
-      bufnr,
-      "v",
-      prefix .. "re",
-      "<Esc><Cmd>lua require('jdtls').extract_variable(true)<CR>",
-      opts
-    )
-    vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jre", "<Cmd>lua require('jdtls').extract_variable()<CR>", opts)
-    vim.api.nvim_buf_set_keymap(
-      bufnr,
-      "v",
-      prefix .. "rm",
-      "<Esc><Cmd>lua require('jdtls').extract_method(true)<CR>",
-      opts
-    )
-  end
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "v",
+    prefix .. "re",
+    "<Esc><Cmd>lua require('jc.refactor').extract_variable(true)<CR>",
+    opts
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "re",
+    "<Cmd>lua require('jc.refactor').extract_variable()<CR>",
+    opts
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "v",
+    prefix .. "rm",
+    "<Esc><Cmd>lua require('jc.refactor').extract_method(true)<CR>",
+    opts
+  )
 end
 
 return M

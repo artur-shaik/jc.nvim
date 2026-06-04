@@ -23,6 +23,22 @@ local function get_text(node)
   return result
 end
 
+-- name of the first class declared in the current buffer (used for
+-- decompiled jdt:// buffers where the filename isn't meaningful)
+function M.get_class_name()
+  local tree = vim.treesitter.get_parser():trees()[1]
+  for node in tree:root():iter_children() do
+    if node:type() == "class_declaration" then
+      for child in node:iter_children() do
+        if child:type() == "identifier" then
+          return get_text(child)
+        end
+      end
+    end
+  end
+  return nil
+end
+
 function M.get_package()
   local tree = vim.treesitter.get_parser():trees()[1]
   for node in tree:root():iter_children() do

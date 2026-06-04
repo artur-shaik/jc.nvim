@@ -31,8 +31,8 @@ Requirements:
 - for debug attach: the [java-debug](https://github.com/microsoft/java-debug)
   bundle loaded into jdtls (nvim-java bundles it; with nvim-jdtls add it to
   `init_options.bundles`);
-- optional: [nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls) for
-  extract refactorings and `JCutil*` commands.
+- `JCutilJol` looks for the jol-cli jar in `~/.m2` and offers to download
+  it via maven when missing (or set `require("jc.tools").jol_path`).
 
 Minimal setup using `lazy.nvim` (jdtls managed by nvim-java):
 
@@ -43,7 +43,6 @@ return {
     ft = { "java" },
     dependencies = {
       "nvim-java/nvim-java",
-      "mfussenegger/nvim-jdtls", -- optional, refactorings and JCutil*
     },
     opts = {
       keys_prefix = "'j",
@@ -80,7 +79,8 @@ fallback when the corresponding option is not passed to `setup`.
 | Organize imports | code action | smart mode remembering preferred classes per project |
 | Debug attach | manual dap config | `JCdebugAttach` with per-project host/port memory, dap or vimspector |
 | Class creation from templates | — | `JCgenerateClass` prompt DSL |
-| Extract refactorings | yes | reused from nvim-jdtls when installed |
+| Extract refactorings | yes | built-in (`java/inferSelection` + `java/getRefactorEdit`) |
+| Classpath-aware javap/jshell/jol | yes | built-in |
 
 `:checkhealth jc` verifies the setup; `:help jc` for full docs.
 
@@ -103,15 +103,12 @@ fallback when the corresponding option is not passed to `setup`.
 - `JCgenerateAbstractMethods` – generate abstract methods;
 - `JCgenerateClass` – start class generation user input prompt;
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
-
-Using `nvim-jdtls`:
-
+- `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
 - `JCrefactorExtractVar` – extract variable;
-- `JCrefactorExtractMethod` – extract method;
-- `JCutilJshell` – execute java shell;
-- `JCutilBytecode` – extract bytecode for class;
-- `JCutilJol` – analyze object layout scheme using `jol.jar`;
-- `JCutilUpdateConfig` – update current project's configuration.
+- `JCrefactorExtractMethod` – extract method (visual range);
+- `JCutilJshell` – execute java shell with project classpath;
+- `JCutilBytecode` – extract bytecode for class (javap);
+- `JCutilJol` – analyze object layout scheme using `jol.jar`.
 
 ## Default mappings
 
@@ -134,8 +131,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>m`, i `<C-j>m` | generate abstract methods |
 | n | `<p>n` | new class prompt |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
-| v | `<p>re` / `<p>rm` | extract variable / method (nvim-jdtls) |
-| n | `<leader>jre` | extract variable (nvim-jdtls) |
+| v | `<p>re` / `<p>rm` | extract variable / method (selection) |
+| n | `<p>re` | extract variable (inferred at cursor) |
 
 ## Class creation
 

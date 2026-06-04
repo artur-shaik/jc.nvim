@@ -57,12 +57,6 @@ function M.check()
   end
 
   -- optional integrations
-  if pcall(require, "jdtls") then
-    health.ok("nvim-jdtls found (extract refactorings, JCutil* commands)")
-  else
-    health.info("nvim-jdtls not installed — extract refactorings and JCutil* commands unavailable")
-  end
-
   local backend = require("jc.debug").backend()
   local has_dap = pcall(require, "dap")
   local has_vimspector = vim.fn.exists(":VimspectorReset") == 1
@@ -78,6 +72,12 @@ function M.check()
     )
   else
     health.warn("neither nvim-dap nor vimspector installed — JCdebug* commands won't work")
+  end
+
+  if require("jc.tools").resolve_jol() then
+    health.ok("jol jar: " .. require("jc.tools").jol_path)
+  else
+    health.info("jol jar not found in ~/.m2 — :JCutilJol will offer to download it via maven")
   end
 
   -- java treesitter parser (class generator uses it to resolve packages)

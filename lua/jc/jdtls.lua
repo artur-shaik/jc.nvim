@@ -259,6 +259,19 @@ function M.organize_imports(bn, smart)
   vim.lsp.buf_request(bn, "java/organizeImports", make_range_params(), apply_edit)
 end
 
+-- jdt.ls declares java/projectConfigurationUpdate as a JsonNotification:
+-- there is never a response, so send a notification (nvim-jdtls sends a
+-- request and its success therefore looks like "nothing happened")
+function M.update_project_config()
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  client:notify("java/projectConfigurationUpdate", { uri = vim.uri_from_bufnr(0) })
+  vim.notify("jc: project configuration update requested", vim.log.levels.INFO)
+end
+
 function M.read_class_content(uri)
   local client = lsp.get_jdtls_client()
   if not client then

@@ -43,7 +43,9 @@ nvim-lspconfig) and provides:
 - for debug attach/launch: the java-debug bundle loaded into jdtls
   (nvim-java bundles it; with nvim-jdtls add it to
   `init_options.bundles`) and nvim-dap or vimspector installed;
-- optional nvim-jdtls for extract refactorings and `JCutil*` commands.
+- `:JCutilJol` looks for the jol-cli jar in `~/.m2` and offers to
+  download it via maven when missing (or set
+  `require("jc.tools").jol_path`).
 
 ==============================================================================
 3. SETUP                                                              *jc-setup*
@@ -90,15 +92,12 @@ with defaults.
   :JCdapAttach               attach via nvim-dap explicitly
   :JCvimspectorAttach        attach via vimspector explicitly
   :JCdebugWithConfig         choose a vimspector configuration
-
-With nvim-jdtls installed:
-
+  :JCutilUpdateConfig        re-read project configuration (pom/gradle)
   :JCrefactorExtractVar      extract variable
-  :JCrefactorExtractMethod   extract method
-  :JCutilJshell              run java shell
-  :JCutilBytecode            show bytecode for current class
+  :JCrefactorExtractMethod   extract method (visual range)
+  :JCutilJshell              run java shell with project classpath
+  :JCutilBytecode            show bytecode for current class (javap)
   :JCutilJol                 analyze object layout (jol)
-  :JCutilUpdateConfig        update project configuration
 
 ==============================================================================
 5. MAPPINGS                                                        *jc-mappings*
@@ -123,11 +122,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>n    new class prompt
   n  <p>da   debug attach
   n  <p>dl   debug launch
-
-With nvim-jdtls:
-
-  v  <p>re   extract variable
-  n  <leader>jre  extract variable
+  v  <p>re   extract variable (selection)
+  n  <p>re   extract variable (inferred at cursor)
   v  <p>rm   extract method
 
 ==============================================================================
@@ -162,8 +158,8 @@ Prompt scheme: >
 8. HEALTH                                                            *jc-health*
 
 Run `:checkhealth jc` to verify: neovim version, attached jdtls client,
-organize-imports and java-debug availability, optional integrations
-(nvim-jdtls, nvim-dap/vimspector), treesitter java parser and data dir
+organize-imports and java-debug availability, debug backends
+(nvim-dap/vimspector), jol jar, treesitter java parser and data dir
 permissions.
 
 vim:tw=78:ts=8:noet:ft=help:norl:
