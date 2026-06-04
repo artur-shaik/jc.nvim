@@ -72,10 +72,23 @@ The legacy `g:jc_default_mappings`, `g:jc_autoformat_on_save`,
 `g:jc_debug_backend` and `g:jc_basedir` variables still work as a
 fallback when the corresponding option is not passed to `setup`.
 
+## What it adds over plain nvim-jdtls
+
+| Feature | nvim-jdtls | jc.nvim |
+|---|---|---|
+| Code generation (toString/equals/hashCode/constructors/accessors) | via code actions | dedicated commands and mappings with field selection |
+| Organize imports | code action | smart mode remembering preferred classes per project |
+| Debug attach | manual dap config | `JCdebugAttach` with per-project host/port memory, dap or vimspector |
+| Class creation from templates | — | `JCgenerateClass` prompt DSL |
+| Extract refactorings | yes | reused from nvim-jdtls when installed |
+
+`:checkhealth jc` verifies the setup; `:help jc` for full docs.
+
 ## Commands
 
-- `JCdebugAttach` – start debug session with vimspector attaching to debug port;
-- `JCdebugLaunch` – start debug session with vimspector executing main class;
+- `JCdebugAttach` – attach debugger (nvim-dap or vimspector, see `debug_backend`);
+- `JCdebugLaunch` – launch debug session;
+- `JCdapAttach` / `JCvimspectorAttach` – attach using a specific backend;
 - `JCdebugWithConfig` – start debug session using predefined vimspector's configuration;
 - `JCimportsOrganizeSmart` – automatically organize imports using regular classes list;
 - `JCimportsOrganize` – automatically organize imports choosing from available classes list;
@@ -102,34 +115,27 @@ Using `nvim-jdtls`:
 
 ## Default mappings
 
-```lua
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ji", "<cmd>lua require('jc.jdtls').organize_imports(bufnr, true)<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jI", "<cmd>lua require('jc.jdtls').organize_imports(bufnr, false)<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>i", "<cmd>lua require('jc.jdtls').organize_imports(bufnr, false)<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jts", "<cmd>lua require('jc.jdtls').generate_toString()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jeq", "<cmd>lua require('jc.jdtls').generate_hashCodeAndEquals()<CR>", opts)
+Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
+`keys_prefix` (default `<leader>j`).
 
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jA", "<cmd>lua require('jc.jdtls').generate_accessors()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>js", "<cmd>lua require('jc.jdtls').generate_accessor('s')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jg", "<cmd>lua require('jc.jdtls').generate_accessor('g')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>ja", "<cmd>lua require('jc.jdtls').generate_accessor('gs')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>s", "<cmd>lua require('jc.jdtls').generate_accessor('s')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>g", "<cmd>lua require('jc.jdtls').generate_accessor('g')<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>a", "<cmd>lua require('jc.jdtls').generate_accessor('sg')<CR>", opts)
-
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jc", "<cmd>lua require('jc.jdtls').generate_constructor(nil, nil, {default = false})<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jcc", "<cmd>lua require('jc.jdtls').generate_constructor(nil, nil, {default = true})<CR>", opts)
-
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jam", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "i", "<C-j>am", "<cmd>lua require('jc.jdtls').generate_abstractMethods()<CR>", opts)
-  
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jda", "<cmd>lua require('jc.vimspector').debug_attach()<CR>", opts)
-
--- using `jdtls`
-  vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jre", "<Esc><Cmd>lua require('jdtls').extract_variable(true)<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "n", "<leader>jre", "<Cmd>lua require('jdtls').extract_variable()<CR>", opts)
-  vim.api.nvim_buf_set_keymap(bufnr, "v", "<leader>jrm", "<Esc><Cmd>lua require('jdtls').extract_method(true)<CR>", opts)
-```
+| Mode | Keys | Action |
+|---|---|---|
+| n | `<p>i` | organize imports (smart) |
+| n | `<p>I` | organize imports (manual selection) |
+| i | `<C-j>i` | organize imports |
+| n | `<p>ts` | generate `toString()` |
+| n | `<p>eq` | generate `hashCode()` and `equals()` |
+| n | `<p>A` | generate accessors (field selection) |
+| n | `<p>s` / `<p>g` | generate setter / getter |
+| n | `<leader>ja` | generate getter and setter |
+| i | `<C-j>s` / `<C-j>g` / `<C-j>a` | accessor generation |
+| n | `<p>c` | generate constructor (field selection) |
+| n | `<p>cc` | generate default constructor |
+| n | `<p>m`, i `<C-j>m` | generate abstract methods |
+| n | `<p>n` | new class prompt |
+| n | `<p>da` / `<p>dl` | debug attach / launch |
+| v | `<p>re` / `<p>rm` | extract variable / method (nvim-jdtls) |
+| n | `<leader>jre` | extract variable (nvim-jdtls) |
 
 ## Class creation
 

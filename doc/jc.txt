@@ -1,0 +1,169 @@
+*jc.txt*  Java code generation layer over an external jdtls
+
+Author:  Artur Shaik
+License: same as the plugin repository
+
+==============================================================================
+CONTENTS                                                          *jc-contents*
+
+  1. Introduction ........................... |jc-introduction|
+  2. Requirements ........................... |jc-requirements|
+  3. Setup .................................. |jc-setup|
+  4. Commands ............................... |jc-commands|
+  5. Mappings ............................... |jc-mappings|
+  6. Debugging .............................. |jc-debug|
+  7. Class creation ......................... |jc-class-creation|
+  8. Health ................................. |jc-health|
+
+==============================================================================
+1. INTRODUCTION                                               *jc-introduction*
+
+jc.nvim is a layer on top of an externally managed Eclipse JDT language
+server (jdtls). It never starts or installs the server itself — it hooks
+into whatever `jdtls` LSP client attaches (nvim-java, nvim-jdtls,
+nvim-lspconfig) and provides:
+
+- organize imports with smart selection of remembered classes;
+- code generation: `toString`, `hashCode`/`equals`, constructors,
+  accessors, with interactive field selection;
+- adding unimplemented (abstract) methods;
+- debug attach/launch via nvim-dap or vimspector with per-project
+  host/port memory;
+- decompiled `jdt://` class contents view;
+- template-based class creation (|jc-class-creation|).
+
+==============================================================================
+2. REQUIREMENTS                                               *jc-requirements*
+
+- Neovim >= 0.10 (0.11+ recommended);
+- a running jdtls managed by nvim-java, nvim-jdtls or lspconfig. The
+  server must be started with `extendedClientCapabilities` — notably
+  `executeClientCommandSupport` and `advancedOrganizeImportsSupport`.
+  nvim-java and nvim-jdtls do this out of the box;
+- for debug attach/launch: the java-debug bundle loaded into jdtls
+  (nvim-java bundles it; with nvim-jdtls add it to
+  `init_options.bundles`) and nvim-dap or vimspector installed;
+- optional nvim-jdtls for extract refactorings and `JCutil*` commands.
+
+==============================================================================
+3. SETUP                                                              *jc-setup*
+
+Call `setup` (or use the `opts` table of lazy.nvim): >lua
+
+  require("jc").setup({
+    keys_prefix = "<leader>j",   -- prefix for default mappings
+    default_mappings = true,     -- install default mappings on attach
+    autoformat_on_save = false,  -- format java buffers on save
+    debug_backend = nil,         -- "dap" | "vimspector" | nil = auto
+    basedir = nil,               -- data dir, ~/.local/share/jc.nvim
+    on_attach = nil,             -- function(client, bufnr) extra hook
+  })
+<
+                                                              *jc-legacy-vars*
+The legacy global variables `g:jc_default_mappings`,
+`g:jc_autoformat_on_save`, `g:jc_debug_backend` and `g:jc_basedir` are
+still honored as a fallback when the corresponding option is not passed
+to `setup`.
+
+If `setup` is never called, opening a java file initializes the plugin
+with defaults.
+
+==============================================================================
+4. COMMANDS                                                        *jc-commands*
+
+  :JCimportsOrganizeSmart    organize imports, auto-pick remembered
+                             candidates
+  :JCimportsOrganize         organize imports with manual selection
+  :JCgenerateToString        generate toString() with field selection
+  :JCgenerateHashCodeAndEquals  generate hashCode() and equals()
+  :JCgenerateAccessors       choose fields for accessors generation
+  :JCgenerateAccessorGetter  generate getter for a field
+  :JCgenerateAccessorSetter  generate setter for a field
+  :JCgenerateAccessorSetterGetter  generate getter and setter
+  :JCgenerateConstructorDefault    generate no-arg constructor
+  :JCgenerateConstructor     choose fields for constructor
+  :JCgenerateAbstractMethods generate unimplemented methods
+  :JCgenerateClass           start class generation prompt
+  :JCtoggleAutoformat        toggle autoformat on save
+  :JCdebugAttach             attach debugger (dap or vimspector)
+  :JCdebugLaunch             launch debug session
+  :JCdapAttach               attach via nvim-dap explicitly
+  :JCvimspectorAttach        attach via vimspector explicitly
+  :JCdebugWithConfig         choose a vimspector configuration
+
+With nvim-jdtls installed:
+
+  :JCrefactorExtractVar      extract variable
+  :JCrefactorExtractMethod   extract method
+  :JCutilJshell              run java shell
+  :JCutilBytecode            show bytecode for current class
+  :JCutilJol                 analyze object layout (jol)
+  :JCutilUpdateConfig        update project configuration
+
+==============================================================================
+5. MAPPINGS                                                        *jc-mappings*
+
+Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
+`keys_prefix` (default `<leader>j`).
+
+  n  <p>i    organize imports (smart)
+  n  <p>I    organize imports (manual selection)
+  i  <C-j>i  organize imports
+  n  <p>ts   generate toString()
+  n  <p>eq   generate hashCode() and equals()
+  n  <p>A    generate accessors (field selection)
+  n  <p>s    generate setter
+  n  <p>g    generate getter
+  n  <leader>ja  generate getter and setter
+  i  <C-j>s / <C-j>g / <C-j>a  accessor generation
+  n  <p>c    generate constructor (field selection)
+  n  <p>cc   generate default constructor
+  n  <p>m    generate abstract methods
+  i  <C-j>m  generate abstract methods
+  n  <p>n    new class prompt
+  n  <p>da   debug attach
+  n  <p>dl   debug launch
+
+With nvim-jdtls:
+
+  v  <p>re   extract variable
+  n  <leader>jre  extract variable
+  v  <p>rm   extract method
+
+==============================================================================
+6. DEBUGGING                                                          *jc-debug*
+
+`JCdebugAttach`/`JCdebugLaunch` route to a backend:
+
+1. `debug_backend` option / `g:jc_debug_backend` if set
+   ("dap" or "vimspector");
+2. auto: nvim-dap installed and vimspector absent -> dap;
+3. fallback: vimspector.
+
+Attach asks for host and port (defaults remembered per project under
+the data dir). The adapter port is resolved from jdtls via
+`vscode.java.startDebugSession`, which requires the java-debug bundle.
+
+==============================================================================
+7. CLASS CREATION                                            *jc-class-creation*
+
+Prompt scheme: >
+
+  template:[subdir]:/package.ClassName extends Super implements If(String s, public Integer i):constructor:toString:equals
+<
+- template (optional): junit, interface, exception, servlet, ...;
+- subdir (optional): e.g. test, androidTest;
+- class name and package; with `/` parent package backsearch is used;
+- extends/implements classes are imported automatically;
+- field list: `private` by default, modifiers can be given;
+- trailing flags: constructor, toString, equals, hashCode.
+
+==============================================================================
+8. HEALTH                                                            *jc-health*
+
+Run `:checkhealth jc` to verify: neovim version, attached jdtls client,
+organize-imports and java-debug availability, optional integrations
+(nvim-jdtls, nvim-dap/vimspector), treesitter java parser and data dir
+permissions.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
