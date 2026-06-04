@@ -1,8 +1,10 @@
 std = "luajit"
 cache = true
 codes = true
+self = false
 
-read_globals = {
+-- vim is writable: the plugin sets vim.g.*, vim.bo.* and lsp handlers
+globals = {
   "vim",
 }
 
