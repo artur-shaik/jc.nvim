@@ -1,6 +1,6 @@
 local paths = require("jc.path")
 
-RegularImports = {}
+local RegularImports = {}
 
 function RegularImports.new()
   local workspace_dir = paths.get_workspace_dir()

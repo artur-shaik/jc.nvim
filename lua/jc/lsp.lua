@@ -30,7 +30,7 @@ function M.executeCommand(command, callback, on_failure)
   if not capableClient then
     callback({ error = "No capable client found for this command" }, nil)
   else
-    capableClient.request("workspace/executeCommand", command, function(error, response)
+    capableClient:request("workspace/executeCommand", command, function(error, response)
       if error then
         if on_failure then
           on_failure()
@@ -54,13 +54,20 @@ function M.get_jdtls_client()
   return nil
 end
 
-function M.apply_edit(err, response)
+function M.apply_edit(err, response, ctx)
   if response then
     local edit = response
     if response.edit then
       edit = response.edit
     end
-    vim.lsp.util.apply_workspace_edit(edit, "utf-16")
+    local encoding = "utf-16"
+    if ctx and ctx.client_id then
+      local client = vim.lsp.get_client_by_id(ctx.client_id)
+      if client then
+        encoding = client.offset_encoding
+      end
+    end
+    vim.lsp.util.apply_workspace_edit(edit, encoding)
   elseif err then
     vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
