@@ -1,7 +1,360 @@
+-- New class generator, ported from autoload/class_generator.vim.
+-- Parses the one-line DSL
+--   [template:][[subdir]:][/|/.]package.Class [extends X] [implements Y](fields):flags
+-- resolves the target file path/package, renders a template and queues the
+-- follow-up code generation (constructor/accessors/toString/...).
+local templates = require("jc.templates")
+
 local M = {}
 
+local SEP = package.config:sub(1, 1)
+
+-- ---- small vimscript-list helpers (0-based, inclusive, negatives from end) ----
+
+-- mimic vim's list[i:j] slice (0-based, both ends inclusive, neg from end)
+local function slice(list, i, j)
+  local n = #list
+  if i == nil then
+    i = 0
+  end
+  if j == nil then
+    j = -1
+  end
+  if i < 0 then
+    i = n + i
+  end
+  if j < 0 then
+    j = n + j
+  end
+  local out = {}
+  for k = i, j do
+    out[#out + 1] = list[k + 1] -- 0-based -> 1-based
+  end
+  return out
+end
+
+-- 0-based index of value in list, or -1
+local function index0(list, value)
+  for k, v in ipairs(list) do
+    if v == value then
+      return k - 1
+    end
+  end
+  return -1
+end
+
+local function reversed(list)
+  local out = {}
+  for k = #list, 1, -1 do
+    out[#out + 1] = list[k]
+  end
+  return out
+end
+
+local function trim(s)
+  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+-- ---- parsing ----
+
+local MODS = {
+  public = true,
+  protected = true,
+  private = true,
+  abstract = true,
+  static = true,
+  final = true,
+  strictfp = true,
+}
+
+-- parse "(mods type name, ...)" -> array of { mod, type, name }
+function M.parse_fields(fieldstr)
+  local inner = trim(fieldstr:sub(2, -2)) -- drop surrounding ()
+  if inner == "" then
+    return {}
+  end
+  local fields = {}
+  for part in vim.gsplit(inner, ",", { plain = true }) do
+    local tokens = {}
+    for tok in part:gmatch("%S+") do
+      tokens[#tokens + 1] = tok
+    end
+    -- leading modifier words, then type, then name
+    local mods = {}
+    local i = 1
+    while tokens[i] and MODS[tokens[i]] do
+      mods[#mods + 1] = tokens[i]
+      i = i + 1
+    end
+    local typ = tokens[i]
+    local name = tokens[i + 1]
+    if typ and name then
+      fields[#fields + 1] = {
+        mod = #mods > 0 and table.concat(mods, " ") or "private",
+        type = typ,
+        name = name,
+      }
+    end
+  end
+  return fields
+end
+
+-- parse ":flag(args):flag2" -> map flag -> args array
+function M.parse_methods(flagstr)
+  local methods = {}
+  for method in vim.gsplit(flagstr:sub(2), ":", { plain = true }) do
+    if method ~= "" then
+      local paren = method:find("(", 1, true)
+      if paren and paren > 1 then
+        local name = method:sub(1, paren - 1)
+        local args = {}
+        for arg in vim.gsplit(method:sub(paren + 1, -2), ",", { plain = true }) do
+          args[#args + 1] = arg == "*" and arg or tonumber(arg) or arg
+        end
+        methods[name] = args
+      else
+        methods[method] = {}
+      end
+    end
+  end
+  return methods
+end
+
+-- split the DSL string into its structural pieces (no path resolution yet)
+function M.parse_input(userinput)
+  local rest = userinput
+  local result = {}
+
+  -- template: leading "word:"
+  local template, after = rest:match("^([%w_]+):(.*)$")
+  if template then
+    result.template = template
+    rest = after
+  end
+
+  -- subdir: "[...]:"
+  local subdir, after2 = rest:match("^%[(.-)%]:(.*)$")
+  if subdir then
+    result.subdir = subdir
+    rest = after2
+  end
+
+  -- trailing flags ":..." (first colon at structural level)
+  local colon = rest:find(":", 1, true)
+  if colon then
+    result.flags = rest:sub(colon)
+    rest = rest:sub(1, colon - 1)
+  end
+
+  -- fields "(...)" at the end
+  local fields = rest:match("(%b())%s*$")
+  if fields then
+    result.fields_str = fields
+    rest = rest:sub(1, rest:find("%b()%s*$") - 1)
+  end
+
+  -- implements / extends
+  local impl_at = rest:find("%s+implements%s+")
+  if impl_at then
+    result.implements = trim(rest:sub(impl_at):gsub("%s+implements%s+", "", 1))
+    rest = rest:sub(1, impl_at - 1)
+  end
+  local ext_at = rest:find("%s+extends%s+")
+  if ext_at then
+    result.extends = trim(rest:sub(ext_at):gsub("%s+extends%s+", "", 1))
+    rest = rest:sub(1, ext_at - 1)
+  end
+
+  result.path_str = trim(rest)
+  if result.path_str == "" then
+    return nil
+  end
+  return result
+end
+
+-- relative path: append parsed path to the current package
+local function relative_path(path, new_path, currentPackage)
+  local pkg_parts = {}
+  vim.list_extend(pkg_parts, currentPackage)
+  vim.list_extend(pkg_parts, slice(path, 0, -2))
+  return {
+    path = new_path .. table.concat(slice(path, 0, -2), SEP),
+    class = path[#path],
+    package = table.concat(pkg_parts, "."),
+  }
+end
+
+-- resolve filesystem path + package from the parsed class path; ported 1:1
+-- from s:BuildPathData (currentPath is the REVERSED dir list)
+function M.build_path_data(path, subdir, currentPath, currentPackage)
+  local new_path = ""
+  if subdir and subdir ~= "" then
+    local idx = index0(currentPath, "src")
+    new_path = string.rep(".." .. SEP, idx >= 0 and idx or 0)
+    new_path = new_path .. subdir .. SEP .. "java" .. SEP
+    new_path = new_path .. table.concat(currentPackage, SEP) .. SEP
+  end
+
+  local is_absolute = path[1] == "/" or path[1]:sub(1, 1) == "/"
+  if is_absolute then
+    if path[1] == "/" then
+      path = slice(path, 1, -1)
+    else
+      path[1] = path[1]:sub(2)
+    end
+    local sameSubpackageIdx = index0(currentPath, currentPackage[1])
+    if sameSubpackageIdx < 0 then
+      return relative_path(path, new_path, currentPackage)
+    end
+    local cur = slice(currentPath, 0, sameSubpackageIdx)
+    local idx = index0(cur, path[1])
+    local newPackage
+    if idx < 0 then
+      new_path = new_path .. string.rep(".." .. SEP, #cur)
+      new_path = new_path .. table.concat(slice(path, 0, -2), SEP)
+      newPackage = slice(path, 0, -2)
+    else
+      new_path = new_path .. (idx > 0 and string.rep(".." .. SEP, #slice(cur, 0, idx - 1)) or "")
+      new_path = new_path .. table.concat(slice(path, 1, -2), SEP)
+      newPackage = slice(path, 1, -2)
+      -- prepend the shared parent packages (reversed tail of cur)
+      local prefix = slice(reversed(cur), 0, -idx - 1)
+      local merged = {}
+      vim.list_extend(merged, prefix)
+      vim.list_extend(merged, newPackage)
+      newPackage = merged
+    end
+    return {
+      path = new_path,
+      class = path[#path],
+      package = table.concat(newPackage, "."),
+    }
+  end
+  return relative_path(path, new_path, currentPackage)
+end
+
+-- full DSL -> resolved class data (or nil)
+function M.parse(userinput, currentPath, currentPackage)
+  local parsed = M.parse_input(userinput)
+  if not parsed then
+    return nil
+  end
+  local path = vim.split(parsed.path_str, ".", { plain = true })
+  local data = M.build_path_data(path, parsed.subdir, currentPath, currentPackage)
+  data.template = parsed.template
+  data.extends = parsed.extends
+  data.implements = parsed.implements
+  if parsed.fields_str then
+    local fields = M.parse_fields(parsed.fields_str)
+    if #fields > 0 then
+      data.fields = fields
+    end
+  end
+  if parsed.flags then
+    data.methods = M.parse_methods(parsed.flags)
+  end
+  return data
+end
+
+-- ---- materialization ----
+
+local function template_options(data)
+  return {
+    name = data.class,
+    package = data.package,
+    fields = data.fields,
+    extends = data.extends,
+    implements = data.implements,
+  }
+end
+
+-- queue the follow-up code generation in the same order as the vimscript
+local function queue_generation(data)
+  local chains = require("jc.chains")()
+  local methods = data.methods or {}
+  local is_interface = data.template == "interface"
+
+  chains:add(function()
+    require("jc.jdtls").organize_imports(0, false)
+  end)
+  if methods.constructor then
+    chains:add(function()
+      require("jc.jdtls").generate_constructor(nil, nil, { default = false })
+    end)
+  end
+  chains:add(function()
+    require("jc.jdtls").generate_abstractMethods()
+  end)
+  if not is_interface and data.fields then
+    chains:add(function()
+      require("jc.jdtls").generate_accessors()
+    end)
+  end
+  if methods.equals or methods.hashCode then
+    chains:add(function()
+      require("jc.jdtls").generate_hashCodeAndEquals()
+    end)
+  end
+  if methods.toString then
+    chains:add(function()
+      require("jc.jdtls").generate_toString()
+    end)
+  end
+  chains:execute_next_if_exists()
+end
+
+local function create_class(data)
+  local path = data.current_path .. SEP .. data.path
+  if vim.fn.filewritable(path) ~= 2 then
+    vim.fn.mkdir(path, "p")
+  end
+  local file_name = vim.fn.fnamemodify(path .. SEP .. data.class, ":p")
+  -- split if the current buffer has unsaved changes and isn't hidden
+  if vim.bo.modified and not vim.o.hidden then
+    vim.cmd("vs")
+  end
+  vim.cmd("edit " .. vim.fn.fnameescape(file_name .. ".java"))
+
+  local size = vim.fn.getfsize(file_name .. ".java")
+  local empty = (size <= 0 and size > -2) or (vim.fn.line("$") == 1 and vim.fn.getline(1) == "")
+  if not empty then
+    return
+  end
+
+  local rendered = templates.render(data.template, template_options(data))
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(rendered, "\n"))
+  vim.cmd("silent! normal! gg=G")
+  vim.fn.search(data.class)
+  vim.cmd("silent! normal! j")
+  vim.cmd("silent! write")
+  vim.cmd("silent! edit")
+  -- mark as a brand-new file so jc.lua's BufWritePost hook refreshes the
+  -- jdtls build path (gd/codegen need the class registered)
+  vim.b.jc_new_java_file = true
+  queue_generation(data)
+end
+
 function M.generate_class()
-  vim.fn["class_generator#CreateClass"]()
+  vim.ui.input({ prompt = "enter new class name: " }, function(userinput)
+    if not userinput or userinput == "" then
+      return
+    end
+    local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
+    local current_path = vim.tbl_filter(function(v)
+      return v ~= ""
+    end, vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true }))
+    if vim.fn.has("win32") == 1 and current_path[1] and current_path[1]:sub(-1) == ":" then
+      table.remove(current_path, 1)
+    end
+
+    local data = M.parse(userinput, reversed(current_path), current_package)
+    if not data then
+      vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+      return
+    end
+    data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
+    create_class(data)
+  end)
 end
 
 return M

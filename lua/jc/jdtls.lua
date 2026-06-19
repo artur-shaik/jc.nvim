@@ -89,7 +89,7 @@ end
 
 function M.generate_accessor(accessor)
   document_symbols(function(symbols)
-    vim.fn["generators#GenerateAccessor"](filter_fields(symbols), accessor)
+    require("jc.generators").accessor(filter_fields(symbols), accessor)
   end)
 end
 
@@ -99,7 +99,7 @@ function M.generate_accessors(fields)
     params.kind = 2
     lsp.jdtls_request(0, "java/resolveUnimplementedAccessors", params, function(err, resp)
       if resp then
-        vim.fn["generators#GenerateAccessors"](resp)
+        require("jc.generators").accessors(resp)
       else
         vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
@@ -183,7 +183,7 @@ function M.generate_constructor(fields, params, opts)
   if fields == nil then
     lsp.jdtls_request(0, "java/checkConstructorsStatus", make_range_params(), function(err, resp)
       if resp then
-        vim.fn["generators#GenerateConstructor"](resp.fields, resp.constructors, opts)
+        require("jc.generators").constructor(resp.fields, resp.constructors, opts)
       else
         vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
@@ -213,7 +213,7 @@ function M.generate_hashCodeAndEquals(fields)
   if not fields then
     lsp.jdtls_request(0, "java/checkHashCodeEqualsStatus", make_range_params(), function(err, resp)
       if resp then
-        vim.fn["generators#GenerateHashCodeAndEquals"](resp.fields)
+        require("jc.generators").hashCodeEquals(resp.fields)
       else
         vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
@@ -235,7 +235,7 @@ function M.generate_toString(fields, params)
   if not fields then
     lsp.jdtls_request(0, "java/checkToStringStatus", make_range_params(), function(err, resp)
       if resp then
-        vim.fn["generators#GenerateToString"](resp.fields)
+        require("jc.generators").toString(resp.fields)
       else
         vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end

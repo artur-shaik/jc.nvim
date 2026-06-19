@@ -1,0 +1,145 @@
+describe("class_generator parsing", function()
+  local cg = require("jc.class_generator")
+
+  describe("parse_input", function()
+    it("plain class name", function()
+      local p = cg.parse_input("Foo")
+      assert.are.equal("Foo", p.path_str)
+      assert.is_nil(p.template)
+      assert.is_nil(p.flags)
+    end)
+
+    it("template prefix", function()
+      local p = cg.parse_input("enum:Color")
+      assert.are.equal("enum", p.template)
+      assert.are.equal("Color", p.path_str)
+    end)
+
+    it("subdir in brackets", function()
+      local p = cg.parse_input("[test]:Foo")
+      assert.are.equal("test", p.subdir)
+      assert.are.equal("Foo", p.path_str)
+    end)
+
+    it("absolute path with package", function()
+      local p = cg.parse_input("/com.example.Foo")
+      assert.are.equal("/com.example.Foo", p.path_str)
+    end)
+
+    it("extends and implements", function()
+      local p = cg.parse_input("Foo extends Base implements Runnable")
+      assert.are.equal("Foo", p.path_str)
+      assert.are.equal("Base", p.extends)
+      assert.are.equal("Runnable", p.implements)
+    end)
+
+    it("fields", function()
+      local p = cg.parse_input("Foo(String a, int b)")
+      assert.are.equal("Foo", p.path_str)
+      assert.are.equal("(String a, int b)", p.fields_str)
+    end)
+
+    it("trailing flags (after fields, since a bare word: is read as template)", function()
+      local p = cg.parse_input("Foo(int x):constructor:toString")
+      assert.are.equal("Foo", p.path_str)
+      assert.are.equal("(int x)", p.fields_str)
+      assert.are.equal(":constructor:toString", p.flags)
+    end)
+
+    it("bare word + colon is greedily a template (vimscript parity)", function()
+      local p = cg.parse_input("Foo:constructor")
+      assert.are.equal("Foo", p.template)
+      assert.are.equal("constructor", p.path_str)
+    end)
+
+    it("everything together", function()
+      local p = cg.parse_input("singleton:[main]:/com.foo.Bar extends B implements I(String s):constructor:equals")
+      assert.are.equal("singleton", p.template)
+      assert.are.equal("main", p.subdir)
+      assert.are.equal("/com.foo.Bar", p.path_str)
+      assert.are.equal("B", p.extends)
+      assert.are.equal("I", p.implements)
+      assert.are.equal("(String s)", p.fields_str)
+      assert.are.equal(":constructor:equals", p.flags)
+    end)
+
+    it("returns nil on empty path", function()
+      assert.is_nil(cg.parse_input(""))
+    end)
+  end)
+
+  describe("parse_fields", function()
+    it("defaults modifier to private", function()
+      local f = cg.parse_fields("(String name, int count)")
+      assert.are.same({
+        { mod = "private", type = "String", name = "name" },
+        { mod = "private", type = "int", name = "count" },
+      }, f)
+    end)
+
+    it("keeps explicit modifiers", function()
+      local f = cg.parse_fields("(public static final String NAME)")
+      assert.are.same({ { mod = "public static final", type = "String", name = "NAME" } }, f)
+    end)
+
+    it("empty field list", function()
+      assert.are.same({}, cg.parse_fields("()"))
+    end)
+  end)
+
+  describe("parse_methods", function()
+    it("flags without args", function()
+      local m = cg.parse_methods(":constructor:toString:equals")
+      assert.is_not_nil(m.constructor)
+      assert.is_not_nil(m.toString)
+      assert.is_not_nil(m.equals)
+      assert.is_nil(m.hashCode)
+    end)
+
+    it("flag with numeric args", function()
+      local m = cg.parse_methods(":constructor(1,2)")
+      assert.are.same({ 1, 2 }, m.constructor)
+    end)
+  end)
+
+  describe("build_path_data", function()
+    -- file at .../src/main/java/com/example/Cur.java
+    local current_path = { "example", "com", "java", "main", "src", "proj" } -- reversed dir list
+    local current_package = { "com", "example" }
+
+    it("relative class -> same package, empty path", function()
+      local d = cg.build_path_data({ "Bar" }, nil, current_path, current_package)
+      assert.are.equal("Bar", d.class)
+      assert.are.equal("com.example", d.package)
+      assert.are.equal("", d.path)
+    end)
+
+    it("relative subpackage", function()
+      local d = cg.build_path_data({ "sub", "Bar" }, nil, current_path, current_package)
+      assert.are.equal("Bar", d.class)
+      assert.are.equal("com.example.sub", d.package)
+      assert.are.equal("sub", d.path)
+    end)
+
+    it("absolute path resolves package from class name", function()
+      local d = cg.build_path_data({ "/com", "other", "Baz" }, nil, current_path, current_package)
+      assert.are.equal("Baz", d.class)
+      assert.are.equal("com.other", d.package)
+    end)
+  end)
+
+  describe("parse (full)", function()
+    local current_path = { "example", "com", "java", "main", "src", "proj" }
+    local current_package = { "com", "example" }
+
+    it("builds full class data", function()
+      local d = cg.parse("Bar extends Base(String s):toString", current_path, current_package)
+      assert.are.equal("Bar", d.class)
+      assert.are.equal("com.example", d.package)
+      assert.are.equal("Base", d.extends)
+      assert.are.equal(1, #d.fields)
+      assert.are.equal("s", d.fields[1].name)
+      assert.is_not_nil(d.methods.toString)
+    end)
+  end)
+end)
