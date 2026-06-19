@@ -261,14 +261,20 @@ end
 -- jdt.ls declares java/projectConfigurationUpdate as a JsonNotification:
 -- there is never a response, so send a notification (nvim-jdtls sends a
 -- request and its success therefore looks like "nothing happened")
-function M.update_project_config()
+function M.update_project_config(bufnr, opts)
+  bufnr = bufnr or 0
+  opts = opts or {}
   local client = lsp.get_jdtls_client()
   if not client then
-    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    if not opts.silent then
+      vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    end
     return
   end
-  client:notify("java/projectConfigurationUpdate", { uri = vim.uri_from_bufnr(0) })
-  vim.notify("jc: project configuration update requested", vim.log.levels.INFO)
+  client:notify("java/projectConfigurationUpdate", { uri = vim.uri_from_bufnr(bufnr) })
+  if not opts.silent then
+    vim.notify("jc: project configuration update requested", vim.log.levels.INFO)
+  end
 end
 
 local function data_dir_from_args(args)

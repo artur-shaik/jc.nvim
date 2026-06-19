@@ -63,6 +63,7 @@ require("jc").setup({
   autoformat_on_save = false,  -- format java buffers on save
   debug_backend = nil,         -- "dap" | "vimspector" | nil (auto-detect)
   basedir = nil,               -- data dir, default ~/.local/share/jc.nvim
+  update_config_on_new_file = true, -- refresh jdtls build path on new java files
   on_attach = nil,             -- function(client, bufnr) extra hook
 })
 ```
@@ -70,6 +71,13 @@ require("jc").setup({
 The legacy `g:jc_default_mappings`, `g:jc_autoformat_on_save`,
 `g:jc_debug_backend` and `g:jc_basedir` variables still work as a
 fallback when the corresponding option is not passed to `setup`.
+
+A java file created in-editor isn't on jdtls' build path until the project
+configuration is refreshed, so go-to-definition returns nothing on it (while
+find-references still works off the search index). With
+`update_config_on_new_file` (default `true`), jc.nvim detects such files and
+fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
+`false` to refresh manually.
 
 ## What it adds over plain nvim-jdtls
 

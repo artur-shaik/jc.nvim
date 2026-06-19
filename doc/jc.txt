@@ -58,6 +58,7 @@ Call `setup` (or use the `opts` table of lazy.nvim): >lua
     autoformat_on_save = false,  -- format java buffers on save
     debug_backend = nil,         -- "dap" | "vimspector" | nil = auto
     basedir = nil,               -- data dir, ~/.local/share/jc.nvim
+    update_config_on_new_file = true, -- refresh build path on new java files
     on_attach = nil,             -- function(client, bufnr) extra hook
   })
 <
