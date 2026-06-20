@@ -334,27 +334,234 @@ local function create_class(data)
   queue_generation(data)
 end
 
-function M.generate_class()
-  vim.ui.input({ prompt = "enter new class name: " }, function(userinput)
-    if not userinput or userinput == "" then
-      return
-    end
-    local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
-    local current_path = vim.tbl_filter(function(v)
-      return v ~= ""
-    end, vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true }))
-    if vim.fn.has("win32") == 1 and current_path[1] and current_path[1]:sub(-1) == ":" then
-      table.remove(current_path, 1)
-    end
+-- ---- prompt completion (ported from class_generator#Completion) ----
 
-    local data = M.parse(userinput, reversed(current_path), current_package)
-    if not data then
-      vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
-      return
+local KEYWORDS = { "extends", "implements" }
+local METHOD_FLAGS = { "constructor", "toString", "hashCode", "equals" }
+
+-- "a:b:c" -> "a:b:" (everything already typed before the current segment)
+local function completed_prefix(tokens)
+  local done = table.concat(slice(tokens, 0, -2), ":")
+  if done ~= "" then
+    done = done .. ":"
+  end
+  return done
+end
+
+local function template_completions(command, add_sep)
+  local result = {}
+  for _, name in ipairs(require("jc.templates").names()) do
+    if name:sub(1, #command) == command then
+      result[#result + 1] = name .. (add_sep and ":" or "")
     end
-    data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
-    create_class(data)
-  end)
+  end
+  return result
+end
+
+-- project source roots (.../src/main/java, .../src/test/java) are discovered
+-- once per project so package completion is scoped to real java sources and
+-- never globs bin/build/module dirs. Cached by project root.
+local source_root_cache = {}
+
+local function project_root_dir()
+  local root =
+    vim.fs.root(0, { ".git", "settings.gradle", "settings.gradle.kts", "pom.xml", "build.gradle", "mvnw", "gradlew" })
+  return root or vim.fn.getcwd()
+end
+
+local function source_roots()
+  local root = project_root_dir()
+  if source_root_cache[root] then
+    return source_root_cache[root]
+  end
+  local roots = {}
+  for _, kind in ipairs({ "main", "test" }) do
+    -- multi-module (**) and single-module (direct) layouts
+    for _, p in ipairs(vim.fn.glob(root .. "/**/src/" .. kind .. "/java", true, true)) do
+      roots[#roots + 1] = p
+    end
+    local direct = root .. "/src/" .. kind .. "/java"
+    if vim.fn.isdirectory(direct) == 1 then
+      roots[#roots + 1] = direct
+    end
+  end
+  source_root_cache[root] = roots
+  return roots
+end
+
+local function keyword_completions(command, completed, is_relative)
+  local tokens = vim.split(command, " ", { plain = true })
+  if #tokens > 1 and vim.tbl_contains(KEYWORDS, tokens[#tokens - 1]) then
+    return {}
+  end
+  local prefix = completed .. (is_relative and "" or "/") .. table.concat(slice(tokens, 0, -2), " ")
+  local result = {}
+  for _, kw in ipairs(KEYWORDS) do
+    if not command:find("%f[%w]" .. kw .. "%f[%W]") and kw:sub(1, #tokens[#tokens]) == tokens[#tokens] then
+      result[#result + 1] = prefix .. " " .. kw
+    end
+  end
+  return result
+end
+
+-- glob package candidates. Absolute (/) lists packages across all project
+-- source roots; relative lists subpackages of the current package (and only
+-- when the current file actually sits in one).
+local function package_completions(command, completed, is_relative)
+  if command:find(" ") then -- past the class name -> suggest keywords
+    return keyword_completions(command, completed, is_relative)
+  end
+
+  local pattern = command:gsub("%.", SEP)
+  local seen, result = {}, {}
+  local function add(prefix, rel)
+    rel = rel:gsub(SEP, "."):gsub("%.$", "")
+    if rel ~= "" and not seen[rel] then
+      seen[rel] = true
+      result[#result + 1] = completed .. prefix .. rel
+    end
+  end
+
+  -- "**" before the typed segment so it matches a package at any depth
+  -- (e.g. /model finds com.foo.model), mirroring the original glob; collapse
+  -- duplicate separators so a bare/leading dot ("." -> "/") doesn't break it
+  local matcher = (SEP .. "**" .. SEP .. pattern .. "*" .. SEP):gsub(SEP .. SEP .. "+", SEP)
+
+  if is_relative then
+    -- only meaningful inside a package; otherwise stay quiet (no project noise)
+    local ok, pkg = pcall(function()
+      return require("jc.treesitter").get_package()
+    end)
+    if not ok or not pkg or pkg == "" then
+      return result
+    end
+    local dir = vim.fn.expand("%:p:h")
+    for _, path in ipairs(vim.fn.glob(dir .. matcher, true, true)) do
+      add("", path:sub(#dir + 2))
+    end
+    return result
+  end
+
+  for _, sr in ipairs(source_roots()) do
+    for _, path in ipairs(vim.fn.glob(sr .. matcher, true, true)) do
+      add("/", path:sub(#sr + 2))
+    end
+  end
+  return result
+end
+
+local function subdir_completions(command, completed)
+  local parts = vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true })
+  local src = index0(parts, "src")
+  if src >= 0 then
+    parts = slice(parts, 0, src)
+  end
+  local pre = SEP .. table.concat(parts, SEP) .. SEP
+  local result = {}
+  for _, path in ipairs(vim.fn.glob(pre .. command .. "*" .. SEP, false, true)) do
+    result[#result + 1] = completed .. "[" .. path:sub(#pre + 1, -2) .. "]"
+  end
+  return result
+end
+
+local function method_completions(command, completed)
+  local result = {}
+  for _, kw in ipairs(METHOD_FLAGS) do
+    if kw:sub(1, #command) == command then
+      result[#result + 1] = completed .. kw
+    end
+  end
+  return result
+end
+
+local function is_template_name(name)
+  return vim.tbl_contains(require("jc.templates").names(), name)
+end
+
+-- a colon segment is "the class path" once it carries a class/package marker
+-- (slash, dot or uppercase first letter), distinguishing it from a template
+-- name or a [subdir]
+local function is_path_token(t)
+  return t ~= "" and (t:find("/", 1, true) ~= nil or t:find(".", 1, true) ~= nil or t:match("^%u") ~= nil)
+end
+
+-- classify the already-typed segments to know which structural slot the
+-- current (last) segment is in
+local function prior_state(tokens)
+  local path_given, subdir_given = false, false
+  for i = 1, #tokens - 1 do
+    local t = tokens[i]
+    local is_template = i == 1 and is_template_name(t)
+    if t:match("^%[.*%]$") then
+      subdir_given = true
+    elseif not is_template and is_path_token(t) then
+      path_given = true
+    end
+  end
+  return path_given, subdir_given
+end
+
+-- customlist completion entry point (exposed via v:lua for vim.fn.input)
+-- follows the DSL shape: template:[subdir]:/package.Class extends/implements
+-- (fields):flag:flag
+function M.complete(_arglead, line)
+  local tokens = vim.split(line, ":", { plain = true })
+  local command = tokens[#tokens]
+  local completed = completed_prefix(tokens)
+  local result = {}
+  local first = command:sub(1, 1)
+  local path_given, subdir_given = prior_state(tokens)
+
+  if first == "/" then
+    -- absolute class path
+    vim.list_extend(result, package_completions(command:sub(2), completed, false))
+  elseif first == "[" then
+    -- subdirectory
+    vim.list_extend(result, subdir_completions(command:sub(2), completed))
+  elseif path_given then
+    -- the class path is in; remaining colon segments are method flags
+    vim.list_extend(result, method_completions(command, completed))
+  elseif #tokens == 1 then
+    -- first slot: a template or the (relative) class path
+    vim.list_extend(result, template_completions(command, true))
+    vim.list_extend(result, package_completions(command, completed, true))
+  else
+    -- after template:/subdir:, before the class path -> offer the remaining
+    -- prefix options (subdir if not given) and the class path
+    if not subdir_given then
+      vim.list_extend(result, subdir_completions(command, completed))
+    end
+    vim.list_extend(result, package_completions(command, completed, true))
+  end
+  return result
+end
+
+function M.generate_class()
+  -- use vim.fn.input directly (not vim.ui.input): the prompt needs cmdline
+  -- completion, and custom-replacing vim.ui.input implementations (dressing,
+  -- snacks, ...) don't reliably honour the `completion` option
+  local ok, userinput = pcall(vim.fn.input, {
+    prompt = "enter new class name: ",
+    completion = "customlist,v:lua.require'jc.class_generator'.complete",
+  })
+  if not ok or userinput == "" then
+    return
+  end
+  local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
+  local current_path = vim.tbl_filter(function(v)
+    return v ~= ""
+  end, vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true }))
+  if vim.fn.has("win32") == 1 and current_path[1] and current_path[1]:sub(-1) == ":" then
+    table.remove(current_path, 1)
+  end
+
+  local data = M.parse(userinput, reversed(current_path), current_package)
+  if not data then
+    vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+    return
+  end
+  data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
+  create_class(data)
 end
 
 return M

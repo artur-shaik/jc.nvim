@@ -25,10 +25,7 @@ describe("templates", function()
 
   it("interface: fields become method signatures, no implements", function()
     local out = templates.render("interface", { name = "Foo", package = "p", fields = opts.fields, extends = "X" })
-    assert.are.equal(
-      "package p;\n\npublic interface Foo extends X {\nprivate String bar();\npublic int n();\n\n}",
-      out
-    )
+    assert.are.equal("package p;\n\npublic interface Foo extends X {\nprivate String bar();\npublic int n();\n\n}", out)
   end)
 
   it("enum: no extends/implements", function()
@@ -44,7 +41,8 @@ describe("templates", function()
   end)
 
   it("exception: explicit extends overrides default", function()
-    local out = templates.render("exception", { name = "MyErr", package = "p", fields = {}, extends = "RuntimeException" })
+    local out =
+      templates.render("exception", { name = "MyErr", package = "p", fields = {}, extends = "RuntimeException" })
     assert.is_truthy(out:find("extends RuntimeException", 1, true))
     assert.is_nil(out:find("extends Exception", 1, true))
   end)
@@ -87,6 +85,15 @@ describe("templates", function()
     local frag = templates.render("android_fragment", { name = "F", package = "p", fields = {} })
     assert.is_truthy(frag:find("extends Fragment", 1, true))
     assert.is_truthy(frag:find("public View onCreateView(", 1, true))
+  end)
+
+  it("omits the package line for the default (empty) package", function()
+    local out = templates.render("class", { name = "Foo", package = "", fields = {} })
+    assert.is_nil(out:find("package", 1, true))
+    assert.is_truthy(out:find("^public class Foo"))
+
+    local iface = templates.render("interface", { name = "I", package = "", fields = {} })
+    assert.is_nil(iface:find("package", 1, true))
   end)
 
   it("default template is class when name omitted", function()

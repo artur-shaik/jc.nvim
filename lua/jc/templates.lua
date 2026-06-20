@@ -9,8 +9,17 @@
 -- does not matter — only structure does.
 local M = {}
 
+-- package declaration, or "" for the default (empty) package — emitting
+-- "package ;" produces invalid Java and pushes organize_imports above it
+local function package_line(opts)
+  if opts.package and opts.package ~= "" then
+    return "package " .. opts.package .. ";\n\n"
+  end
+  return ""
+end
+
 local function header(opts, keyword, default_extends)
-  local result = "package " .. opts.package .. ";\n\n"
+  local result = package_line(opts)
   result = result .. "public " .. keyword .. " " .. opts.name
   if opts.extends then
     result = result .. " extends " .. opts.extends
@@ -41,7 +50,7 @@ end
 
 templates["interface"] = function(opts)
   -- interface fields render as method signatures (type name();)
-  local result = "package " .. opts.package .. ";\n\n"
+  local result = package_line(opts)
   result = result .. "public interface " .. opts.name
   if opts.extends then
     result = result .. " extends " .. opts.extends
@@ -50,7 +59,7 @@ templates["interface"] = function(opts)
 end
 
 templates["enum"] = function(opts)
-  local result = "package " .. opts.package .. ";\n\n"
+  local result = package_line(opts)
   result = result .. "public enum " .. opts.name
   return result .. " {\n" .. fields_block(opts) .. "\n}"
 end
@@ -73,7 +82,7 @@ templates["main"] = function(opts)
 end
 
 templates["junit"] = function(opts)
-  local result = "package " .. opts.package .. ";\n\n"
+  local result = package_line(opts)
   result = result .. "import static org.junit.Assert.*;\n\n"
   result = result .. "public class " .. opts.name
   if opts.extends then
@@ -103,7 +112,7 @@ end
 templates["servlet"] = function(opts)
   local name = opts.name
   local url = vim.fn.tolower(vim.fn.substitute(name, "\\C\\([A-Z]\\)", "/\\1", "g"))
-  local result = "package " .. opts.package .. ";\n\n"
+  local result = package_line(opts)
   result = result .. '@WebServlet(name = "' .. name .. '", urlPatterns = {"' .. url .. '"})\n'
   result = result .. "public class " .. name
   if opts.extends then

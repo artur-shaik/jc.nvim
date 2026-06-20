@@ -128,6 +128,45 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("complete", function()
+    it("first token suggests template names with a separator", function()
+      local r = cg.complete("", "enu")
+      assert.is_true(vim.tbl_contains(r, "enum:"))
+    end)
+
+    it("method flags after the class segment", function()
+      local r = cg.complete("", "enum:Foo:to")
+      assert.are.same({ "enum:Foo:toString" }, r)
+    end)
+
+    it("extends/implements keywords after the class name", function()
+      local r = cg.complete("", "Foo ext")
+      assert.is_true(vim.tbl_contains(r, "Foo extends"))
+    end)
+
+    it("does not re-offer a keyword already present", function()
+      local r = cg.complete("", "Foo extends Base imp")
+      assert.is_true(vim.tbl_contains(r, "Foo extends Base implements"))
+      assert.is_false(vim.tbl_contains(r, "Foo extends Base extends"))
+    end)
+
+    it("after a template, offers no method flags (the subdir/path slot)", function()
+      local r = cg.complete("", "enum:")
+      assert.is_false(vim.tbl_contains(r, "enum:constructor"))
+      assert.is_false(vim.tbl_contains(r, "enum:toString"))
+    end)
+
+    it("offers method flags only once the class path is given", function()
+      local r = cg.complete("", "/kz.foo.Bar:con")
+      assert.are.same({ "/kz.foo.Bar:constructor" }, r)
+    end)
+
+    it("chained method flags keep completing", function()
+      local r = cg.complete("", "/kz.foo.Bar:constructor:to")
+      assert.are.same({ "/kz.foo.Bar:constructor:toString" }, r)
+    end)
+  end)
+
   describe("parse (full)", function()
     local current_path = { "example", "com", "java", "main", "src", "proj" }
     local current_package = { "com", "example" }
