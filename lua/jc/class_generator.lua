@@ -233,6 +233,12 @@ function M.build_path_data(path, subdir, currentPath, currentPackage)
   return relative_path(path, new_path, currentPackage)
 end
 
+-- a class name must be present and follow Java convention (uppercase first);
+-- a trailing dot or a lowercase segment means the user typed only a package
+function M.is_class_name(name)
+  return type(name) == "string" and name:match("^%u[%w_$]*$") ~= nil
+end
+
 -- full DSL -> resolved class data (or nil)
 function M.parse(userinput, currentPath, currentPackage)
   local parsed = M.parse_input(userinput)
@@ -558,6 +564,10 @@ function M.generate_class()
   local data = M.parse(userinput, reversed(current_path), current_package)
   if not data then
     vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+    return
+  end
+  if not M.is_class_name(data.class) then
+    vim.notify("jc: no class name given (looks like a package) — request ignored", vim.log.levels.WARN)
     return
   end
   data.current_path = SEP .. table.concat(current_path, SEP) .. SEP

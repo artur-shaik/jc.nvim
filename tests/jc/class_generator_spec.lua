@@ -167,6 +167,19 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("is_class_name", function()
+    it("accepts a conventional class name", function()
+      assert.is_true(cg.is_class_name("AccountType"))
+      assert.is_true(cg.is_class_name("Foo2"))
+    end)
+
+    it("rejects empty / package-only input", function()
+      assert.is_false(cg.is_class_name(""))
+      assert.is_false(cg.is_class_name("refund_service"))
+      assert.is_false(cg.is_class_name(nil))
+    end)
+  end)
+
   describe("parse (full)", function()
     local current_path = { "example", "com", "java", "main", "src", "proj" }
     local current_package = { "com", "example" }
