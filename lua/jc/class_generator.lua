@@ -311,17 +311,26 @@ end
 
 local function create_class(data)
   local path = data.current_path .. SEP .. data.path
+  -- collapse the duplicate separators an empty data.path introduces
+  local file_name = (vim.fn.fnamemodify(path .. SEP .. data.class, ":p") .. ".java"):gsub(SEP .. SEP .. "+", SEP)
+
+  -- don't clobber an existing class — open it and bail
+  if vim.fn.filereadable(file_name) == 1 then
+    vim.notify("jc: class already exists: " .. file_name, vim.log.levels.WARN)
+    vim.cmd("edit " .. vim.fn.fnameescape(file_name))
+    return
+  end
+
   if vim.fn.filewritable(path) ~= 2 then
     vim.fn.mkdir(path, "p")
   end
-  local file_name = vim.fn.fnamemodify(path .. SEP .. data.class, ":p")
   -- split if the current buffer has unsaved changes and isn't hidden
   if vim.bo.modified and not vim.o.hidden then
     vim.cmd("vs")
   end
-  vim.cmd("edit " .. vim.fn.fnameescape(file_name .. ".java"))
+  vim.cmd("edit " .. vim.fn.fnameescape(file_name))
 
-  local size = vim.fn.getfsize(file_name .. ".java")
+  local size = vim.fn.getfsize(file_name)
   local empty = (size <= 0 and size > -2) or (vim.fn.line("$") == 1 and vim.fn.getline(1) == "")
   if not empty then
     return
