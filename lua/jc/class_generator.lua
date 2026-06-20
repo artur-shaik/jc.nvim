@@ -239,14 +239,9 @@ function M.is_class_name(name)
   return type(name) == "string" and name:match("^%u[%w_$]*$") ~= nil
 end
 
--- full DSL -> resolved class data (or nil)
-function M.parse(userinput, currentPath, currentPackage)
-  local parsed = M.parse_input(userinput)
-  if not parsed then
-    return nil
-  end
-  local path = vim.split(parsed.path_str, ".", { plain = true })
-  local data = M.build_path_data(path, parsed.subdir, currentPath, currentPackage)
+-- copy the template/extends/implements/fields/flags from a parsed DSL onto
+-- resolved path data
+local function decorate(data, parsed)
   data.template = parsed.template
   data.extends = parsed.extends
   data.implements = parsed.implements
@@ -260,6 +255,16 @@ function M.parse(userinput, currentPath, currentPackage)
     data.methods = M.parse_methods(parsed.flags)
   end
   return data
+end
+
+-- full DSL -> resolved class data (or nil)
+function M.parse(userinput, currentPath, currentPackage)
+  local parsed = M.parse_input(userinput)
+  if not parsed then
+    return nil
+  end
+  local path = vim.split(parsed.path_str, ".", { plain = true })
+  return decorate(M.build_path_data(path, parsed.subdir, currentPath, currentPackage), parsed)
 end
 
 -- ---- materialization ----
@@ -404,6 +409,32 @@ local function source_roots()
   return roots
 end
 
+-- subprojects keyed by name: { <name> = { dir, sets = { main=path, test=path } } }
+-- derived from the discovered source roots (.../<module>/src/<set>/java)
+local module_cache = {}
+
+function M.modules()
+  local root = project_root_dir()
+  if module_cache[root] then
+    return module_cache[root]
+  end
+  local mods = {}
+  local tail = SEP .. "src" .. SEP .. "([^" .. SEP .. "]+)" .. SEP .. "java$"
+  for _, sr in ipairs(source_roots()) do
+    local set = sr:match(tail)
+    if set then
+      local dir = sr:gsub(tail, "")
+      local name = vim.fn.fnamemodify(dir, ":t")
+      if name ~= "" then
+        mods[name] = mods[name] or { dir = dir, sets = {} }
+        mods[name].sets[set] = sr
+      end
+    end
+  end
+  module_cache[root] = mods
+  return mods
+end
+
 -- LSP SymbolKind: Class=5, Interface=11
 local TYPE_KINDS = { extends = { [5] = true, [11] = true }, implements = { [11] = true } }
 
@@ -446,10 +477,10 @@ local function keyword_completions(command, completed, is_relative)
   return result
 end
 
--- glob package candidates. Absolute (/) lists packages across all project
--- source roots; relative lists subpackages of the current package (and only
--- when the current file actually sits in one).
-local function package_completions(command, completed, is_relative)
+-- glob package candidates. With `roots` (a chosen [module]) packages come
+-- from those source roots; otherwise absolute (/) lists packages across all
+-- project source roots and relative lists subpackages of the current package.
+local function package_completions(command, completed, is_relative, roots)
   if command:find(" ") then -- past the class name -> suggest keywords
     return keyword_completions(command, completed, is_relative)
   end
@@ -468,6 +499,16 @@ local function package_completions(command, completed, is_relative)
   -- (e.g. /model finds com.foo.model), mirroring the original glob; collapse
   -- duplicate separators so a bare/leading dot ("." -> "/") doesn't break it
   local matcher = (SEP .. "**" .. SEP .. pattern .. "*" .. SEP):gsub(SEP .. SEP .. "+", SEP)
+
+  -- scoped to a chosen [module]: packages from its source roots, bare names
+  if roots then
+    for _, sr in ipairs(roots) do
+      for _, path in ipairs(vim.fn.glob(sr .. matcher, true, true)) do
+        add("", path:sub(#sr + 2))
+      end
+    end
+    return result
+  end
 
   if is_relative then
     -- only meaningful inside a package; otherwise stay quiet (no project noise)
@@ -493,15 +534,31 @@ local function package_completions(command, completed, is_relative)
 end
 
 local function subdir_completions(command, completed)
+  -- tolerate an autopairs-inserted closing bracket: "[module]" -> "module"
+  command = command:gsub("%]$", "")
   local parts = vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true })
   local src = index0(parts, "src")
   if src >= 0 then
     parts = slice(parts, 0, src)
   end
   local pre = SEP .. table.concat(parts, SEP) .. SEP
-  local result = {}
+  local result, seen = {}, {}
+  local function add(name)
+    if name:sub(1, #command) == command and not seen[name] then
+      seen[name] = true
+      result[#result + 1] = completed .. "[" .. name .. "]"
+    end
+  end
+  -- source-set dirs at the current src level (test, main, androidTest, ...)
   for _, path in ipairs(vim.fn.glob(pre .. command .. "*" .. SEP, false, true)) do
-    result[#result + 1] = completed .. "[" .. path:sub(#pre + 1, -2) .. "]"
+    add(path:sub(#pre + 1, -2))
+  end
+  -- subprojects (and module/<set> to target a specific source set)
+  for name, mod in pairs(M.modules()) do
+    add(name)
+    for set in pairs(mod.sets) do
+      add(name .. "/" .. set)
+    end
   end
   return result
 end
@@ -543,6 +600,40 @@ local function prior_state(tokens)
   return path_given, subdir_given
 end
 
+-- source roots of the subproject containing the current file (so its source
+-- sets see each other)
+local function current_module_roots()
+  local file = vim.fn.expand("%:p")
+  for _, m in pairs(M.modules()) do
+    if file:sub(1, #m.dir + 1) == m.dir .. SEP then
+      return vim.tbl_values(m.sets)
+    end
+  end
+  return nil
+end
+
+-- the source roots to scope package completion to once a [..] slot is set:
+-- a subproject name -> that module (a specific set if given, else all); a
+-- plain source-set ([test]/[main]) -> the current module's sets (test and
+-- main see each other)
+local function module_scope(tokens)
+  for i = 1, #tokens - 1 do
+    local content = tokens[i]:match("^%[(.-)%]$")
+    if content then
+      local mod, set = content:match("^([^/]+)/?(.*)$")
+      local m = M.modules()[mod]
+      if m then
+        if set ~= "" and m.sets[set] then
+          return { m.sets[set] }
+        end
+        return vim.tbl_values(m.sets)
+      end
+      return current_module_roots()
+    end
+  end
+  return nil
+end
+
 -- customlist completion entry point (exposed via v:lua for vim.fn.input)
 -- follows the DSL shape: template:[subdir]:/package.Class extends/implements
 -- (fields):flag:flag
@@ -553,10 +644,12 @@ function M.complete(_arglead, line)
   local result = {}
   local first = command:sub(1, 1)
   local path_given, subdir_given = prior_state(tokens)
+  -- once a [module] is chosen, packages come from that module
+  local scope = module_scope(tokens)
 
   if first == "/" then
     -- absolute class path
-    vim.list_extend(result, package_completions(command:sub(2), completed, false))
+    vim.list_extend(result, package_completions(command:sub(2), completed, false, scope))
   elseif first == "[" then
     -- subdirectory
     vim.list_extend(result, subdir_completions(command:sub(2), completed))
@@ -573,12 +666,69 @@ function M.complete(_arglead, line)
     if not subdir_given then
       vim.list_extend(result, subdir_completions(command, completed))
     end
-    vim.list_extend(result, package_completions(command, completed, true))
+    vim.list_extend(result, package_completions(command, completed, true, scope))
   end
   return result
 end
 
+-- when the [..] slot names a subproject, resolve straight into its source
+-- root (no backtracking). returns data, nil (not a module) or false (module
+-- named but the requested source set is missing -> abort)
+function M.module_data(parsed)
+  if not parsed.subdir then
+    return nil
+  end
+  local mod, set = parsed.subdir:match("^([^/]+)/?(.*)$")
+  local m = M.modules()[mod]
+  if not m then
+    return nil -- a plain source-set like [test], handled by build_path_data
+  end
+  if set == "" then
+    set = "main"
+  end
+  local base = m.sets[set]
+  if not base then
+    vim.notify("jc: module '" .. mod .. "' has no '" .. set .. "' source set", vim.log.levels.ERROR)
+    return false
+  end
+  local pkg_path = vim.split((parsed.path_str:gsub("^/", "")), ".", { plain = true })
+  local pkg = table.concat(slice(pkg_path, 0, -2), ".")
+  return decorate({
+    class = pkg_path[#pkg_path],
+    package = pkg,
+    current_path = base .. SEP,
+    path = (pkg:gsub("%.", SEP)),
+  }, parsed)
+end
+
+-- keys an autopairs plugin would auto-close inside the DSL prompt
+local PAIR_KEYS = { "[", "(", "{", "<", '"', "'", "`" }
+
+-- remove and return any cmdline-mode mappings on the pairing keys
+local function suppress_cmdline_pairs()
+  local saved = {}
+  for _, key in ipairs(PAIR_KEYS) do
+    local map = vim.fn.maparg(key, "c", false, true)
+    if type(map) == "table" and not vim.tbl_isempty(map) then
+      saved[#saved + 1] = map
+      pcall(vim.keymap.del, "c", key)
+    end
+  end
+  return saved
+end
+
+local function restore_cmdline_pairs(saved)
+  for _, map in ipairs(saved) do
+    pcall(vim.fn.mapset, "c", false, map)
+  end
+end
+
 function M.generate_class()
+  -- any autopairs plugin that maps in the cmdline would auto-insert a closing
+  -- "]"/")" when typing "["/"(", breaking the DSL. Plugin-agnostically strip
+  -- the cmdline mappings on the pairing keys for the prompt, then restore.
+  local saved_pairs = suppress_cmdline_pairs()
+
   -- use vim.fn.input directly (not vim.ui.input): the prompt needs cmdline
   -- completion, and custom-replacing vim.ui.input implementations (dressing,
   -- snacks, ...) don't reliably honour the `completion` option
@@ -586,27 +736,39 @@ function M.generate_class()
     prompt = "enter new class name: ",
     completion = "customlist,v:lua.require'jc.class_generator'.complete",
   })
+
+  restore_cmdline_pairs(saved_pairs)
   if not ok or userinput == "" then
     return
   end
-  local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
-  local current_path = vim.tbl_filter(function(v)
-    return v ~= ""
-  end, vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true }))
-  if vim.fn.has("win32") == 1 and current_path[1] and current_path[1]:sub(-1) == ":" then
-    table.remove(current_path, 1)
-  end
-
-  local data = M.parse(userinput, reversed(current_path), current_package)
-  if not data then
+  local parsed = M.parse_input(userinput)
+  if not parsed then
     vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
     return
   end
+
+  local data = M.module_data(parsed)
+  if data == false then
+    return -- module named but its source set is missing
+  end
+  if data == nil then
+    -- default: resolve relative to the current file (current module)
+    local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
+    local current_path = vim.tbl_filter(function(v)
+      return v ~= ""
+    end, vim.split(vim.fn.expand("%:p:h"), SEP, { plain = true }))
+    if vim.fn.has("win32") == 1 and current_path[1] and current_path[1]:sub(-1) == ":" then
+      table.remove(current_path, 1)
+    end
+    local path = vim.split(parsed.path_str, ".", { plain = true })
+    data = decorate(M.build_path_data(path, parsed.subdir, reversed(current_path), current_package), parsed)
+    data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
+  end
+
   if not M.is_class_name(data.class) then
     vim.notify("jc: no class name given (looks like a package) — request ignored", vim.log.levels.WARN)
     return
   end
-  data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
   create_class(data)
 end
 

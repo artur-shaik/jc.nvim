@@ -126,6 +126,72 @@ describe("class_generator parsing", function()
       assert.are.equal("Baz", d.class)
       assert.are.equal("com.other", d.package)
     end)
+
+    -- build a temp multi-module project and open a file inside it so the
+    -- project root resolves there
+    local function make_multimodule()
+      local root = vim.fn.tempname()
+      for _, m in ipairs({ "app", "model" }) do
+        vim.fn.mkdir(root .. "/" .. m .. "/src/main/java", "p")
+        vim.fn.mkdir(root .. "/" .. m .. "/src/test/java", "p")
+      end
+      vim.fn.writefile({ "" }, root .. "/settings.gradle")
+      vim.fn.writefile({ "package p;" }, root .. "/app/src/main/java/Cur.java")
+      vim.cmd("edit " .. root .. "/app/src/main/java/Cur.java")
+      return root
+    end
+
+    it("modules() discovers subprojects and their source sets", function()
+      make_multimodule()
+      local mods = cg.modules()
+      assert.is_not_nil(mods.app)
+      assert.is_not_nil(mods.model)
+      assert.is_truthy(mods.app.sets.main)
+      assert.is_truthy(mods.model.sets.test)
+    end)
+
+    it("module_data routes [module]:/pkg.Class into that module's source root", function()
+      make_multimodule()
+      local d = cg.module_data(cg.parse_input("[model]:/p.q.Foo"))
+      assert.are.equal("Foo", d.class)
+      assert.are.equal("p.q", d.package)
+      assert.is_truthy(d.current_path:find("model" .. "/src/main/java", 1, true))
+
+      local d2 = cg.module_data(cg.parse_input("[model/test]:Bar"))
+      assert.is_truthy(d2.current_path:find("model" .. "/src/test/java", 1, true))
+
+      -- a plain source-set is not a module -> nil (falls back to build_path_data)
+      assert.is_nil(cg.module_data(cg.parse_input("[test]:Bar")))
+    end)
+
+    it("package completion after [module] is scoped to that module", function()
+      local root = make_multimodule()
+      vim.fn.mkdir(root .. "/model/src/main/java/m/dto", "p")
+      vim.fn.mkdir(root .. "/app/src/main/java/apponly", "p")
+      local r = cg.complete("", "[model]:") -- empty path slot -> all model packages
+      assert.is_true(vim.tbl_contains(r, "[model]:m"))
+      assert.is_true(vim.tbl_contains(r, "[model]:m.dto"))
+      -- app-only package must not leak into the model-scoped completion
+      assert.is_false(vim.tbl_contains(r, "[model]:apponly"))
+    end)
+
+    it("[test]/[main] source-sets see both sets of the current module", function()
+      local root = make_multimodule() -- current file is app/src/main/java/Cur.java
+      vim.fn.mkdir(root .. "/app/src/main/java/inmain", "p")
+      vim.fn.mkdir(root .. "/app/src/test/java/intest", "p")
+      local r = cg.complete("", "[test]:")
+      assert.is_true(vim.tbl_contains(r, "[test]:inmain")) -- from src/main
+      assert.is_true(vim.tbl_contains(r, "[test]:intest")) -- from src/test
+    end)
+
+    it("[test] subdir targets the test source root (src/test/java)", function()
+      -- file under src/main/java/com/example -> [test] mirrors into src/test/java
+      local d = cg.build_path_data({ "Bar" }, "test", current_path, current_package)
+      assert.are.equal("Bar", d.class)
+      assert.are.equal("com.example", d.package)
+      -- climbs to src then descends test/java/<package>
+      assert.is_truthy(d.path:find("test/java/com/example", 1, true))
+    end)
   end)
 
   describe("complete", function()

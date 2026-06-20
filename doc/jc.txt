@@ -169,7 +169,9 @@ Prompt scheme: >
   template:[subdir]:/package.ClassName extends Super implements If(String s, public Integer i):constructor:toString:equals
 <
 - template (optional): junit, interface, exception, servlet, ...;
-- subdir (optional): e.g. test, androidTest;
+- subdir (optional): source-set or subproject. `[test]` -> current
+  module's src/test/java; `[module]` / `[module/test]` -> that
+  subproject's source root (multi-module projects);
 - class name and package; with `/` parent package backsearch is used;
 - extends/implements classes are imported automatically;
 - field list: `private` by default, modifiers can be given;

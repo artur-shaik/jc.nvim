@@ -186,7 +186,12 @@ Prompt scheme, for class creation:
 
 A: (optional) template - which will be used to create class boilerplate. Some existed templates: junit, interface, exception, servlet, etc;
 
-B: (optional) subdirectory in which class will be put. For example: test, androidTest;
+B: (optional) source root / subproject. A source-set name places the
+class in the current module's `src/<name>/java` (`[test]` mirrors the
+package into `src/test/java`). A subproject name (multi-module projects)
+targets that module's `src/main/java` directly — `[refunds-model]` or
+`[refunds-model/test]` for its test sources. Without it, the class goes
+relative to the current file as before;
 
 C: class name and package. With `/` will use backsearch for parent package to put in it. Without `/` put in relative package to current;
 
