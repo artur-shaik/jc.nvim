@@ -48,6 +48,10 @@ function M.setup(args)
   end
   M.config = vim.tbl_deep_extend("keep", args, default_config)
 
+  if M.config.templates_dir then
+    require("jc.templates").load_dir(M.config.templates_dir)
+  end
+
   local group = vim.api.nvim_create_augroup("jc_nvim_attach", { clear = true })
   vim.api.nvim_create_autocmd("LspAttach", {
     group = group,

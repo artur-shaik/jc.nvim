@@ -25,12 +25,18 @@ describe("templates", function()
 
   it("interface: fields become method signatures, no implements", function()
     local out = templates.render("interface", { name = "Foo", package = "p", fields = opts.fields, extends = "X" })
-    assert.are.equal("package p;\n\npublic interface Foo extends X {\nprivate String bar();\npublic int n();\n\n}", out)
+    assert.is_truthy(out:find("public interface Foo extends X {", 1, true))
+    assert.is_truthy(out:find("private String bar();", 1, true))
+    assert.is_truthy(out:find("public int n();", 1, true))
+    assert.is_nil(out:find("implements", 1, true))
   end)
 
-  it("enum: no extends/implements", function()
-    local out = templates.render("enum", { name = "E", package = "p", fields = { opts.fields[1] } })
-    assert.are.equal("package p;\n\npublic enum E {\nprivate String bar;\n\n}", out)
+  it("enum: no extends, but implements is honoured", function()
+    local out = templates.render("enum", { name = "E", package = "p", fields = { opts.fields[1] }, extends = "X" })
+    assert.is_truthy(out:find("public enum E {", 1, true))
+    assert.is_nil(out:find("extends", 1, true)) -- enum cannot extend
+    local out2 = templates.render("enum", { name = "E", package = "p", fields = {}, implements = "Serializable" })
+    assert.is_truthy(out2:find("public enum E implements Serializable {", 1, true))
   end)
 
   it("exception: default extends Exception and two constructors", function()
@@ -106,5 +112,81 @@ describe("templates", function()
     end)
     assert.are.equal("record Foo", templates.render("rec", { name = "Foo" }))
     assert.is_truthy(vim.tbl_contains(templates.names(), "rec"))
+  end)
+
+  it("record: components from fields, no field declarations", function()
+    local out = templates.render("record", {
+      name = "Point",
+      package = "p",
+      fields = { { type = "int", name = "x" }, { type = "int", name = "y" } },
+    })
+    assert.is_truthy(out:find("public record Point(int x, int y) {", 1, true))
+  end)
+
+  it("spring stereotypes carry their annotation", function()
+    assert.is_truthy(templates.render("service", { name = "S", package = "p", fields = {} }):find("@Service", 1, true))
+    assert.is_truthy(
+      templates.render("controller", { name = "C", package = "p", fields = {} }):find("@RestController", 1, true)
+    )
+  end)
+
+  it("junit5: jupiter imports, BeforeEach and Test", function()
+    local out = templates.render("junit5", { name = "FooTest", package = "p", fields = {} })
+    assert.is_truthy(out:find("org.junit.jupiter.api.Test", 1, true))
+    assert.is_truthy(out:find("@BeforeEach", 1, true))
+    assert.is_truthy(out:find("@Test", 1, true))
+  end)
+
+  it("load_dir registers *.lua templates returning a function", function()
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, "p")
+    vim.fn.writefile({ "return function(o) return 'custom ' .. o.name end" }, dir .. "/mytpl.lua")
+    templates.load_dir(dir)
+    assert.are.equal("custom Foo", templates.render("mytpl", { name = "Foo" }))
+  end)
+
+  describe("declarative spec", function()
+    it("user input overrides the spec default extends", function()
+      templates.register("exc", { extends = "Exception" })
+      local out = templates.render("exc", { name = "E", package = "p", fields = {}, extends = "RuntimeException" })
+      assert.is_truthy(out:find("extends RuntimeException", 1, true))
+      assert.is_nil(out:find("extends Exception", 1, true))
+    end)
+
+    it("imports and annotations resolve from string, list and function", function()
+      templates.register("ann", {
+        imports = function(o)
+          return { "java.util.List", "a." .. o.name }
+        end,
+        annotations = "@Generated",
+      })
+      local out = templates.render("ann", { name = "Foo", package = "p", fields = {} })
+      assert.is_truthy(out:find("import java.util.List;", 1, true))
+      assert.is_truthy(out:find("import a.Foo;", 1, true))
+      assert.is_truthy(out:find("@Generated", 1, true))
+    end)
+
+    it("a spec carries no boilerplate — only the essence", function()
+      -- declarative DTO: just imports + annotation, no class skeleton
+      templates.register("dto", { imports = { "lombok.Data" }, annotations = { "@Data" } })
+      local out = templates.render("dto", {
+        name = "User",
+        package = "com.app",
+        fields = { { mod = "private", type = "String", name = "name" } },
+      })
+      assert.is_truthy(out:find("package com.app;", 1, true))
+      assert.is_truthy(out:find("import lombok.Data;", 1, true))
+      assert.is_truthy(out:find("@Data\npublic class User {", 1, true))
+      assert.is_truthy(out:find("private String name;", 1, true))
+    end)
+
+    it("load_dir accepts a spec table too", function()
+      local dir = vim.fn.tempname()
+      vim.fn.mkdir(dir, "p")
+      vim.fn.writefile({ 'return { annotations = "@Entity" }' }, dir .. "/entity.lua")
+      templates.load_dir(dir)
+      local out = templates.render("entity", { name = "User", package = "p", fields = {} })
+      assert.is_truthy(out:find("@Entity\npublic class User {", 1, true))
+    end)
   end)
 end)

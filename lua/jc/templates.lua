@@ -1,13 +1,37 @@
--- Class boilerplate templates, ported 1:1 from plugin/res/gen__class_*.tpl.
--- Each template is function(opts) -> java source string. opts:
+-- Declarative class templates. A template is either:
+--   * a function(opts) -> java source string (full control), or
+--   * a spec table describing only the essence; the engine assembles the
+--     surrounding class structure (package, declaration, extends/implements,
+--     fields, braces).
+--
+-- opts passed to templates/specs:
 --   name       class name
---   package    package name
+--   package    package name (may be empty -> default package)
 --   fields     array of { mod, type, name } (mod defaults to "private")
---   extends    optional superclass
---   implements optional interface list
+--   extends    optional superclass (from user input, overrides spec default)
+--   implements optional interface list (from user input)
+--
+-- Spec fields (all optional):
+--   kind        "class" | "interface" | "enum" | "annotation" | "record"
+--   modifiers   declaration modifiers (default "public")
+--   extends     default superclass when the user gives none
+--   implements  default interface list
+--   imports     string | {string} | function(opts) -> string|{string}
+--   annotations string | {string} | function(opts) -> string|{string}
+--   body        string | function(opts) -> string ; members after the fields
+--
 -- The result is reindented by the caller (gg=G), so exact whitespace here
 -- does not matter — only structure does.
 local M = {}
+
+-- which declaration parts each kind allows (Java rules)
+local KINDS = {
+  class = { keyword = "class", extends = true, implements = true },
+  interface = { keyword = "interface", extends = true, implements = false },
+  enum = { keyword = "enum", extends = false, implements = true },
+  annotation = { keyword = "@interface", extends = false, implements = false },
+  record = { keyword = "record", extends = false, implements = true, record = true },
+}
 
 -- package declaration, or "" for the default (empty) package — emitting
 -- "package ;" produces invalid Java and pushes organize_imports above it
@@ -16,20 +40,6 @@ local function package_line(opts)
     return "package " .. opts.package .. ";\n\n"
   end
   return ""
-end
-
-local function header(opts, keyword, default_extends)
-  local result = package_line(opts)
-  result = result .. "public " .. keyword .. " " .. opts.name
-  if opts.extends then
-    result = result .. " extends " .. opts.extends
-  elseif default_extends then
-    result = result .. " extends " .. default_extends
-  end
-  if opts.implements then
-    result = result .. " implements " .. opts.implements
-  end
-  return result
 end
 
 -- field declarations; `suffix` is "" for "type name;" or "()" for interface
@@ -42,140 +52,216 @@ local function fields_block(opts, suffix)
   return result
 end
 
-local templates = {}
-
-templates["class"] = function(opts)
-  return header(opts, "class") .. " {\n\n" .. fields_block(opts) .. "\n}"
-end
-
-templates["interface"] = function(opts)
-  -- interface fields render as method signatures (type name();)
-  local result = package_line(opts)
-  result = result .. "public interface " .. opts.name
-  if opts.extends then
-    result = result .. " extends " .. opts.extends
+-- spec values may be a string, a list of strings or a function returning
+-- either; normalize to a list / single string
+local function resolve_list(value, opts)
+  if value == nil then
+    return {}
   end
-  return result .. " {\n" .. fields_block(opts, "()") .. "\n}"
-end
-
-templates["enum"] = function(opts)
-  local result = package_line(opts)
-  result = result .. "public enum " .. opts.name
-  return result .. " {\n" .. fields_block(opts) .. "\n}"
-end
-
-templates["annotation"] = function(opts)
-  return header(opts, "@interface") .. " {\n" .. fields_block(opts) .. "\n}"
-end
-
-templates["exception"] = function(opts)
-  local result = header(opts, "class", "Exception") .. " {\n" .. fields_block(opts)
-  result = result .. "\npublic " .. opts.name .. "() {\n\n}\n"
-  result = result .. "\npublic " .. opts.name .. "(String msg) {\nsuper(msg);\n}\n"
-  return result .. "\n}"
-end
-
-templates["main"] = function(opts)
-  local result = header(opts, "class") .. " {\n" .. fields_block(opts)
-  result = result .. "\npublic static void main(String[] args) {\n\n}\n"
-  return result .. "\n}"
-end
-
-templates["junit"] = function(opts)
-  local result = package_line(opts)
-  result = result .. "import static org.junit.Assert.*;\n\n"
-  result = result .. "public class " .. opts.name
-  if opts.extends then
-    result = result .. " extends " .. opts.extends
+  if type(value) == "function" then
+    return resolve_list(value(opts), opts)
   end
-  if opts.implements then
-    result = result .. " implements " .. opts.implements
+  if type(value) == "string" then
+    return { value }
   end
-  result = result .. " {\n" .. fields_block(opts)
-  result = result .. "\n@Before\npublic void setUp() {\n\n}\n"
-  return result .. "\n}"
+  return value
 end
 
-templates["singleton"] = function(opts)
-  local name = opts.name
-  local result = header(opts, "class") .. " {\n" .. fields_block(opts)
-  result = result .. "\nprivate " .. name .. "() {\n\n}\n"
-  result = result .. "\npublic static " .. name .. " getInstance() {\n"
-  result = result .. "return " .. name .. "Holder.INSTANCE;\n"
-  result = result .. "}\n"
-  result = result .. "\nprivate static class " .. name .. "Holder {\n"
-  result = result .. "private static final " .. name .. " INSTANCE = new " .. name .. "();\n"
-  result = result .. "}\n"
-  return result .. "\n}"
+local function resolve_str(value, opts)
+  if type(value) == "function" then
+    return value(opts)
+  end
+  return value
 end
 
-templates["servlet"] = function(opts)
-  local name = opts.name
-  local url = vim.fn.tolower(vim.fn.substitute(name, "\\C\\([A-Z]\\)", "/\\1", "g"))
-  local result = package_line(opts)
-  result = result .. '@WebServlet(name = "' .. name .. '", urlPatterns = {"' .. url .. '"})\n'
-  result = result .. "public class " .. name
-  if opts.extends then
-    result = result .. " extends " .. opts.extends
-  else
-    result = result .. " extends HttpServlet"
+-- assemble a full class source from a declarative spec
+local function assemble(spec, opts)
+  local kind = KINDS[spec.kind or "class"] or KINDS.class
+  local out = package_line(opts)
+
+  local imports = resolve_list(spec.imports, opts)
+  if #imports > 0 then
+    for _, imp in ipairs(imports) do
+      out = out .. "import " .. imp .. ";\n"
+    end
+    out = out .. "\n"
   end
-  if opts.implements then
-    result = result .. " implements " .. opts.implements
+
+  for _, annotation in ipairs(resolve_list(spec.annotations, opts)) do
+    out = out .. annotation .. "\n"
   end
-  result = result .. " {\n" .. fields_block(opts)
-  result = result
-    .. "\nprotected void processRequest(HttpServletRequest request, HttpServletResponse response)"
-    .. " throws ServletException, IOException {\n"
-  result = result .. 'response.setContentType("text/html;charset=UTF-8");\n'
-  result = result .. "try (PrintWriter out = response.getWriter()) {\n"
-  result = result .. 'out.println("<!DOCTYPE HTML");\n'
-  result = result .. 'out.println("<html>");\n'
-  result = result .. 'out.println("<head>");\n'
-  result = result .. 'out.println("<title>Servlet ' .. name .. '</title>");\n'
-  result = result .. 'out.println("</head>");\n'
-  result = result .. 'out.println("<body>");\n'
-  result = result .. 'out.println("<h1>Servlet ' .. name .. " at " .. url .. '</h1>");\n'
-  result = result .. 'out.println("</body>");\n'
-  result = result .. 'out.println("</html>");\n'
-  result = result .. "}\n"
-  result = result .. "}\n"
-  result = result
-    .. "\nprotected void doGet(HttpServletRequest request, HttpServletResponse response)"
-    .. " throws ServletException, IOException {\n"
-  result = result .. "processRequest(request, response);\n"
-  result = result .. "}\n"
-  result = result
-    .. "\nprotected void doPost(HttpServletRequest request, HttpServletResponse response)"
-    .. " throws ServletException, IOException {\n"
-  result = result .. "processRequest(request, response);\n"
-  result = result .. "}\n"
-  return result .. "\n}"
+
+  out = out .. (spec.modifiers or "public") .. " " .. kind.keyword .. " " .. opts.name
+
+  if kind.record then
+    local comp = {}
+    for _, field in ipairs(opts.fields or {}) do
+      comp[#comp + 1] = field.type .. " " .. field.name
+    end
+    out = out .. "(" .. table.concat(comp, ", ") .. ")"
+  end
+  if kind.extends then
+    local ext = opts.extends or resolve_str(spec.extends, opts)
+    if ext then
+      out = out .. " extends " .. ext
+    end
+  end
+  if kind.implements then
+    local impl = opts.implements or resolve_str(spec.implements, opts)
+    if impl then
+      out = out .. " implements " .. impl
+    end
+  end
+
+  out = out .. " {\n\n"
+  if not kind.record then
+    out = out .. fields_block(opts, spec.kind == "interface" and "()" or "")
+  end
+  local body = resolve_str(spec.body, opts)
+  if body then
+    out = out .. body .. "\n"
+  end
+  return out .. "\n}"
 end
 
-local function android(default_extends, override)
-  return function(opts)
-    local result = header(opts, "class", default_extends) .. " {\n" .. fields_block(opts)
-    result = result .. "\n@Override\n" .. override
-    return result .. "\n}"
-  end
+-- ---- built-in templates as declarative specs ----
+
+local templates = {
+  class = {},
+  interface = { kind = "interface" },
+  enum = { kind = "enum" },
+  annotation = { kind = "annotation" },
+  record = { kind = "record" },
+
+  exception = {
+    extends = "Exception",
+    body = function(opts)
+      return "public " .. opts.name .. "() {\n\n}\n\npublic " .. opts.name .. "(String msg) {\nsuper(msg);\n}"
+    end,
+  },
+
+  main = { body = "public static void main(String[] args) {\n\n}" },
+
+  singleton = {
+    body = function(opts)
+      local n = opts.name
+      return "private "
+        .. n
+        .. "() {\n\n}\n\npublic static "
+        .. n
+        .. " getInstance() {\nreturn "
+        .. n
+        .. "Holder.INSTANCE;\n}\n\nprivate static class "
+        .. n
+        .. "Holder {\nprivate static final "
+        .. n
+        .. " INSTANCE = new "
+        .. n
+        .. "();\n}"
+    end,
+  },
+
+  servlet = {
+    extends = "HttpServlet",
+    annotations = function(opts)
+      local url = vim.fn.tolower(vim.fn.substitute(opts.name, "\\C\\([A-Z]\\)", "/\\1", "g"))
+      return '@WebServlet(name = "' .. opts.name .. '", urlPatterns = {"' .. url .. '"})'
+    end,
+    body = function(opts)
+      local url = vim.fn.tolower(vim.fn.substitute(opts.name, "\\C\\([A-Z]\\)", "/\\1", "g"))
+      return "protected void processRequest(HttpServletRequest request, HttpServletResponse response)"
+        .. " throws ServletException, IOException {\n"
+        .. 'response.setContentType("text/html;charset=UTF-8");\n'
+        .. "try (PrintWriter out = response.getWriter()) {\n"
+        .. 'out.println("<!DOCTYPE HTML");\n'
+        .. 'out.println("<html>");\n'
+        .. 'out.println("<head>");\n'
+        .. 'out.println("<title>Servlet '
+        .. opts.name
+        .. '</title>");\n'
+        .. 'out.println("</head>");\n'
+        .. 'out.println("<body>");\n'
+        .. 'out.println("<h1>Servlet '
+        .. opts.name
+        .. " at "
+        .. url
+        .. '</h1>");\n'
+        .. 'out.println("</body>");\n'
+        .. 'out.println("</html>");\n'
+        .. "}\n}\n\nprotected void doGet(HttpServletRequest request, HttpServletResponse response)"
+        .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}\n"
+        .. "\nprotected void doPost(HttpServletRequest request, HttpServletResponse response)"
+        .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}"
+    end,
+  },
+
+  junit = {
+    imports = "static org.junit.Assert.*",
+    body = "@Before\npublic void setUp() {\n\n}",
+  },
+
+  junit5 = {
+    imports = {
+      "org.junit.jupiter.api.Test",
+      "org.junit.jupiter.api.BeforeEach",
+      "static org.junit.jupiter.api.Assertions.*",
+    },
+    body = "@BeforeEach\nvoid setUp() {\n\n}\n\n@Test\nvoid test() {\n\n}",
+  },
+}
+
+-- spring stereotypes: a class carrying the matching @ annotation
+for name, annotation in pairs({
+  service = "Service",
+  component = "Component",
+  repository = "Repository",
+  controller = "RestController",
+}) do
+  templates[name] = { annotations = "@" .. annotation }
 end
 
-templates["android_activity"] =
-  android("Activity", "public void onCreate(Bundle savedInstanceState) {\nsuper.onCreate(savedInstanceBundle);\n}\n")
-templates["android_fragment"] = android(
-  "Fragment",
-  "public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {\nreturn null;\n}\n"
-)
-templates["android_service"] = android("Service", "public IBinder onBind(Intent intent) {\nreturn null;\n}\n")
-templates["android_broadcast_receiver"] =
-  android("BroadcastReceiver", "public void onReceive(Context context, Intent intent) {\nreturn null;\n}\n")
+-- android components: a class with a default superclass and one override
+for name, def in pairs({
+  android_activity = {
+    "Activity",
+    "@Override\npublic void onCreate(Bundle savedInstanceState) {\nsuper.onCreate(savedInstanceBundle);\n}",
+  },
+  android_fragment = {
+    "Fragment",
+    "@Override\npublic View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {\nreturn null;\n}",
+  },
+  android_service = { "Service", "@Override\npublic IBinder onBind(Intent intent) {\nreturn null;\n}" },
+  android_broadcast_receiver = {
+    "BroadcastReceiver",
+    "@Override\npublic void onReceive(Context context, Intent intent) {\nreturn null;\n}",
+  },
+}) do
+  templates[name] = { extends = def[1], body = def[2] }
+end
 
 -- user templates registered via setup{ templates_dir } land here
 local custom = {}
 
-function M.register(name, fn)
-  custom[name] = fn
+function M.register(name, template)
+  custom[name] = template
+end
+
+-- load user templates from a directory: each `<name>.lua` returns a
+-- function(opts) -> string OR a declarative spec table
+function M.load_dir(dir)
+  dir = vim.fn.expand(dir)
+  if vim.fn.isdirectory(dir) ~= 1 then
+    return
+  end
+  for _, file in ipairs(vim.fn.glob(dir .. "/*.lua", true, true)) do
+    local name = vim.fn.fnamemodify(file, ":t:r")
+    local ok, template = pcall(dofile, file)
+    if ok and (type(template) == "function" or type(template) == "table") then
+      custom[name] = template
+    else
+      vim.notify("jc: invalid template " .. file, vim.log.levels.WARN)
+    end
+  end
 end
 
 function M.get(name)
@@ -196,7 +282,11 @@ end
 
 -- render template `name` (defaults to "class") with opts
 function M.render(name, opts)
-  return M.get(name)(opts)
+  local template = M.get(name)
+  if type(template) == "function" then
+    return template(opts)
+  end
+  return assemble(template, opts)
 end
 
 return M

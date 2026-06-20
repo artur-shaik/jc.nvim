@@ -59,9 +59,28 @@ Call `setup` (or use the `opts` table of lazy.nvim): >lua
     debug_backend = nil,         -- "dap" | "vimspector" | nil = auto
     basedir = nil,               -- data dir, ~/.local/share/jc.nvim
     update_config_on_new_file = true, -- refresh build path on new java files
+    templates_dir = nil,         -- dir of user class templates
     on_attach = nil,             -- function(client, bufnr) extra hook
   })
 <
+                                                            *jc-templates*
+Built-in templates: class, interface, enum, record, annotation,
+exception, main, singleton, servlet, junit, junit5, service, component,
+repository, controller, android_*.
+
+Custom templates live in `templates_dir` as `<name>.lua` files, each
+returning either a declarative spec table or a function(opts) -> string.
+A spec describes only the essence; the engine assembles the package,
+declaration, extends/implements and fields. Example: >lua
+
+  -- jc-templates/dto.lua
+  return { imports = { "lombok.Data" }, annotations = { "@Data" } }
+<
+Spec fields (all optional): kind (class|interface|enum|annotation|
+record), modifiers, extends, implements, imports, annotations, body.
+imports/annotations/body may be a string, list or function(opts). User
+input for extends/implements overrides the spec defaults. opts: name,
+package, fields ({mod,type,name}), extends, implements.
                                                               *jc-legacy-vars*
 The legacy global variables `g:jc_default_mappings`,
 `g:jc_autoformat_on_save`, `g:jc_debug_backend` and `g:jc_basedir` are

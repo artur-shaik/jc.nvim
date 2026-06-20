@@ -64,9 +64,44 @@ require("jc").setup({
   debug_backend = nil,         -- "dap" | "vimspector" | nil (auto-detect)
   basedir = nil,               -- data dir, default ~/.local/share/jc.nvim
   update_config_on_new_file = true, -- refresh jdtls build path on new java files
+  templates_dir = nil,         -- dir of user class templates (see below)
   on_attach = nil,             -- function(client, bufnr) extra hook
 })
 ```
+
+Built-in class templates: `class`, `interface`, `enum`, `record`,
+`annotation`, `exception`, `main`, `singleton`, `servlet`, `junit`,
+`junit5`, `service`, `component`, `repository`, `controller` and the
+`android_*` family.
+
+### Custom templates
+
+Point `templates_dir` at a folder of `<name>.lua` files. Each returns
+**either** a declarative spec table (recommended — describe only the
+essence, the engine builds the rest) **or** a `function(opts) -> string`
+for full control.
+
+Declarative spec — a Lombok DTO is just imports + an annotation, no class
+skeleton to repeat:
+
+```lua
+-- ~/.config/nvim/jc-templates/dto.lua
+return {
+  imports = { "lombok.Data" },
+  annotations = { "@Data" },
+}
+```
+
+`dto:/com.app.User(String name, int age)` then produces a `@Data` class
+with the package, declaration and fields filled in. Spec fields (all
+optional): `kind` (`class`/`interface`/`enum`/`annotation`/`record`),
+`modifiers`, `extends`, `implements`, `imports`, `annotations`, `body` —
+each of `imports`/`annotations`/`body` may be a string, a list or a
+`function(opts)`. User input for `extends`/`implements` overrides the
+spec defaults.
+
+`opts`: `name`, `package`, `fields` (`{ mod, type, name }`), `extends`,
+`implements`.
 
 The legacy `g:jc_default_mappings`, `g:jc_autoformat_on_save`,
 `g:jc_debug_backend` and `g:jc_basedir` variables still work as a
