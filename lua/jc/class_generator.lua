@@ -395,12 +395,39 @@ local function source_roots()
   return roots
 end
 
-local function keyword_completions(command, completed, is_relative)
-  local tokens = vim.split(command, " ", { plain = true })
-  if #tokens > 1 and vim.tbl_contains(KEYWORDS, tokens[#tokens - 1]) then
+-- LSP SymbolKind: Class=5, Interface=11
+local TYPE_KINDS = { extends = { [5] = true, [11] = true }, implements = { [11] = true } }
+
+-- class/interface names from jdtls matching `query`, as "<prefix> <Name>"
+local function type_completions(query, prefix, kinds)
+  local client = require("jc.lsp").get_jdtls_client()
+  if not client then
     return {}
   end
+  -- synchronous: completion must return inline; jdtls answers quickly
+  local response = client:request_sync("workspace/symbol", { query = query }, 1000)
+  if not response or response.err or type(response.result) ~= "table" then
+    return {}
+  end
+  local seen, result = {}, {}
+  for _, sym in ipairs(response.result) do
+    if kinds[sym.kind] and not seen[sym.name] then
+      seen[sym.name] = true
+      result[#result + 1] = prefix .. " " .. sym.name
+    end
+  end
+  return result
+end
+
+local function keyword_completions(command, completed, is_relative)
+  local tokens = vim.split(command, " ", { plain = true })
+  local prev = tokens[#tokens - 1]
   local prefix = completed .. (is_relative and "" or "/") .. table.concat(slice(tokens, 0, -2), " ")
+  -- right after "extends "/"implements " -> complete class/interface names
+  if #tokens > 1 and TYPE_KINDS[prev] then
+    return type_completions(tokens[#tokens], prefix, TYPE_KINDS[prev])
+  end
+  -- otherwise offer the keywords themselves
   local result = {}
   for _, kw in ipairs(KEYWORDS) do
     if not command:find("%f[%w]" .. kw .. "%f[%W]") and kw:sub(1, #tokens[#tokens]) == tokens[#tokens] then

@@ -195,3 +195,9 @@ D: (optional) extends and implements classes will be automatically imported;
 E: (optional) private str variable, and public i variable will be added to class;
 
 F: (optional) contructor using all fields and toString will be created. Also hashCode and equals can be used.
+
+The prompt has `<Tab>` completion following the scheme: templates and
+project packages for the path, `[subdir]` after a template, method flags
+(`constructor`/`toString`/...) once the class path is given, and — after
+`extends `/`implements ` — class/interface names resolved live from
+jdtls.

@@ -165,6 +165,15 @@ describe("class_generator parsing", function()
       local r = cg.complete("", "/kz.foo.Bar:constructor:to")
       assert.are.same({ "/kz.foo.Bar:constructor:toString" }, r)
     end)
+
+    it("after 'extends ' routes to type completion (empty without jdtls)", function()
+      -- no jdtls client in the test env -> empty, but must not error and must
+      -- not fall back to offering keywords again
+      assert.has_no.errors(function()
+        local r = cg.complete("", "Foo extends Ru")
+        assert.are.same({}, r)
+      end)
+    end)
   end)
 
   describe("is_class_name", function()

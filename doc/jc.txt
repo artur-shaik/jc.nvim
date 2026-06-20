@@ -175,6 +175,10 @@ Prompt scheme: >
 - field list: `private` by default, modifiers can be given;
 - trailing flags: constructor, toString, equals, hashCode.
 
+The prompt completes with <Tab>: templates and project packages for the
+path, `[subdir]` after a template, the trailing flags once the path is
+given, and class/interface names from jdtls after `extends `/`implements `.
+
 ==============================================================================
 8. HEALTH                                                            *jc-health*
 
