@@ -221,6 +221,9 @@ describe("class_generator parsing", function()
         cb(({ "com.foo", "Bar" })[ii])
       end
       vim.fn.input = function(o)
+        if o.prompt and o.prompt:find("confirm") then
+          return o.default -- accept the assembled DSL unchanged
+        end
         fi = fi + 1
         defaults[fi] = o.default
         return fn_inputs[fi]
@@ -253,7 +256,10 @@ describe("class_generator parsing", function()
         ii = ii + 1
         cb(({ "com.foo", "Bar" })[ii])
       end
-      vim.fn.input = function()
+      vim.fn.input = function(o)
+        if o.prompt and o.prompt:find("confirm") then
+          return o.default
+        end
         fi = fi + 1
         return fn_inputs[fi]
       end
@@ -285,7 +291,10 @@ describe("class_generator parsing", function()
         ii = ii + 1
         cb(ui_inputs[ii])
       end
-      vim.fn.input = function()
+      vim.fn.input = function(o)
+        if o.prompt and o.prompt:find("confirm") then
+          return o.default
+        end
         fi = fi + 1
         return fn_inputs[fi]
       end

@@ -90,8 +90,14 @@ function M.apply_edit(err, response, ctx)
   elseif err then
     vim.notify(vim.inspect(err), vim.log.levels.ERROR)
   end
-  -- jdtls needs time to apply the edit and refresh diagnostics before the
-  -- next chained command (e.g. generate_abstractMethods reads diagnostics)
+  M.advance_chain()
+end
+
+-- run the next chained command after a delay; jdtls needs time to apply the
+-- edit and refresh diagnostics before the next step (e.g.
+-- generate_abstractMethods reads diagnostics). A code-gen step that does
+-- nothing (no edit) must still call this so the chain doesn't stall.
+function M.advance_chain()
   vim.defer_fn(function()
     chains:execute_next_if_exists()
   end, M.chain_delay_ms)

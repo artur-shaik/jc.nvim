@@ -404,7 +404,11 @@ local function queue_generation(data)
       require("jc.jdtls").generate_toString()
     end)
   end
-  chains:execute_next_if_exists()
+  -- give jdtls time to index the just-written class (and its fields) before
+  -- the first code-gen step, so e.g. toString sees the fields
+  vim.defer_fn(function()
+    chains:execute_next_if_exists()
+  end, 800)
 end
 
 local function create_class(data)

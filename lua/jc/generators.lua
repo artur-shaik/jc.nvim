@@ -113,7 +113,9 @@ local function open_buffer(name, title, commands, body)
     end, opts)
   end
 
-  vim.api.nvim_win_set_cursor(0, { #header + 1, 0 })
+  -- first candidate line, clamped (the list may be empty for a fieldless class)
+  local cursor = math.min(#header + 1, vim.api.nvim_buf_line_count(buf))
+  vim.api.nvim_win_set_cursor(0, { cursor, 0 })
 end
 
 -- "f0 --> type name" candidate lines

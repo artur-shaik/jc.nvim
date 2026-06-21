@@ -12,6 +12,25 @@ local function make_range_params()
   return vim.lsp.util.make_range_params(0, encoding)
 end
 
+-- run a code-generation status request, retrying while jdtls hasn't finished
+-- building the model for a just-created class (the request errors until then,
+-- which would silently skip the generator buffer); `build` re-creates params
+-- per attempt so the cursor encoding stays current
+local function request_status(method, build, on_ok, tries)
+  tries = tries or 10
+  lsp.jdtls_request(0, method, build(), function(err, resp)
+    if resp then
+      on_ok(resp)
+    elseif tries > 1 then
+      vim.defer_fn(function()
+        request_status(method, build, on_ok, tries - 1)
+      end, 200)
+    else
+      vim.notify("jc: " .. method .. " failed: " .. vim.inspect(err), vim.log.levels.WARN)
+    end
+  end)
+end
+
 local function choose_imports(params, _)
   local candidates = params.arguments[2][1].candidates
   local regulars = regular_imports()
@@ -95,14 +114,12 @@ end
 
 function M.generate_accessors(fields)
   if not fields then
-    local params = make_range_params()
-    params.kind = 2
-    lsp.jdtls_request(0, "java/resolveUnimplementedAccessors", params, function(err, resp)
-      if resp then
-        require("jc.generators").accessors(resp)
-      else
-        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
-      end
+    request_status("java/resolveUnimplementedAccessors", function()
+      local params = make_range_params()
+      params.kind = 2
+      return params
+    end, function(resp)
+      require("jc.generators").accessors(resp)
     end)
   else
     set_configuration({
@@ -143,50 +160,49 @@ function M.generate_abstractMethods()
       })
     end
   end
-  if #diagnostics > 0 then
-    local params = make_range_params()
-    params.context = {
-      diagnostics = diagnostics,
-    }
-    params.range = {
-      start = {
-        character = 0,
-        line = line,
-      },
-      ["end"] = {
-        character = 0,
-        line = line,
-      },
-    }
-    lsp.jdtls_request(curbuf, "textDocument/codeAction", params, function(err, actions)
-      if actions then
-        local add_method_action = nil
-        for _, action in ipairs(actions) do
-          if action.title == "Add unimplemented methods" then
-            add_method_action = action
-            break
-          end
-        end
-        if add_method_action then
-          lsp.jdtls_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
-        else
-          vim.notify("No action found", vim.log.levels.INFO)
-        end
-      elseif err then
+  -- no unimplemented methods -> nothing to do, but keep the chain moving
+  if #diagnostics == 0 then
+    lsp.advance_chain()
+    return
+  end
+  local params = make_range_params()
+  params.context = {
+    diagnostics = diagnostics,
+  }
+  params.range = {
+    start = {
+      character = 0,
+      line = line,
+    },
+    ["end"] = {
+      character = 0,
+      line = line,
+    },
+  }
+  lsp.jdtls_request(curbuf, "textDocument/codeAction", params, function(err, actions)
+    local add_method_action = nil
+    for _, action in ipairs(actions or {}) do
+      if action.title == "Add unimplemented methods" then
+        add_method_action = action
+        break
+      end
+    end
+    if add_method_action then
+      lsp.jdtls_request(curbuf, "codeAction/resolve", add_method_action, apply_edit)
+    else
+      -- nothing applicable; advance the chain instead of stalling it
+      if err then
         vim.notify(vim.inspect(err), vim.log.levels.ERROR)
       end
-    end)
-  end
+      lsp.advance_chain()
+    end
+  end)
 end
 
 function M.generate_constructor(fields, params, opts)
   if fields == nil then
-    lsp.jdtls_request(0, "java/checkConstructorsStatus", make_range_params(), function(err, resp)
-      if resp then
-        require("jc.generators").constructor(resp.fields, resp.constructors, opts)
-      else
-        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
-      end
+    request_status("java/checkConstructorsStatus", make_range_params, function(resp)
+      require("jc.generators").constructor(resp.fields, resp.constructors, opts)
     end)
   else
     set_configuration({
@@ -211,12 +227,8 @@ end
 
 function M.generate_hashCodeAndEquals(fields)
   if not fields then
-    lsp.jdtls_request(0, "java/checkHashCodeEqualsStatus", make_range_params(), function(err, resp)
-      if resp then
-        require("jc.generators").hashCodeEquals(resp.fields)
-      else
-        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
-      end
+    request_status("java/checkHashCodeEqualsStatus", make_range_params, function(resp)
+      require("jc.generators").hashCodeEquals(resp.fields)
     end)
   else
     set_configuration({
@@ -233,12 +245,8 @@ end
 
 function M.generate_toString(fields, params)
   if not fields then
-    lsp.jdtls_request(0, "java/checkToStringStatus", make_range_params(), function(err, resp)
-      if resp then
-        require("jc.generators").toString(resp.fields)
-      else
-        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
-      end
+    request_status("java/checkToStringStatus", make_range_params, function(resp)
+      require("jc.generators").toString(resp.fields)
     end)
   else
     set_configuration({
