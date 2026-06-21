@@ -736,7 +736,12 @@ end
 -- customlist completion entry point (exposed via v:lua for vim.fn.input)
 -- follows the DSL shape: template:[subdir]:/package.Class extends/implements
 -- (fields):flag:flag
-function M.complete(_arglead, line)
+function M.complete(_arglead, line, cursorpos)
+  -- complete what's left of the cursor, not the whole line, so editing mid
+  -- string (e.g. right after "[") offers the right candidates
+  if cursorpos then
+    line = line:sub(1, cursorpos)
+  end
   local tokens = vim.split(line, ":", { plain = true })
   local command = tokens[#tokens]
   local completed = completed_prefix(tokens)

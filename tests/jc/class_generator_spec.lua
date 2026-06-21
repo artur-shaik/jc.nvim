@@ -228,6 +228,19 @@ describe("class_generator parsing", function()
       assert.is_false(vim.tbl_contains(r, "Foo extends Base extends"))
     end)
 
+    it("completes at the cursor, not the whole line (mid-string editing)", function()
+      -- cursor sits right after "[", with text still trailing after it
+      local line = "service:[:/kz.foo.Bar"
+      local pos = #"service:[" -- byte offset of the cursor
+      local r = cg.complete("", line, pos)
+      -- routed to the subdir slot (offers source-sets/modules), not the path
+      assert.is_false(vim.tbl_contains(r, "service:[:/kz.foo.Bar"))
+      -- and the trailing path text after the cursor is not treated as command
+      for _, item in ipairs(r) do
+        assert.is_truthy(item:find("%[", 1))
+      end
+    end)
+
     it("after a template, offers no method flags (the subdir/path slot)", function()
       local r = cg.complete("", "enum:")
       assert.is_false(vim.tbl_contains(r, "enum:constructor"))
