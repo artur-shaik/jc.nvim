@@ -204,6 +204,71 @@ describe("class_generator parsing", function()
       assert.is_false(vim.tbl_contains(r, "[model]:apponly"))
     end)
 
+    it("wizard re-prompts an invalid field with the entered text and notifies", function()
+      local root = make_multimodule()
+      local selects = { "class", "(current module)", "(new package…)" }
+      -- extends, implements, fields(invalid then valid), flags
+      local fn_inputs = { "", "", "HashMap<String", "String a", "" }
+      local si, ii, fi = 0, 0, 0
+      local notes, defaults = {}, {}
+      local s_sel, s_ui, s_fn, s_notify = vim.ui.select, vim.ui.input, vim.fn.input, vim.notify
+      vim.ui.select = function(_, _, cb)
+        si = si + 1
+        cb(selects[si])
+      end
+      vim.ui.input = function(_, cb)
+        ii = ii + 1
+        cb(({ "com.foo", "Bar" })[ii])
+      end
+      vim.fn.input = function(o)
+        fi = fi + 1
+        defaults[fi] = o.default
+        return fn_inputs[fi]
+      end
+      vim.notify = function(msg)
+        notes[#notes + 1] = msg
+      end
+      pcall(cg.generate_class_wizard)
+      vim.ui.select, vim.ui.input, vim.fn.input, vim.notify = s_sel, s_ui, s_fn, s_notify
+
+      assert.are.equal("HashMap<String", defaults[4]) -- re-seeded with the bad value
+      assert.is_true(#vim.tbl_filter(function(m)
+        return type(m) == "string" and m:find("unbalanced", 1, true)
+      end, notes) > 0)
+      assert.are.equal(1, vim.fn.filereadable(root .. "/app/src/main/java/com/foo/Bar.java"))
+    end)
+
+    it("wizard rejects an empty generic in a supertype (no wildcard allowed)", function()
+      local root = make_multimodule()
+      local selects = { "class", "(current module)", "(new package…)" }
+      local fn_inputs = { "", "Comparable<>", "Comparable<String>", "", "" }
+      local si, ii, fi = 0, 0, 0
+      local notes = {}
+      local s_sel, s_ui, s_fn, s_notify = vim.ui.select, vim.ui.input, vim.fn.input, vim.notify
+      vim.ui.select = function(_, _, cb)
+        si = si + 1
+        cb(selects[si])
+      end
+      vim.ui.input = function(_, cb)
+        ii = ii + 1
+        cb(({ "com.foo", "Bar" })[ii])
+      end
+      vim.fn.input = function()
+        fi = fi + 1
+        return fn_inputs[fi]
+      end
+      vim.notify = function(m)
+        notes[#notes + 1] = m
+      end
+      pcall(cg.generate_class_wizard)
+      vim.ui.select, vim.ui.input, vim.fn.input, vim.notify = s_sel, s_ui, s_fn, s_notify
+
+      assert.is_true(#vim.tbl_filter(function(m)
+        return type(m) == "string" and m:find("supertype", 1, true)
+      end, notes) > 0)
+      assert.are.equal(1, vim.fn.filereadable(root .. "/app/src/main/java/com/foo/Bar.java"))
+    end)
+
     it("wizard builds the class from step-by-step answers", function()
       local root = make_multimodule() -- current file: app/src/main/java/Cur.java
       -- queue answers for the vim.ui prompts in order

@@ -1086,10 +1086,79 @@ local function packages_in(roots)
   return names
 end
 
--- prompt for a value, "" -> nil (skipped)
-local function ui_input(prompt, default, cb)
+-- are <> () [] balanced (catches half-typed generics like "HashMap<String")
+local function brackets_balanced(s)
+  local close = { ["<"] = ">", ["("] = ")", ["["] = "]" }
+  local stack = {}
+  for ch in s:gmatch(".") do
+    if close[ch] then
+      stack[#stack + 1] = close[ch]
+    elseif ch == ">" or ch == ")" or ch == "]" then
+      if stack[#stack] ~= ch then
+        return false
+      end
+      stack[#stack] = nil
+    end
+  end
+  return #stack == 0
+end
+
+-- validators return an error string (re-prompt) or nil (accept). They run
+-- only on a non-empty value; an empty value means the step was skipped.
+local VALIDATE = {
+  class = function(v)
+    return not M.is_class_name(v) and "invalid class name: " .. v or nil
+  end,
+  type = function(v)
+    if not brackets_balanced(v) then
+      return "unbalanced <>/()/[] in: " .. v
+    end
+    -- a supertype may not be a wildcard, and a bare "<>" can't be a raw type
+    if v:find("<%s*>") then
+      return "supertype can't have an empty/wildcard generic: " .. v
+    end
+    return nil
+  end,
+  fields = function(v)
+    if not brackets_balanced(v) then
+      return "unbalanced <>/()/[] in fields: " .. v
+    end
+    if #M.parse_fields("(" .. v .. ")") == 0 then
+      return "couldn't parse fields (expected: type name, ...): " .. v
+    end
+    return nil
+  end,
+  flags = function(v)
+    for w in v:gmatch("%a+") do
+      if not vim.tbl_contains(METHOD_FLAGS, w) then
+        return "unknown flag '" .. w .. "' (use: " .. table.concat(METHOD_FLAGS, " ") .. ")"
+      end
+    end
+    return nil
+  end,
+}
+
+-- run validate on a value; on error notify and return true (re-prompt)
+local function rejected(value, validate)
+  if value and validate then
+    local err = validate(value)
+    if err then
+      vim.notify("jc: " .. err, vim.log.levels.WARN)
+      return true
+    end
+  end
+  return false
+end
+
+-- prompt for a value, "" -> nil (skipped); re-prompts with the entered text
+-- when `validate` rejects it
+local function ui_input(prompt, default, cb, validate)
   vim.ui.input({ prompt = prompt, default = default or "" }, function(value)
-    cb(value and value ~= "" and value or nil)
+    value = value and value ~= "" and value or nil
+    if rejected(value, validate) then
+      return ui_input(prompt, value, cb, validate)
+    end
+    cb(value)
   end)
 end
 
@@ -1149,15 +1218,21 @@ function M.complete_fields(_arglead, line, pos)
 end
 
 -- blocking prompt with jdtls type completion (vim.fn.input honours the
--- completion option, unlike custom vim.ui.input replacements); "" -> nil
-local function type_input(prompt, complete_fn, cb)
+-- completion option, unlike custom vim.ui.input replacements); "" -> nil;
+-- re-prompts with the entered text when `validate` rejects it
+local function type_input(prompt, complete_fn, cb, validate, default)
   local saved = suppress_cmdline_pairs()
   local ok, value = pcall(vim.fn.input, {
     prompt = prompt,
+    default = default or "",
     completion = "customlist,v:lua.require'jc.class_generator'." .. complete_fn,
   })
   restore_cmdline_pairs(saved)
-  cb(ok and value ~= "" and value or nil)
+  value = ok and value ~= "" and value or nil
+  if rejected(value, validate) then
+    return type_input(prompt, complete_fn, cb, validate, value)
+  end
+  cb(value)
 end
 
 function M.generate_class_wizard()
@@ -1192,7 +1267,8 @@ function M.generate_class_wizard()
             if not name then
               return
             end
-            -- 5/6. extends / implements (jdtls type completion), 7/8 fields/flags
+            -- 5/6. extends / implements (jdtls type completion), 7/8 fields/flags;
+            -- each step validates and re-prompts the same value on error
             type_input("extends (optional): ", "complete_extends", function(extends)
               type_input("implements (optional): ", "complete_implements", function(implements)
                 type_input("fields, e.g. String a, int b (optional): ", "complete_fields", function(fields)
@@ -1208,11 +1284,11 @@ function M.generate_class_wizard()
                       flags = flags and (":" .. vim.trim(flags):gsub("[%s,]+", ":")) or nil,
                     }
                     resolve_and_create(parsed)
-                  end)
-                end)
-              end)
-            end)
-          end)
+                  end, VALIDATE.flags)
+                end, VALIDATE.fields)
+              end, VALIDATE.type)
+            end, VALIDATE.type)
+          end, VALIDATE.class)
         end
         if pkg_choice == "(new package…)" then
           ui_input("Package: ", nil, with_package)
