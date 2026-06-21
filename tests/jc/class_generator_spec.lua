@@ -175,6 +175,31 @@ describe("class_generator parsing", function()
       assert.is_false(vim.tbl_contains(r, "[model]:apponly"))
     end)
 
+    it("wizard builds the class from step-by-step answers", function()
+      local root = make_multimodule() -- current file: app/src/main/java/Cur.java
+      -- queue answers for the vim.ui prompts in order
+      local selects = { "class", "(current module)", "(new package…)" }
+      local ui_inputs = { "com.foo", "Bar" } -- pkg, name
+      local fn_inputs = { "", "", "", "" } -- extends, implements, fields, flags
+      local si, ii, fi = 0, 0, 0
+      local saved_sel, saved_ui, saved_fn = vim.ui.select, vim.ui.input, vim.fn.input
+      vim.ui.select = function(_, _, cb)
+        si = si + 1
+        cb(selects[si])
+      end
+      vim.ui.input = function(_, cb)
+        ii = ii + 1
+        cb(ui_inputs[ii])
+      end
+      vim.fn.input = function()
+        fi = fi + 1
+        return fn_inputs[fi]
+      end
+      pcall(cg.generate_class_wizard)
+      vim.ui.select, vim.ui.input, vim.fn.input = saved_sel, saved_ui, saved_fn
+      assert.are.equal(1, vim.fn.filereadable(root .. "/app/src/main/java/com/foo/Bar.java"))
+    end)
+
     it("absolute path resolves into the current source root, no backtracking", function()
       local root = make_multimodule() -- current file: app/src/main/java/Cur.java
       local saved_input = vim.fn.input
@@ -241,6 +266,15 @@ describe("class_generator parsing", function()
       end
     end)
 
+    it("complete_flags suggests remaining method flags by word", function()
+      local r = cg.complete_flags("", "con")
+      assert.are.same({ "constructor" }, r)
+      -- already-typed flags are not offered again
+      local r2 = cg.complete_flags("", "constructor to")
+      assert.are.same({ "constructor toString" }, r2)
+      assert.is_false(vim.tbl_contains(cg.complete_flags("", "constructor "), "constructor constructor"))
+    end)
+
     it("after a template, offers no method flags (the subdir/path slot)", function()
       local r = cg.complete("", "enum:")
       assert.is_false(vim.tbl_contains(r, "enum:constructor"))
@@ -272,6 +306,38 @@ describe("class_generator parsing", function()
       -- after ")" the keyword completion takes over
       local r = cg.complete("", "Test(String s) ext")
       assert.is_true(vim.tbl_contains(r, "Test(String s) extends"))
+    end)
+
+    it("completes the trailing type inside generics, keeping the prefix", function()
+      -- fake jdtls returning a "String" class symbol on the project root
+      local lsp = require("jc.lsp")
+      local saved = lsp.get_jdtls_client
+      lsp.get_jdtls_client = function()
+        return {
+          request_sync = function()
+            return {
+              result = {
+                {
+                  name = "String",
+                  kind = 5,
+                  containerName = "java.lang",
+                  location = { uri = "jdt://java.base/java.lang/String.class" },
+                },
+              },
+            }
+          end,
+        }
+      end
+
+      -- extends accepts classes; inside a generic only "Strin" is the query
+      -- and the prefix is preserved
+      local r = cg.complete_extends("", "Base<Strin")
+      assert.is_true(vim.tbl_contains(r, "Base<String"))
+      -- field type inside a generic (fields accept classes too)
+      local f = cg.complete_fields("", "Map<String, Strin")
+      assert.is_true(vim.tbl_contains(f, "Map<String, String"))
+
+      lsp.get_jdtls_client = saved
     end)
 
     it("after 'extends ' routes to type completion (empty without jdtls)", function()

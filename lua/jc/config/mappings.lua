@@ -94,6 +94,14 @@ function M.install_mappings(conf, bufnr)
     "<cmd>lua require('jc.class_generator').generate_class()<CR>",
     opts
   )
+  -- always the step-by-step wizard, regardless of the class_prompt option
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "N",
+    "<cmd>lua require('jc.class_generator').generate_class_wizard()<CR>",
+    opts
+  )
 
   vim.api.nvim_buf_set_keymap(
     bufnr,

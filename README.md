@@ -66,9 +66,16 @@ require("jc").setup({
   update_config_on_new_file = true, -- refresh jdtls build path on new java files
   templates_dir = nil,         -- dir of user class templates (see below)
   class_type_exclude = nil,    -- package prefixes to hide from type completion
+  class_prompt = "oneline",    -- "oneline" (DSL) | "wizard" (step-by-step)
   on_attach = nil,             -- function(client, bufnr) extra hook
 })
 ```
+
+`class_prompt = "wizard"` swaps the one-line DSL prompt for a
+step-by-step `vim.ui.select`/`vim.ui.input` flow (template -> module ->
+package -> name -> extends/implements/fields/flags). Each step is a short
+clean list, which avoids the cmdline-completion truncation of very long
+package paths.
 
 `class_type_exclude` adds package prefixes to hide from the `extends`/
 `implements`/field-type completion. The prompt resolves types from
@@ -184,7 +191,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>c` | generate constructor (field selection) |
 | n | `<p>cc` | generate default constructor |
 | n | `<p>m`, i `<C-j>m` | generate abstract methods |
-| n | `<p>n` | new class prompt |
+| n | `<p>n` | new class prompt (DSL or wizard per `class_prompt`) |
+| n | `<p>N` | new class — step-by-step wizard |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
 | v | `<p>re` / `<p>rm` | extract variable / method (selection) |
 | n | `<p>re` | extract variable (inferred at cursor) |

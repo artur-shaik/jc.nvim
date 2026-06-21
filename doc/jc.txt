@@ -60,9 +60,15 @@ Call `setup` (or use the `opts` table of lazy.nvim): >lua
     basedir = nil,               -- data dir, ~/.local/share/jc.nvim
     update_config_on_new_file = true, -- refresh build path on new java files
     templates_dir = nil,         -- dir of user class templates
+    class_type_exclude = nil,    -- package prefixes hidden from completion
+    class_prompt = "oneline",    -- "oneline" (DSL) | "wizard" (step-by-step)
     on_attach = nil,             -- function(client, bufnr) extra hook
   })
 <
+`class_prompt = "wizard"` replaces the one-line DSL with a step-by-step
+vim.ui flow (template -> module -> package -> name -> extends/implements/
+fields/flags), each step a short clean list — handy when long package
+paths get truncated in the cmdline completion popup.
                                                             *jc-templates*
 Built-in templates: class, interface, enum, record, annotation,
 exception, main, singleton, servlet, junit, junit5, service, component,
@@ -140,7 +146,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>cc   generate default constructor
   n  <p>m    generate abstract methods
   i  <C-j>m  generate abstract methods
-  n  <p>n    new class prompt
+  n  <p>n    new class prompt (DSL or wizard per class_prompt)
+  n  <p>N    new class - step-by-step wizard
   n  <p>da   debug attach
   n  <p>dl   debug launch
   v  <p>re   extract variable (selection)

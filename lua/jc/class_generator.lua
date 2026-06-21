@@ -529,33 +529,54 @@ local function type_completions(query, prefix, kinds, sep)
   return result
 end
 
--- inside the field list "(...)", complete the type token of the current
--- field from jdtls (a field is "[modifiers] type name")
+-- the trailing type identifier of `s` and the text before it; the boundary is
+-- any non-identifier char (space, "<", ",", "(", "[") so completion works
+-- inside generics: "List<Strin" -> ("Strin", "List<")
+local function trailing_type_query(s)
+  local q = s:match("[%w_%$%.]*$")
+  return q, s:sub(1, #s - #q)
+end
+
+-- for the current field text `frag` (after the last comma), return the jdtls
+-- type names for its type token + the token, or ({}, "") when typing the field
+-- name or a modifier
+local function field_type_completions(frag)
+  local trailing = frag:match("%s$") ~= nil
+  local words = {}
+  for w in frag:gmatch("%S+") do
+    words[#words + 1] = w
+  end
+  -- the word under the cursor (empty right after "(", "," or a space)
+  local word = (not trailing) and (words[#words] or "") or ""
+  local preceding = #words - ((not trailing) and 1 or 0)
+  -- a non-modifier word before the cursor means the type is already given
+  for k = 1, preceding do
+    if not MODS[words[k]] then
+      return {}, "" -- typing the field name, not the type
+    end
+  end
+  if word ~= "" and MODS[word] then
+    return {}, "" -- still finishing a modifier
+  end
+  -- complete the trailing identifier so generics ("List<Strin") work
+  local query = trailing_type_query(word)
+  return type_completions(query, "", FIELD_TYPE_KINDS, ""), query
+end
+
+-- inside the field list "(...)", complete the type token of the current field
 local function field_completions(command, completed)
   local paren = command:find("%([^)]*$") -- last unclosed "("
   if not paren then
     return nil
   end
   local frag = command:sub(paren + 1):match("[^,]*$"):gsub("^%s+", "") -- current field
-  local trailing = frag:match("%s$") ~= nil
-  local words = {}
-  for w in frag:gmatch("%S+") do
-    words[#words + 1] = w
-  end
-  -- the token under the cursor (empty right after "(", "," or a space)
-  local current = (not trailing) and (words[#words] or "") or ""
-  local preceding = #words - ((not trailing) and 1 or 0)
-  -- a non-modifier word before the cursor means the type is already given
-  for k = 1, preceding do
-    if not MODS[words[k]] then
-      return {} -- typing the field name, not the type
-    end
-  end
-  if current ~= "" and MODS[current] then
-    return {} -- still finishing a modifier
-  end
+  local names, current = field_type_completions(frag)
   local prefix = completed .. command:sub(1, #command - #current)
-  return type_completions(current, prefix, FIELD_TYPE_KINDS, "")
+  local result = {}
+  for _, name in ipairs(names) do
+    result[#result + 1] = prefix .. name
+  end
+  return result
 end
 
 local function keyword_completions(command, completed, is_relative)
@@ -852,30 +873,9 @@ local function restore_cmdline_pairs(saved)
   end
 end
 
-function M.generate_class()
-  -- any autopairs plugin that maps in the cmdline would auto-insert a closing
-  -- "]"/")" when typing "["/"(", breaking the DSL. Plugin-agnostically strip
-  -- the cmdline mappings on the pairing keys for the prompt, then restore.
-  local saved_pairs = suppress_cmdline_pairs()
-
-  -- use vim.fn.input directly (not vim.ui.input): the prompt needs cmdline
-  -- completion, and custom-replacing vim.ui.input implementations (dressing,
-  -- snacks, ...) don't reliably honour the `completion` option
-  local ok, userinput = pcall(vim.fn.input, {
-    prompt = "enter new class name: ",
-    completion = "customlist,v:lua.require'jc.class_generator'.complete",
-  })
-
-  restore_cmdline_pairs(saved_pairs)
-  if not ok or userinput == "" then
-    return
-  end
-  local parsed = M.parse_input(userinput)
-  if not parsed then
-    vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
-    return
-  end
-
+-- resolve a parsed DSL to class data and create the file (shared by the
+-- one-line prompt and the wizard)
+local function resolve_and_create(parsed)
   local data = M.module_data(parsed)
   if data == false then
     return -- module named but its source set is missing
@@ -905,6 +905,201 @@ function M.generate_class()
     return
   end
   create_class(data)
+end
+
+-- the one-line DSL prompt with cmdline completion
+function M.generate_class_oneline()
+  -- any autopairs plugin that maps in the cmdline would auto-insert a closing
+  -- "]"/")" when typing "["/"(", breaking the DSL. Plugin-agnostically strip
+  -- the cmdline mappings on the pairing keys for the prompt, then restore.
+  local saved_pairs = suppress_cmdline_pairs()
+
+  -- use vim.fn.input directly (not vim.ui.input): the prompt needs cmdline
+  -- completion, and custom-replacing vim.ui.input implementations (dressing,
+  -- snacks, ...) don't reliably honour the `completion` option
+  local ok, userinput = pcall(vim.fn.input, {
+    prompt = "enter new class name: ",
+    completion = "customlist,v:lua.require'jc.class_generator'.complete",
+  })
+
+  restore_cmdline_pairs(saved_pairs)
+  if not ok or userinput == "" then
+    return
+  end
+  local parsed = M.parse_input(userinput)
+  if not parsed then
+    vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+    return
+  end
+  resolve_and_create(parsed)
+end
+
+-- ---- wizard prompt: step-by-step vim.ui, each step a short clean list ----
+
+-- subpackages of `roots` as dotted names (for the package picker)
+local function packages_in(roots)
+  local seen, names = {}, {}
+  for _, sr in ipairs(roots or {}) do
+    for _, path in ipairs(vim.fn.glob(sr .. SEP .. "**", true, true)) do
+      if vim.fn.isdirectory(path) == 1 then
+        local rel = path:sub(#sr + 2):gsub(SEP, ".")
+        if rel ~= "" and not seen[rel] then
+          seen[rel] = true
+          names[#names + 1] = rel
+        end
+      end
+    end
+  end
+  table.sort(names)
+  return names
+end
+
+-- prompt for a value, "" -> nil (skipped)
+local function ui_input(prompt, default, cb)
+  vim.ui.input({ prompt = prompt, default = default or "" }, function(value)
+    cb(value and value ~= "" and value or nil)
+  end)
+end
+
+-- complete the trailing type identifier of the line: works for the 2nd+
+-- interface of an implements list (boundary ",") and inside generics ("<")
+local function complete_type_segment(line, pos, kinds)
+  line = pos and line:sub(1, pos) or line
+  local query, prefix = trailing_type_query(line)
+  local result = {}
+  for _, name in ipairs(type_completions(query, "", kinds, "")) do
+    result[#result + 1] = prefix .. name
+  end
+  return result
+end
+
+-- cmdline completion functions for the wizard's extends/implements steps:
+-- class+interface for extends, interface only for implements
+function M.complete_extends(_arglead, line, pos)
+  return complete_type_segment(line, pos, { [5] = true, [11] = true })
+end
+function M.complete_implements(_arglead, line, pos)
+  return complete_type_segment(line, pos, { [11] = true })
+end
+
+-- method-flag completion for the wizard (space-separated): the current word
+-- against the known flags, minus the ones already typed
+function M.complete_flags(_arglead, line, pos)
+  line = pos and line:sub(1, pos) or line
+  -- the current word (after the last space or comma) and the chosen ones
+  local current = line:match("[%w]*$")
+  local chosen = {}
+  for w in line:sub(1, #line - #current):gmatch("[%a]+") do
+    chosen[w] = true
+  end
+  local prefix = line:sub(1, #line - #current)
+  local result = {}
+  for _, flag in ipairs(METHOD_FLAGS) do
+    if not chosen[flag] and flag:sub(1, #current) == current then
+      result[#result + 1] = prefix .. flag
+    end
+  end
+  return result
+end
+
+-- field-list completion for the wizard (bare "type a, type b", no parens):
+-- complete the type token of the current field
+function M.complete_fields(_arglead, line, pos)
+  line = pos and line:sub(1, pos) or line
+  local frag = line:match("[^,]*$"):gsub("^%s+", "")
+  local names, current = field_type_completions(frag)
+  local prefix = line:sub(1, #line - #current)
+  local result = {}
+  for _, name in ipairs(names) do
+    result[#result + 1] = prefix .. name
+  end
+  return result
+end
+
+-- blocking prompt with jdtls type completion (vim.fn.input honours the
+-- completion option, unlike custom vim.ui.input replacements); "" -> nil
+local function type_input(prompt, complete_fn, cb)
+  local saved = suppress_cmdline_pairs()
+  local ok, value = pcall(vim.fn.input, {
+    prompt = prompt,
+    completion = "customlist,v:lua.require'jc.class_generator'." .. complete_fn,
+  })
+  restore_cmdline_pairs(saved)
+  cb(ok and value ~= "" and value or nil)
+end
+
+function M.generate_class_wizard()
+  local modules = M.modules()
+  local module_names = vim.tbl_keys(modules)
+  table.sort(module_names)
+
+  -- 1. template
+  vim.ui.select(require("jc.templates").names(), { prompt = "Template:" }, function(template)
+    if not template then
+      return
+    end
+    -- 2. target module (only meaningful in multi-module projects)
+    local module_choices = { "(current module)" }
+    vim.list_extend(module_choices, module_names)
+    vim.ui.select(module_choices, { prompt = "Module:" }, function(module_choice)
+      if not module_choice then
+        return
+      end
+      local module = module_choice ~= "(current module)" and module_choice or nil
+      local roots = module and vim.tbl_values(modules[module].sets) or current_module_roots()
+      -- 3. package (existing ones, or a fresh one typed in)
+      local pkg_choices = { "(new package…)" }
+      vim.list_extend(pkg_choices, packages_in(roots))
+      vim.ui.select(pkg_choices, { prompt = "Package:" }, function(pkg_choice)
+        if not pkg_choice then
+          return
+        end
+        local function with_package(package)
+          -- 4. class name
+          ui_input("Class name: ", nil, function(name)
+            if not name then
+              return
+            end
+            -- 5/6. extends / implements (jdtls type completion), 7/8 fields/flags
+            type_input("extends (optional): ", "complete_extends", function(extends)
+              type_input("implements (optional): ", "complete_implements", function(implements)
+                type_input("fields, e.g. String a, int b (optional): ", "complete_fields", function(fields)
+                  type_input("flags, e.g. constructor toString equals (optional): ", "complete_flags", function(flags)
+                    local parsed = {
+                      template = template ~= "class" and template or nil,
+                      subdir = module,
+                      path_str = "/" .. (package and (package .. ".") or "") .. name,
+                      extends = extends,
+                      implements = implements,
+                      fields_str = fields and ("(" .. fields .. ")") or nil,
+                      -- flags entered space- or comma-separated -> ":a:b:c"
+                      flags = flags and (":" .. vim.trim(flags):gsub("[%s,]+", ":")) or nil,
+                    }
+                    resolve_and_create(parsed)
+                  end)
+                end)
+              end)
+            end)
+          end)
+        end
+        if pkg_choice == "(new package…)" then
+          ui_input("Package: ", nil, with_package)
+        else
+          with_package(pkg_choice)
+        end
+      end)
+    end)
+  end)
+end
+
+function M.generate_class()
+  local ok, jc = pcall(require, "jc")
+  local mode = (ok and jc.config and jc.config.class_prompt) or vim.g.jc_class_prompt or "oneline"
+  if mode == "wizard" then
+    M.generate_class_wizard()
+  else
+    M.generate_class_oneline()
+  end
 end
 
 return M
