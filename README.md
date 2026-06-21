@@ -65,9 +65,20 @@ require("jc").setup({
   basedir = nil,               -- data dir, default ~/.local/share/jc.nvim
   update_config_on_new_file = true, -- refresh jdtls build path on new java files
   templates_dir = nil,         -- dir of user class templates (see below)
+  class_type_exclude = nil,    -- package prefixes to hide from type completion
   on_attach = nil,             -- function(client, bufnr) extra hook
 })
 ```
+
+`class_type_exclude` adds package prefixes to hide from the `extends`/
+`implements`/field-type completion. The prompt resolves types from
+jdtls' workspace symbols, which include non-importable ones; nested
+classes, shaded jars, `internal`/`impl` packages and a built-in list of
+known JDK/library internals (`sun.*`, `com.sun.*`, `jdk.internal`,
+jackson `introspect`/`cfg`/…) are dropped automatically. The LSP gives
+no visibility, so package-private classes in ordinary packages can still
+slip through — add their prefixes here to suppress them, e.g.
+`{ "com.example.somelib.internalish" }`.
 
 Built-in class templates: `class`, `interface`, `enum`, `record`,
 `annotation`, `exception`, `main`, `singleton`, `servlet`, `junit`,

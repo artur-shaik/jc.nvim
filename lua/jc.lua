@@ -51,6 +51,9 @@ function M.setup(args)
   if M.config.templates_dir then
     require("jc.templates").load_dir(M.config.templates_dir)
   end
+  if M.config.class_type_exclude then
+    require("jc.class_generator").set_type_excludes(M.config.class_type_exclude)
+  end
 
   local group = vim.api.nvim_create_augroup("jc_nvim_attach", { clear = true })
   vim.api.nvim_create_autocmd("LspAttach", {

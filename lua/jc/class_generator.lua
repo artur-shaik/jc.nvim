@@ -435,11 +435,66 @@ function M.modules()
   return mods
 end
 
--- LSP SymbolKind: Class=5, Interface=11
+-- LSP SymbolKind: Class=5, Enum=10, Interface=11
 local TYPE_KINDS = { extends = { [5] = true, [11] = true }, implements = { [11] = true } }
+local FIELD_TYPE_KINDS = { [5] = true, [10] = true, [11] = true }
 
--- class/interface names from jdtls matching `query`, as "<prefix> <Name>"
-local function type_completions(query, prefix, kinds)
+-- package segments that mark non-API / internal types you can't import
+local BLOCKED_SEGMENTS = { internal = true, impl = true, shaded = true, bundled = true, relocated = true }
+local TLD = { com = true, org = true, net = true, io = true, edu = true, gov = true }
+
+-- default prefixes of known non-API packages (JDK internals + internal
+-- packages of common libraries) that workspace/symbol surfaces but you can't
+-- import. Not exhaustive — extend per setup with `class_type_exclude`.
+local DEFAULT_EXCLUDES = {
+  "sun",
+  "com.sun",
+  "jdk.internal",
+  "java.lang.invoke",
+  "com.fasterxml.jackson.databind.introspect",
+  "com.fasterxml.jackson.databind.cfg",
+  "com.fasterxml.jackson.databind.deser",
+  "com.fasterxml.jackson.databind.ser",
+  "org.springframework.aop.framework.autoproxy",
+  "org.hibernate.internal",
+}
+
+-- user-supplied package prefixes added on top of DEFAULT_EXCLUDES via the
+-- setup option `class_type_exclude`
+local excludes = vim.deepcopy(DEFAULT_EXCLUDES)
+function M.set_type_excludes(prefixes)
+  excludes = vim.deepcopy(DEFAULT_EXCLUDES)
+  vim.list_extend(excludes, prefixes or {})
+end
+
+-- heuristically reject types not meant to be imported: internal/impl/shaded
+-- packages, shaded relocations (a TLD segment appearing after the first,
+-- e.g. wiremock.com.fasterxml...), and excluded prefixes (defaults + user).
+-- Can't catch every package-private type in ordinary packages — the protocol
+-- gives no visibility; those need a `class_type_exclude` entry.
+local function blocked_package(container)
+  if not container or container == "" then
+    return false
+  end
+  for _, prefix in ipairs(excludes) do
+    if container == prefix or container:sub(1, #prefix + 1) == prefix .. "." then
+      return true
+    end
+  end
+  local segs = vim.split(container, ".", { plain = true })
+  for i, seg in ipairs(segs) do
+    if BLOCKED_SEGMENTS[seg] then
+      return true
+    end
+    if i > 1 and TLD[seg] then
+      return true -- relocated/shaded jar
+    end
+  end
+  return false
+end
+
+-- type names from jdtls matching `query`, as "<prefix><sep><Name>"
+local function type_completions(query, prefix, kinds, sep)
   local client = require("jc.lsp").get_jdtls_client()
   if not client then
     return {}
@@ -449,14 +504,58 @@ local function type_completions(query, prefix, kinds)
   if not response or response.err or type(response.result) ~= "table" then
     return {}
   end
+  -- workspace/symbol indexes every project jdtls has opened, not just this
+  -- one; keep only types that are actually importable here — library types
+  -- on the classpath (jdt://) and sources under the current project root
+  local root = project_root_dir()
   local seen, result = {}, {}
   for _, sym in ipairs(response.result) do
-    if kinds[sym.kind] and not seen[sym.name] then
+    local uri = sym.location and sym.location.uri or ""
+    local importable = uri:match("^jdt:") ~= nil
+    if not importable and uri:match("^file:") then
+      importable = vim.uri_to_fname(uri):sub(1, #root + 1) == root .. SEP
+    end
+    -- skip nested types (containerName ends in a class name, or the uri
+    -- carries a "$"): they can't be imported by their simple name, so
+    -- organize_imports would leave them unresolved (e.g. ImmutableTable$X)
+    local enclosing = sym.containerName and sym.containerName:match("[^.]+$")
+    local nested = uri:find("%$") ~= nil or (enclosing ~= nil and enclosing:match("^%u") ~= nil)
+    local junk = nested or blocked_package(sym.containerName)
+    if importable and not junk and kinds[sym.kind] and not seen[sym.name] then
       seen[sym.name] = true
-      result[#result + 1] = prefix .. " " .. sym.name
+      result[#result + 1] = prefix .. (sep or " ") .. sym.name
     end
   end
   return result
+end
+
+-- inside the field list "(...)", complete the type token of the current
+-- field from jdtls (a field is "[modifiers] type name")
+local function field_completions(command, completed)
+  local paren = command:find("%([^)]*$") -- last unclosed "("
+  if not paren then
+    return nil
+  end
+  local frag = command:sub(paren + 1):match("[^,]*$"):gsub("^%s+", "") -- current field
+  local trailing = frag:match("%s$") ~= nil
+  local words = {}
+  for w in frag:gmatch("%S+") do
+    words[#words + 1] = w
+  end
+  -- the token under the cursor (empty right after "(", "," or a space)
+  local current = (not trailing) and (words[#words] or "") or ""
+  local preceding = #words - ((not trailing) and 1 or 0)
+  -- a non-modifier word before the cursor means the type is already given
+  for k = 1, preceding do
+    if not MODS[words[k]] then
+      return {} -- typing the field name, not the type
+    end
+  end
+  if current ~= "" and MODS[current] then
+    return {} -- still finishing a modifier
+  end
+  local prefix = completed .. command:sub(1, #command - #current)
+  return type_completions(current, prefix, FIELD_TYPE_KINDS, "")
 end
 
 local function keyword_completions(command, completed, is_relative)
@@ -647,6 +746,14 @@ function M.complete(_arglead, line)
   -- once a [module] is chosen, packages come from that module
   local scope = module_scope(tokens)
 
+  -- inside the field list of the class path: complete the field type
+  if not path_given then
+    local fields = field_completions(command, completed)
+    if fields then
+      return fields
+    end
+  end
+
   if first == "/" then
     -- absolute class path
     vim.list_extend(result, package_completions(command:sub(2), completed, false, scope))
@@ -671,6 +778,19 @@ function M.complete(_arglead, line)
   return result
 end
 
+-- resolve a class directly into `base` (a source root): the package is taken
+-- from the typed path literally, no backtracking
+local function direct_data(parsed, base)
+  local pkg_path = vim.split((parsed.path_str:gsub("^/", "")), ".", { plain = true })
+  local pkg = table.concat(slice(pkg_path, 0, -2), ".")
+  return decorate({
+    class = pkg_path[#pkg_path],
+    package = pkg,
+    current_path = base .. SEP,
+    path = (pkg:gsub("%.", SEP)),
+  }, parsed)
+end
+
 -- when the [..] slot names a subproject, resolve straight into its source
 -- root (no backtracking). returns data, nil (not a module) or false (module
 -- named but the requested source set is missing -> abort)
@@ -691,14 +811,7 @@ function M.module_data(parsed)
     vim.notify("jc: module '" .. mod .. "' has no '" .. set .. "' source set", vim.log.levels.ERROR)
     return false
   end
-  local pkg_path = vim.split((parsed.path_str:gsub("^/", "")), ".", { plain = true })
-  local pkg = table.concat(slice(pkg_path, 0, -2), ".")
-  return decorate({
-    class = pkg_path[#pkg_path],
-    package = pkg,
-    current_path = base .. SEP,
-    path = (pkg:gsub("%.", SEP)),
-  }, parsed)
+  return direct_data(parsed, base)
 end
 
 -- keys an autopairs plugin would auto-close inside the DSL prompt

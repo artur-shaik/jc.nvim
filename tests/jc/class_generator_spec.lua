@@ -232,6 +232,23 @@ describe("class_generator parsing", function()
       assert.are.same({ "/kz.foo.Bar:constructor:toString" }, r)
     end)
 
+    it("inside the field list routes to type completion, not templates", function()
+      -- no jdtls -> empty, but must route to field-type (not offer templates)
+      assert.are.same({}, cg.complete("", "Test(Stri"))
+      assert.are.same({}, cg.complete("", "Test(public "))
+      assert.are.same({}, cg.complete("", "Test("))
+    end)
+
+    it("does not complete the field name as a type", function()
+      assert.are.same({}, cg.complete("", "Test(String fo"))
+    end)
+
+    it("a closed field list is no longer a field context", function()
+      -- after ")" the keyword completion takes over
+      local r = cg.complete("", "Test(String s) ext")
+      assert.is_true(vim.tbl_contains(r, "Test(String s) extends"))
+    end)
+
     it("after 'extends ' routes to type completion (empty without jdtls)", function()
       -- no jdtls client in the test env -> empty, but must not error and must
       -- not fall back to offering keywords again
