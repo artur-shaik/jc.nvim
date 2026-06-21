@@ -441,7 +441,22 @@ local FIELD_TYPE_KINDS = { [5] = true, [10] = true, [11] = true }
 
 -- package segments that mark non-API / internal types you can't import
 local BLOCKED_SEGMENTS = { internal = true, impl = true, shaded = true, bundled = true, relocated = true }
-local TLD = { com = true, org = true, net = true, io = true, edu = true, gov = true }
+-- group-id roots that, appearing AFTER the first segment, signal a shaded /
+-- relocated jar (e.g. wiremock.com.fasterxml...). Kept to com/org only —
+-- net/io/etc. are legitimate JDK package segments (java.io, java.net)
+local SHADE_ROOT = { com = true, org = true }
+-- standard top packages whose own subpackages are never relocations
+local STD_ROOT = {
+  java = true,
+  javax = true,
+  jakarta = true,
+  jdk = true,
+  sun = true,
+  kotlin = true,
+  scala = true,
+  groovy = true,
+  android = true,
+}
 
 -- default prefixes of known non-API packages (JDK internals + internal
 -- packages of common libraries) that workspace/symbol surfaces but you can't
@@ -482,12 +497,18 @@ local function blocked_package(container)
     end
   end
   local segs = vim.split(container, ".", { plain = true })
-  for i, seg in ipairs(segs) do
+  for _, seg in ipairs(segs) do
     if BLOCKED_SEGMENTS[seg] then
       return true
     end
-    if i > 1 and TLD[seg] then
-      return true -- relocated/shaded jar
+  end
+  -- shaded relocation: a com/org root reappears past the first segment, and
+  -- the package doesn't start at a standard root (java.io stays allowed)
+  if not STD_ROOT[segs[1]] then
+    for i = 2, #segs do
+      if SHADE_ROOT[segs[i]] then
+        return true
+      end
     end
   end
   return false
@@ -508,13 +529,11 @@ local function type_completions(query, prefix, kinds, sep)
   -- one; keep only types that are actually importable here — library types
   -- on the classpath (jdt://) and sources under the current project root
   local root = project_root_dir()
-  local seen, result = {}, {}
+  local seen, matches = {}, {}
   for _, sym in ipairs(response.result) do
     local uri = sym.location and sym.location.uri or ""
-    local importable = uri:match("^jdt:") ~= nil
-    if not importable and uri:match("^file:") then
-      importable = vim.uri_to_fname(uri):sub(1, #root + 1) == root .. SEP
-    end
+    local from_project = uri:match("^file:") ~= nil and vim.uri_to_fname(uri):sub(1, #root + 1) == root .. SEP
+    local importable = uri:match("^jdt:") ~= nil or from_project
     -- skip nested types (containerName ends in a class name, or the uri
     -- carries a "$"): they can't be imported by their simple name, so
     -- organize_imports would leave them unresolved (e.g. ImmutableTable$X)
@@ -523,8 +542,28 @@ local function type_completions(query, prefix, kinds, sep)
     local junk = nested or blocked_package(sym.containerName)
     if importable and not junk and kinds[sym.kind] and not seen[sym.name] then
       seen[sym.name] = true
-      result[#result + 1] = prefix .. (sep or " ") .. sym.name
+      -- rank: common JDK (java.lang/util) < project < other JDK < libraries
+      local c = sym.containerName or ""
+      local rank = 3
+      if c == "java.lang" or c == "java.util" then
+        rank = 0
+      elseif from_project then
+        rank = 1
+      elseif c:match("^javax?%.") or c:match("^jakarta%.") then
+        rank = 2
+      end
+      matches[#matches + 1] = { name = sym.name, rank = rank }
     end
+  end
+  table.sort(matches, function(a, b)
+    if a.rank ~= b.rank then
+      return a.rank < b.rank
+    end
+    return a.name < b.name
+  end)
+  local result = {}
+  for _, m in ipairs(matches) do
+    result[#result + 1] = prefix .. (sep or " ") .. m.name
   end
   return result
 end

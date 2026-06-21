@@ -308,6 +308,47 @@ describe("class_generator parsing", function()
       assert.is_true(vim.tbl_contains(r, "Test(String s) extends"))
     end)
 
+    it("ranks completions: common JDK, then project, then libraries; allows java.io", function()
+      local lsp = require("jc.lsp")
+      local saved = lsp.get_jdtls_client
+      local function sym(name, kind, container, uri)
+        return { name = name, kind = kind, containerName = container, location = { uri = uri } }
+      end
+      -- a real project so the file:// project type matches the detected root
+      local proj = vim.fn.tempname()
+      vim.fn.mkdir(proj .. "/app/src/main/java/kz/proj", "p")
+      vim.fn.writefile({ "" }, proj .. "/settings.gradle")
+      vim.fn.writefile({ "package kz.proj;" }, proj .. "/app/src/main/java/kz/proj/Cur.java")
+      vim.cmd("edit " .. proj .. "/app/src/main/java/kz/proj/Cur.java")
+      lsp.get_jdtls_client = function()
+        return {
+          request_sync = function()
+            return {
+              result = {
+                sym("ZebraLib", 11, "com.acme.api", "jdt://lib.jar/com.acme.api/ZebraLib.class"),
+                sym("Serializable", 11, "java.io", "jdt://java.base/java.io/Serializable.class"),
+                sym("MyIface", 11, "kz.proj", "file://" .. proj .. "/app/src/main/java/kz/proj/MyIface.java"),
+              },
+            }
+          end,
+        }
+      end
+      local r = cg.complete_implements("", "Fo")
+      lsp.get_jdtls_client = saved
+      -- java.io interface is present (not wrongly blocked as a shaded jar)
+      assert.is_true(vim.tbl_contains(r, "Serializable"))
+      local function idx(name)
+        for i, v in ipairs(r) do
+          if v == name then
+            return i
+          end
+        end
+      end
+      -- project (rank 1) < other JDK java.io (rank 2) < library (rank 3)
+      assert.is_true(idx("MyIface") < idx("Serializable"))
+      assert.is_true(idx("Serializable") < idx("ZebraLib"))
+    end)
+
     it("completes the trailing type inside generics, keeping the prefix", function()
       -- fake jdtls returning a "String" class symbol on the project root
       local lsp = require("jc.lsp")
