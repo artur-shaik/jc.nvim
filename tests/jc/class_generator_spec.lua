@@ -85,6 +85,35 @@ describe("class_generator parsing", function()
     it("empty field list", function()
       assert.are.same({}, cg.parse_fields("()"))
     end)
+
+    it("keeps generics with their inner commas in the type", function()
+      local f = cg.parse_fields("(HashMap<Long, String> hash, int n)")
+      assert.are.same({
+        { mod = "private", type = "HashMap<Long, String>", name = "hash" },
+        { mod = "private", type = "int", name = "n" },
+      }, f)
+    end)
+
+    it("handles nested generics and modifiers", function()
+      local f = cg.parse_fields("(public List<Map<String, Long>> items)")
+      assert.are.same({ { mod = "public", type = "List<Map<String, Long>>", name = "items" } }, f)
+    end)
+
+    it("rewrites an empty generic <> to the wildcard <?>", function()
+      assert.are.equal("Comparable<?>", cg.normalize_generics("Comparable<>"))
+      assert.are.equal("Map<String, Long>", cg.normalize_generics("Map<String, Long>"))
+    end)
+
+    it("infers wildcards for bare generic collection types", function()
+      -- bare known generic -> wildcards by arity
+      assert.are.same({ { mod = "private", type = "HashMap<?, ?>", name = "m" } }, cg.parse_fields("(HashMap m)"))
+      assert.are.same({ { mod = "private", type = "List<?>", name = "xs" } }, cg.parse_fields("(List xs)"))
+      -- empty "<>" filled to the right arity
+      assert.are.same({ { mod = "private", type = "Map<?, ?>", name = "m" } }, cg.parse_fields("(Map<> m)"))
+      -- explicit params kept, non-generic types untouched
+      assert.are.same({ { mod = "private", type = "List<String>", name = "s" } }, cg.parse_fields("(List<String> s)"))
+      assert.are.same({ { mod = "private", type = "String", name = "name" } }, cg.parse_fields("(String name)"))
+    end)
   end)
 
   describe("parse_methods", function()

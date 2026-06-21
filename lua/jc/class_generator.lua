@@ -67,33 +67,124 @@ local MODS = {
   strictfp = true,
 }
 
--- parse "(mods type name, ...)" -> array of { mod, type, name }
+-- turn a bare "<>" into the wildcard "<?>" (valid Java), e.g.
+-- "Comparable<>" -> "Comparable<?>"
+local function normalize_generics(s)
+  return s and (s:gsub("<%s*>", "<?>"))
+end
+M.normalize_generics = normalize_generics
+
+-- number of type parameters for common generic JDK types, so a bare
+-- collection field type gets wildcards (HashMap -> HashMap<?, ?>)
+local GENERIC_ARITY = {
+  Iterable = 1,
+  Collection = 1,
+  List = 1,
+  ArrayList = 1,
+  LinkedList = 1,
+  Set = 1,
+  HashSet = 1,
+  TreeSet = 1,
+  LinkedHashSet = 1,
+  Queue = 1,
+  Deque = 1,
+  Stack = 1,
+  Iterator = 1,
+  Optional = 1,
+  Stream = 1,
+  Comparable = 1,
+  Comparator = 1,
+  Class = 1,
+  Supplier = 1,
+  Consumer = 1,
+  Callable = 1,
+  Map = 2,
+  HashMap = 2,
+  TreeMap = 2,
+  LinkedHashMap = 2,
+  ConcurrentHashMap = 2,
+  Hashtable = 2,
+  Function = 2,
+  BiConsumer = 2,
+  BiFunction = 3,
+}
+
+-- fill in wildcards for a known generic type given without parameters, and
+-- complete an empty "<>" with the right number of "?": HashMap -> HashMap<?, ?>
+local function infer_generics(typ)
+  if not typ then
+    return typ
+  end
+  local base, inside = typ:match("^(.-)<(.*)>%s*$")
+  local simple = (base or typ):match("[%w_%$]+$")
+  local arity = simple and GENERIC_ARITY[simple]
+  -- already has non-empty parameters -> keep as is
+  if base and vim.trim(inside) ~= "" then
+    return typ
+  end
+  if not arity then
+    return base and normalize_generics(typ) or typ -- e.g. unknown "<>" -> "<?>"
+  end
+  local wild = {}
+  for _ = 1, arity do
+    wild[#wild + 1] = "?"
+  end
+  return (base or typ) .. "<" .. table.concat(wild, ", ") .. ">"
+end
+
+-- split `s` on `sep` only at bracket depth 0, so a comma inside generics
+-- ("HashMap<Long, String>") doesn't split the field
+local function split_top_level(s, sep)
+  local parts, depth, buf = {}, 0, {}
+  for ch in s:gmatch(".") do
+    if ch == "<" or ch == "(" or ch == "[" then
+      depth = depth + 1
+      buf[#buf + 1] = ch
+    elseif ch == ">" or ch == ")" or ch == "]" then
+      depth = depth - 1
+      buf[#buf + 1] = ch
+    elseif ch == sep and depth == 0 then
+      parts[#parts + 1] = table.concat(buf)
+      buf = {}
+    else
+      buf[#buf + 1] = ch
+    end
+  end
+  parts[#parts + 1] = table.concat(buf)
+  return parts
+end
+
+-- parse "(mods type name, ...)" -> array of { mod, type, name }; the type may
+-- contain generics with their own commas/spaces ("Map<String, Long>")
 function M.parse_fields(fieldstr)
   local inner = trim(fieldstr:sub(2, -2)) -- drop surrounding ()
   if inner == "" then
     return {}
   end
   local fields = {}
-  for part in vim.gsplit(inner, ",", { plain = true }) do
-    local tokens = {}
-    for tok in part:gmatch("%S+") do
-      tokens[#tokens + 1] = tok
-    end
-    -- leading modifier words, then type, then name
-    local mods = {}
-    local i = 1
-    while tokens[i] and MODS[tokens[i]] do
-      mods[#mods + 1] = tokens[i]
-      i = i + 1
-    end
-    local typ = tokens[i]
-    local name = tokens[i + 1]
-    if typ and name then
-      fields[#fields + 1] = {
-        mod = #mods > 0 and table.concat(mods, " ") or "private",
-        type = typ,
-        name = name,
-      }
+  for _, part in ipairs(split_top_level(inner, ",")) do
+    part = trim(part)
+    local name = part:match("[%w_%$]+$") -- the field name = trailing identifier
+    if name and name ~= part then
+      local rest = trim(part:sub(1, #part - #name))
+      -- peel leading modifier words; whatever remains is the type
+      local mods = {}
+      while true do
+        local w, after = rest:match("^([%a]+)%s+(.*)$")
+        if w and MODS[w] then
+          mods[#mods + 1] = w
+          rest = after
+        else
+          break
+        end
+      end
+      if rest ~= "" then
+        fields[#fields + 1] = {
+          mod = #mods > 0 and table.concat(mods, " ") or "private",
+          type = infer_generics(rest),
+          name = name,
+        }
+      end
     end
   end
   return fields
@@ -243,6 +334,8 @@ end
 -- resolved path data
 local function decorate(data, parsed)
   data.template = parsed.template
+  -- supertypes can't carry a wildcard, so they are kept verbatim (a bare
+  -- "<>" there is a user error caught by the wizard validator)
   data.extends = parsed.extends
   data.implements = parsed.implements
   if parsed.fields_str then
@@ -1094,7 +1187,7 @@ function M.generate_class_wizard()
           return
         end
         local function with_package(package)
-          -- 4. class name
+          -- 4. class name (must be a valid Java class name)
           ui_input("Class name: ", nil, function(name)
             if not name then
               return
