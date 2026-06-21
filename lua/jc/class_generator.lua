@@ -350,6 +350,32 @@ local function decorate(data, parsed)
   return data
 end
 
+-- reassemble a parsed DSL back into its one-line form (used by the wizard to
+-- show an editable command before generating)
+function M.build_dsl(p)
+  local s = ""
+  if p.template then
+    s = s .. p.template .. ":"
+  end
+  if p.subdir then
+    s = s .. "[" .. p.subdir .. "]:"
+  end
+  s = s .. p.path_str
+  if p.extends then
+    s = s .. " extends " .. p.extends
+  end
+  if p.implements then
+    s = s .. " implements " .. p.implements
+  end
+  if p.fields_str then
+    s = s .. p.fields_str
+  end
+  if p.flags then
+    s = s .. p.flags
+  end
+  return s
+end
+
 -- full DSL -> resolved class data (or nil)
 function M.parse(userinput, currentPath, currentPackage)
   local parsed = M.parse_input(userinput)
@@ -1287,7 +1313,24 @@ function M.generate_class_wizard()
                       -- flags entered space- or comma-separated -> ":a:b:c"
                       flags = flags and (":" .. vim.trim(flags):gsub("[%s,]+", ":")) or nil,
                     }
-                    resolve_and_create(parsed)
+                    -- show the assembled DSL for a final edit (with completion)
+                    -- before generating; empty/cancel aborts
+                    local saved = suppress_cmdline_pairs()
+                    local ok, edited = pcall(vim.fn.input, {
+                      prompt = "confirm: ",
+                      default = M.build_dsl(parsed),
+                      completion = "customlist,v:lua.require'jc.class_generator'.complete",
+                    })
+                    restore_cmdline_pairs(saved)
+                    if not ok or edited == "" then
+                      return
+                    end
+                    local final = M.parse_input(edited)
+                    if not final then
+                      vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+                      return
+                    end
+                    resolve_and_create(final)
                   end, VALIDATE.flags)
                 end, VALIDATE.fields)
               end, VALIDATE.type)

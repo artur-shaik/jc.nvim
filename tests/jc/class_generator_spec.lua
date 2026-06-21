@@ -116,6 +116,19 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("build_dsl", function()
+    it("reassembles a parsed DSL back to its one-line form", function()
+      local dsl = "singleton:[main]:/com.foo.Bar extends B implements I(String s):constructor:equals"
+      local p = cg.parse_input(dsl)
+      assert.are.equal(dsl, cg.build_dsl(p))
+    end)
+
+    it("round-trips a minimal class", function()
+      local p = cg.parse_input("/com.foo.Baz")
+      assert.are.equal("/com.foo.Baz", cg.build_dsl(p))
+    end)
+  end)
+
   describe("parse_methods", function()
     it("flags without args", function()
       local m = cg.parse_methods(":constructor:toString:equals")
