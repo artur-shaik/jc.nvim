@@ -204,7 +204,10 @@ targets that module's `src/main/java` directly — `[refunds-model]` or
 `[refunds-model/test]` for its test sources. Without it, the class goes
 relative to the current file as before;
 
-C: class name and package. With `/` will use backsearch for parent package to put in it. Without `/` put in relative package to current;
+C: class name and package. A leading `/` means an absolute package: the
+class is created at `<current source root>/<package>/Name.java` with that
+package exactly (e.g. `/com.foo.Bar` -> `src/main/java/com/foo/Bar.java`).
+Without `/` the package is relative to the current file's package;
 
 D: (optional) extends and implements classes will be automatically imported;
 

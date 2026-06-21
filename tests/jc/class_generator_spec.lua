@@ -175,6 +175,18 @@ describe("class_generator parsing", function()
       assert.is_false(vim.tbl_contains(r, "[model]:apponly"))
     end)
 
+    it("absolute path resolves into the current source root, no backtracking", function()
+      local root = make_multimodule() -- current file: app/src/main/java/Cur.java
+      local saved_input = vim.fn.input
+      vim.fn.input = function()
+        return "/com.foo.Bar"
+      end
+      local ok = pcall(cg.generate_class)
+      vim.fn.input = saved_input
+      assert.is_true(ok)
+      assert.are.equal(1, vim.fn.filereadable(root .. "/app/src/main/java/com/foo/Bar.java"))
+    end)
+
     it("[test]/[main] source-sets see both sets of the current module", function()
       local root = make_multimodule() -- current file is app/src/main/java/Cur.java
       vim.fn.mkdir(root .. "/app/src/main/java/inmain", "p")

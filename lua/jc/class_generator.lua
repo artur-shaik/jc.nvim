@@ -791,6 +791,17 @@ local function direct_data(parsed, base)
   }, parsed)
 end
 
+-- the source root (.../src/<set>/java) the current file sits in
+local function current_source_root()
+  local file = vim.fn.expand("%:p")
+  for _, sr in ipairs(source_roots()) do
+    if file:sub(1, #sr + 1) == sr .. SEP then
+      return sr
+    end
+  end
+  return nil
+end
+
 -- when the [..] slot names a subproject, resolve straight into its source
 -- root (no backtracking). returns data, nil (not a module) or false (module
 -- named but the requested source set is missing -> abort)
@@ -864,8 +875,14 @@ function M.generate_class()
   if data == false then
     return -- module named but its source set is missing
   end
+  -- absolute path "/pkg.Class" -> the package literally, in the current
+  -- file's source root (predictable; no backtracking)
+  local src_root = current_source_root()
+  if data == nil and parsed.path_str:sub(1, 1) == "/" and not parsed.subdir and src_root then
+    data = direct_data(parsed, src_root)
+  end
   if data == nil then
-    -- default: resolve relative to the current file (current module)
+    -- relative path: resolve against the current file's package
     local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
     local current_path = vim.tbl_filter(function(v)
       return v ~= ""

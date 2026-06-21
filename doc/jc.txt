@@ -172,7 +172,9 @@ Prompt scheme: >
 - subdir (optional): source-set or subproject. `[test]` -> current
   module's src/test/java; `[module]` / `[module/test]` -> that
   subproject's source root (multi-module projects);
-- class name and package; with `/` parent package backsearch is used;
+- class name and package; leading `/` = absolute package in the current
+  source root (/com.foo.Bar -> src/main/java/com/foo/Bar.java); no `/` =
+  relative to the current file's package;
 - extends/implements classes are imported automatically;
 - field list: `private` by default, modifiers can be given;
 - trailing flags: constructor, toString, equals, hashCode.
