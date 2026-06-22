@@ -545,6 +545,18 @@ end
 local KEYWORDS = { "extends", "implements" }
 local METHOD_FLAGS = { "constructor", "toString", "hashCode", "equals" }
 
+-- all flag names for completion: jdtls code-gen flags first, then lombok
+local ALL_FLAGS
+local function all_flags()
+  if not ALL_FLAGS then
+    ALL_FLAGS = vim.deepcopy(METHOD_FLAGS)
+    local lombok = vim.tbl_keys(LOMBOK)
+    table.sort(lombok)
+    vim.list_extend(ALL_FLAGS, lombok)
+  end
+  return ALL_FLAGS
+end
+
 -- "a:b:c" -> "a:b:" (everything already typed before the current segment)
 local function completed_prefix(tokens)
   local done = table.concat(slice(tokens, 0, -2), ":")
@@ -910,7 +922,7 @@ end
 
 local function method_completions(command, completed)
   local result = {}
-  for _, kw in ipairs(METHOD_FLAGS) do
+  for _, kw in ipairs(all_flags()) do
     if kw:sub(1, #command) == command then
       result[#result + 1] = completed .. kw
     end
@@ -1279,18 +1291,6 @@ end
 -- method-flag completion for the wizard (space-separated): the current word
 -- against the known flags, minus the ones already typed
 -- jdtls code-gen flags first, then the lombok flags (sorted)
--- all flag names for completion: jdtls code-gen flags first, then lombok
-local ALL_FLAGS
-local function all_flags()
-  if not ALL_FLAGS then
-    ALL_FLAGS = vim.deepcopy(METHOD_FLAGS)
-    local lombok = vim.tbl_keys(LOMBOK)
-    table.sort(lombok)
-    vim.list_extend(ALL_FLAGS, lombok)
-  end
-  return ALL_FLAGS
-end
-
 function M.complete_flags(_arglead, line, pos)
   line = pos and line:sub(1, pos) or line
   -- the current word (after the last space or comma) and the chosen ones
