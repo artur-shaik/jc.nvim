@@ -261,6 +261,122 @@ function M.generate_toString(fields, params)
   end
 end
 
+-- apply a code action — a direct workspace edit, a jdtls refactoring command
+-- (java.action.applyRefactoringCommand), a generic command, or one that still
+-- needs codeAction/resolve. `on_result(found)` runs after it's applied.
+local function apply_action(action, on_result)
+  if action.edit then
+    apply_edit(nil, action)
+    if on_result then
+      vim.defer_fn(function()
+        on_result(true)
+      end, 300)
+    end
+    return
+  end
+  local command = action.command
+  if type(command) == "table" then
+    if require("jc.refactor").apply_command(command, on_result) then
+      return
+    end
+    lsp.executeCommand({ command = command.command, arguments = command.arguments }, function()
+      if on_result then
+        on_result(true)
+      end
+    end)
+    return
+  end
+  -- not resolved yet -> resolve then re-dispatch
+  lsp.jdtls_request(0, "codeAction/resolve", action, function(_, resolved)
+    if resolved then
+      apply_action(resolved, on_result)
+    elseif on_result then
+      on_result(false)
+    end
+  end)
+end
+
+-- "Convert to static import" at the cursor, picking the action straight from
+-- jdtls without the code-action menu. `all` prefers the all-occurrences
+-- variant (e.g. Math.max(...) -> import static ...Math.max; max(...)).
+-- `on_result(found)` runs after the edit (or when nothing matched).
+function M.convert_static_import(all, on_result)
+  local params = make_range_params()
+  params.context = { diagnostics = {} }
+  lsp.jdtls_request(0, "textDocument/codeAction", params, function(err, actions)
+    local match
+    for _, action in ipairs(actions or {}) do
+      local title = (action.title or ""):lower()
+      if title:find("static import", 1, true) then
+        local is_all = title:find("all occurrences", 1, true) ~= nil
+        if all == is_all then
+          match = action
+          break
+        end
+        match = match or action -- fall back to the other variant
+      end
+    end
+    if match then
+      apply_action(match, on_result)
+    else
+      if err then
+        vim.notify(vim.inspect(err), vim.log.levels.ERROR)
+      end
+      if on_result then
+        on_result(false)
+      else
+        vim.notify("jc: no static-import conversion at the cursor", vim.log.levels.WARN)
+      end
+    end
+  end)
+end
+
+-- find a live "qualifier.member" occurrence in code (skipping import lines, so
+-- a freshly-added `import static ...` isn't matched) and return the 0-based
+-- cursor position on the member
+local function find_member_use(qualifier, member)
+  local needle = qualifier .. "." .. member
+  for ln, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+    if not line:match("^%s*import%s") then
+      local s = line:find(needle, 1, true)
+      if s then
+        return { ln - 1, s - 1 + #qualifier + 1 } -- on the member, past "qualifier."
+      end
+    end
+  end
+  return nil
+end
+
+-- convert every constant of the enum under the cursor to a static import. The
+-- constant names are collected once; each is converted (all occurrences) in
+-- turn, re-locating it by text so buffer edits don't invalidate positions.
+function M.static_import_enum()
+  local ts = require("jc.treesitter")
+  local qualifier = ts.qualifier_at_cursor()
+  if not qualifier then
+    vim.notify("jc: place the cursor on an enum constant (Enum.CONST)", vim.log.levels.WARN)
+    return
+  end
+  local names = ts.qualified_member_names(qualifier)
+  local i = 0
+  local function step()
+    i = i + 1
+    local member = names[i]
+    if not member then
+      return -- all converted
+    end
+    local pos = find_member_use(qualifier, member)
+    if not pos then
+      return step() -- already gone (e.g. fully qualified elsewhere)
+    end
+    vim.api.nvim_win_set_cursor(0, { pos[1] + 1, pos[2] })
+    M.convert_static_import(true, function()
+      vim.defer_fn(step, 350)
+    end)
+  end
+  step()
+end
+
 function M.organize_imports(bn, smart)
   M.organize_imports_smart = smart
   lsp.jdtls_request(bn, "java/organizeImports", make_range_params(), apply_edit)

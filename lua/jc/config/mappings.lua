@@ -124,6 +124,16 @@ function M.install_mappings(conf, bufnr)
     "<Esc><Cmd>lua require('jc.refactor').extract_method(true)<CR>",
     opts
   )
+  -- convert the call at the cursor to a static import (all occurrences)
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "rs",
+    "<Cmd>lua require('jc.jdtls').convert_static_import(true)<CR>",
+    opts
+  )
+  -- convert every constant of the enum under the cursor to a static import
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rS", "<Cmd>lua require('jc.jdtls').static_import_enum()<CR>", opts)
 end
 
 return M

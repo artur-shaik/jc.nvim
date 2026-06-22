@@ -54,4 +54,48 @@ function M.get_package()
   return nil
 end
 
+-- the qualifier of the "Qualifier.member" access under the cursor (e.g. cursor
+-- on MyEnum.A or A returns "MyEnum"), or nil
+function M.qualifier_at_cursor()
+  local node = vim.treesitter.get_node()
+  while node do
+    if node:type() == "field_access" then
+      local object = node:field("object")[1]
+      if object and object:type() == "identifier" then
+        return vim.treesitter.get_node_text(object, 0)
+      end
+    end
+    node = node:parent()
+  end
+  return nil
+end
+
+-- unique member names of every "qualifier.member" access in the buffer (e.g.
+-- the enum constants used: { "MON", "TUE" }). Collected in one parse so it is
+-- stable while the caller edits the buffer.
+function M.qualified_member_names(qualifier)
+  local ok, parser = pcall(vim.treesitter.get_parser, 0)
+  if not ok or not parser then
+    return {}
+  end
+  local root = parser:parse()[1]:root()
+  local query =
+    vim.treesitter.query.parse("java", "(field_access object: (identifier) @obj field: (identifier) @field) @fa")
+  local seen, names = {}, {}
+  for id, node in query:iter_captures(root, 0) do
+    if query.captures[id] == "fa" then
+      local object = node:field("object")[1]
+      local field = node:field("field")[1]
+      if object and field and vim.treesitter.get_node_text(object, 0) == qualifier then
+        local name = vim.treesitter.get_node_text(field, 0)
+        if not seen[name] then
+          seen[name] = true
+          names[#names + 1] = name
+        end
+      end
+    end
+  end
+  return names
+end
+
 return M

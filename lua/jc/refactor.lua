@@ -83,6 +83,35 @@ local function refactor(cmd, visual)
   end, bufnr)
 end
 
+-- run a jdtls "java.action.applyRefactoringCommand" code-action command
+-- (arguments = { refactoring_kind, context_params }) by asking for the edit
+-- and applying it. `on_done(true)` runs after the edit. Returns false if the
+-- command isn't a refactoring command.
+function M.apply_command(command, on_done)
+  local client = lsp.get_jdtls_client()
+  if not client or type(command) ~= "table" or command.command ~= "java.action.applyRefactoringCommand" then
+    return false
+  end
+  local kind, context = command.arguments[1], command.arguments[2]
+  client:request("java/getRefactorEdit", {
+    command = kind,
+    context = context,
+    options = {
+      tabSize = vim.lsp.util.get_effective_tabstop(),
+      insertSpaces = vim.bo.expandtab,
+    },
+  }, function(err, result, ctx)
+    apply_refactor_edit(err, result, ctx)
+    if on_done then
+      -- let the edit apply and the tree refresh before the caller continues
+      vim.defer_fn(function()
+        on_done(true)
+      end, 300)
+    end
+  end, vim.api.nvim_get_current_buf())
+  return true
+end
+
 function M.extract_variable(visual)
   refactor("extractVariable", visual)
 end

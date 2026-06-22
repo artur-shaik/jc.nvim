@@ -122,6 +122,8 @@ with defaults.
   :JCutilWipeWorkspace       delete jdtls workspace (index), restart LSP
   :JCrefactorExtractVar      extract variable
   :JCrefactorExtractMethod   extract method (visual range)
+  :JCrefactorStaticImport    convert call at cursor to a static import
+  :JCrefactorStaticImportEnum static-import every constant of the enum
   :JCutilJshell              run java shell with project classpath
   :JCutilBytecode            show bytecode for current class (javap)
   :JCutilJol                 analyze object layout (jol)
@@ -153,6 +155,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   v  <p>re   extract variable (selection)
   n  <p>re   extract variable (inferred at cursor)
   v  <p>rm   extract method
+  n  <p>rs   convert call to a static import (all occurrences)
+  n  <p>rS   static-import every constant of the enum at the cursor
 
 ==============================================================================
 6. DEBUGGING                                                          *jc-debug*

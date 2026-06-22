@@ -168,6 +168,8 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
 - `JCrefactorExtractVar` – extract variable;
 - `JCrefactorExtractMethod` – extract method (visual range);
+- `JCrefactorStaticImport` – convert the call at the cursor to a static import (all occurrences);
+- `JCrefactorStaticImportEnum` – static-import every constant of the enum under the cursor;
 - `JCutilJshell` – execute java shell with project classpath;
 - `JCutilBytecode` – extract bytecode for class (javap);
 - `JCutilJol` – analyze object layout scheme using `jol.jar`.
@@ -196,6 +198,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>da` / `<p>dl` | debug attach / launch |
 | v | `<p>re` / `<p>rm` | extract variable / method (selection) |
 | n | `<p>re` | extract variable (inferred at cursor) |
+| n | `<p>rs` | convert call to static import (all occurrences) |
+| n | `<p>rS` | static-import every constant of the enum at the cursor |
 
 ## Class creation
 
