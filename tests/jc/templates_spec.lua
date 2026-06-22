@@ -106,6 +106,12 @@ describe("templates", function()
     assert.are.equal(templates.get(), templates.get("class"))
   end)
 
+  it("names() lists class first (the default), then the rest sorted", function()
+    local names = templates.names()
+    assert.are.equal("class", names[1])
+    assert.is_true(names[2] < names[3]) -- remainder alphabetical
+  end)
+
   it("register adds a custom template", function()
     templates.register("rec", function(o)
       return "record " .. o.name

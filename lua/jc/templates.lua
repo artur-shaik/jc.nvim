@@ -271,12 +271,16 @@ end
 function M.names()
   local names = {}
   for name in pairs(templates) do
-    names[#names + 1] = name
+    if name ~= "class" then
+      names[#names + 1] = name
+    end
   end
   for name in pairs(custom) do
     names[#names + 1] = name
   end
   table.sort(names)
+  -- "class" is the default, so it leads the list (e.g. the wizard picker)
+  table.insert(names, 1, "class")
   return names
 end
 
