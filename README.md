@@ -166,7 +166,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
 - `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
 - `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
-- `JCrefactorExtractVar` – extract variable;
+- `JCrefactorExtractVar` – extract variable (all occurrences);
 - `JCrefactorExtractMethod` – extract method (visual range);
 - `JCrefactorStaticImport` – convert the call at the cursor to a static import (all occurrences);
 - `JCrefactorStaticImportEnum` – static-import every constant of the enum under the cursor;
@@ -196,8 +196,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>n` | new class prompt (DSL or wizard per `class_prompt`) |
 | n | `<p>N` | new class — step-by-step wizard |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
-| v | `<p>re` / `<p>rm` | extract variable / method (selection) |
-| n | `<p>re` | extract variable (inferred at cursor) |
+| v | `<p>re` / `<p>rm` | extract variable (all occurrences) / method (selection) |
+| n | `<p>re` | extract variable, all occurrences (inferred at cursor) |
 | n | `<p>rs` | convert call to static import (all occurrences) |
 | n | `<p>rS` | static-import every constant of the enum at the cursor |
 

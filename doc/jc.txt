@@ -120,7 +120,7 @@ with defaults.
   :JCdebugWithConfig         choose a vimspector configuration
   :JCutilUpdateConfig        re-read project configuration (pom/gradle)
   :JCutilWipeWorkspace       delete jdtls workspace (index), restart LSP
-  :JCrefactorExtractVar      extract variable
+  :JCrefactorExtractVar      extract variable (all occurrences)
   :JCrefactorExtractMethod   extract method (visual range)
   :JCrefactorStaticImport    convert call at cursor to a static import
   :JCrefactorStaticImportEnum static-import every constant of the enum
@@ -152,8 +152,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>N    new class - step-by-step wizard
   n  <p>da   debug attach
   n  <p>dl   debug launch
-  v  <p>re   extract variable (selection)
-  n  <p>re   extract variable (inferred at cursor)
+  v  <p>re   extract variable, all occurrences (selection)
+  n  <p>re   extract variable, all occurrences (inferred at cursor)
   v  <p>rm   extract method
   n  <p>rs   convert call to a static import (all occurrences)
   n  <p>rS   static-import every constant of the enum at the cursor

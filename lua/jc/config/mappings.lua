@@ -103,18 +103,19 @@ function M.install_mappings(conf, bufnr)
     opts
   )
 
+  -- extract variable defaults to all occurrences
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "v",
     prefix .. "re",
-    "<Esc><Cmd>lua require('jc.refactor').extract_variable(true)<CR>",
+    "<Esc><Cmd>lua require('jc.refactor').extract_variable_all(true)<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     prefix .. "re",
-    "<Cmd>lua require('jc.refactor').extract_variable()<CR>",
+    "<Cmd>lua require('jc.refactor').extract_variable_all()<CR>",
     opts
   )
   vim.api.nvim_buf_set_keymap(
