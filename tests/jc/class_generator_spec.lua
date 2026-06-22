@@ -116,6 +116,46 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("lombok flags", function()
+    local current_path = { "example", "com", "java", "main", "src", "proj" }
+    local current_package = { "com", "example" }
+
+    it("turn into class annotations + imports, not codegen methods", function()
+      local d = cg.parse("/com.foo.Bar:lombokData:lombokBuilder:toString", current_path, current_package)
+      -- toString stays a codegen flag; lombok* become annotations/imports
+      assert.is_not_nil(d.methods.toString)
+      assert.is_nil(d.methods.lombokData)
+      assert.is_true(vim.tbl_contains(d.annotations, "@Data"))
+      assert.is_true(vim.tbl_contains(d.annotations, "@Builder"))
+      assert.is_true(vim.tbl_contains(d.imports, "lombok.Data"))
+      assert.is_true(vim.tbl_contains(d.imports, "lombok.Builder"))
+    end)
+
+    it("plain 'lombok' is the @Data default", function()
+      local d = cg.parse("/com.foo.Bar:lombok", current_path, current_package)
+      assert.are.same({ "@Data" }, d.annotations)
+      assert.are.same({ "lombok.Data" }, d.imports)
+    end)
+
+    it("renders the lombok annotation and import on the class", function()
+      local templates = require("jc.templates")
+      local out = templates.render("class", {
+        name = "User",
+        package = "p",
+        fields = {},
+        annotations = { "@Data" },
+        imports = { "lombok.Data" },
+      })
+      assert.is_truthy(out:find("import lombok.Data;", 1, true))
+      assert.is_truthy(out:find("@Data\npublic class User", 1, true))
+    end)
+
+    it("complete_flags offers lombok flags", function()
+      local r = cg.complete_flags("", "lombokDa")
+      assert.is_true(vim.tbl_contains(r, "lombokData"))
+    end)
+  end)
+
   describe("build_dsl", function()
     it("reassembles a parsed DSL back to its one-line form", function()
       local dsl = "singleton:[main]:/com.foo.Bar extends B implements I(String s):constructor:equals"

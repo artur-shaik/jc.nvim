@@ -211,6 +211,40 @@ function M.parse_methods(flagstr)
   return methods
 end
 
+-- lombok flags -> a class annotation + its import (added to the class instead
+-- of running a jdtls code generator). `lombok` is the common @Data default.
+local LOMBOK = {
+  lombok = { "@Data", "lombok.Data" },
+  lombokData = { "@Data", "lombok.Data" },
+  lombokValue = { "@Value", "lombok.Value" },
+  lombokBuilder = { "@Builder", "lombok.Builder" },
+  lombokGetter = { "@Getter", "lombok.Getter" },
+  lombokSetter = { "@Setter", "lombok.Setter" },
+  lombokToString = { "@ToString", "lombok.ToString" },
+  lombokEqualsHashCode = { "@EqualsAndHashCode", "lombok.EqualsAndHashCode" },
+  lombokNoArgs = { "@NoArgsConstructor", "lombok.NoArgsConstructor" },
+  lombokAllArgs = { "@AllArgsConstructor", "lombok.AllArgsConstructor" },
+  lombokRequiredArgs = { "@RequiredArgsConstructor", "lombok.RequiredArgsConstructor" },
+  lombokSlf4j = { "@Slf4j", "lombok.extern.slf4j.Slf4j" },
+}
+M.LOMBOK = LOMBOK
+
+-- split a parsed flags map into jdtls code-gen flags (kept in `methods`) and
+-- lombok annotations/imports contributed to the class
+local function split_lombok(methods)
+  local codegen, annotations, imports = {}, {}, {}
+  for name in pairs(methods or {}) do
+    local lb = LOMBOK[name]
+    if lb then
+      annotations[#annotations + 1] = lb[1]
+      imports[#imports + 1] = lb[2]
+    else
+      codegen[name] = methods[name]
+    end
+  end
+  return codegen, annotations, imports
+end
+
 -- split the DSL string into its structural pieces (no path resolution yet)
 function M.parse_input(userinput)
   local rest = userinput
@@ -345,7 +379,12 @@ local function decorate(data, parsed)
     end
   end
   if parsed.flags then
-    data.methods = M.parse_methods(parsed.flags)
+    local codegen, annotations, imports = split_lombok(M.parse_methods(parsed.flags))
+    data.methods = codegen
+    if #annotations > 0 then
+      data.annotations = annotations
+      data.imports = imports
+    end
   end
   return data
 end
@@ -395,6 +434,8 @@ local function template_options(data)
     fields = data.fields,
     extends = data.extends,
     implements = data.implements,
+    annotations = data.annotations, -- lombok @-annotations, if any
+    imports = data.imports,
   }
 end
 
@@ -1159,9 +1200,9 @@ local VALIDATE = {
     return nil
   end,
   flags = function(v)
-    for w in v:gmatch("%a+") do
-      if not vim.tbl_contains(METHOD_FLAGS, w) then
-        return "unknown flag '" .. w .. "' (use: " .. table.concat(METHOD_FLAGS, " ") .. ")"
+    for w in v:gmatch("%w+") do
+      if not vim.tbl_contains(METHOD_FLAGS, w) and not LOMBOK[w] then
+        return "unknown flag '" .. w .. "' (codegen: " .. table.concat(METHOD_FLAGS, " ") .. "; or lombok*)"
       end
     end
     return nil
@@ -1215,17 +1256,29 @@ end
 
 -- method-flag completion for the wizard (space-separated): the current word
 -- against the known flags, minus the ones already typed
+-- jdtls code-gen flags first, then the lombok flags (sorted)
+local ALL_FLAGS
+local function all_flags()
+  if not ALL_FLAGS then
+    ALL_FLAGS = vim.deepcopy(METHOD_FLAGS)
+    local lombok = vim.tbl_keys(LOMBOK)
+    table.sort(lombok)
+    vim.list_extend(ALL_FLAGS, lombok)
+  end
+  return ALL_FLAGS
+end
+
 function M.complete_flags(_arglead, line, pos)
   line = pos and line:sub(1, pos) or line
   -- the current word (after the last space or comma) and the chosen ones
   local current = line:match("[%w]*$")
   local chosen = {}
-  for w in line:sub(1, #line - #current):gmatch("[%a]+") do
+  for w in line:sub(1, #line - #current):gmatch("[%w]+") do
     chosen[w] = true
   end
   local prefix = line:sub(1, #line - #current)
   local result = {}
-  for _, flag in ipairs(METHOD_FLAGS) do
+  for _, flag in ipairs(all_flags()) do
     if not chosen[flag] and flag:sub(1, #current) == current then
       result[#result + 1] = prefix .. flag
     end

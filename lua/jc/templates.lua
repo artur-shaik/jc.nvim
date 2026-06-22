@@ -79,7 +79,10 @@ local function assemble(spec, opts)
   local kind = KINDS[spec.kind or "class"] or KINDS.class
   local out = package_line(opts)
 
+  -- spec imports/annotations plus any contributed at runtime (e.g. lombok
+  -- flags add @Data and its import on top of the chosen template)
   local imports = resolve_list(spec.imports, opts)
+  vim.list_extend(imports, opts.imports or {})
   if #imports > 0 then
     for _, imp in ipairs(imports) do
       out = out .. "import " .. imp .. ";\n"
@@ -87,7 +90,9 @@ local function assemble(spec, opts)
     out = out .. "\n"
   end
 
-  for _, annotation in ipairs(resolve_list(spec.annotations, opts)) do
+  local annotations = resolve_list(spec.annotations, opts)
+  vim.list_extend(annotations, opts.annotations or {})
+  for _, annotation in ipairs(annotations) do
     out = out .. annotation .. "\n"
   end
 
