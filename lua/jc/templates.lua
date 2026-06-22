@@ -119,6 +119,10 @@ local function assemble(spec, opts)
   end
 
   out = out .. " {\n\n"
+  -- enum constants come first as "A, B, C;"
+  if kind.keyword == "enum" and opts.values and #opts.values > 0 then
+    out = out .. table.concat(opts.values, ", ") .. ";\n"
+  end
   if not kind.record then
     out = out .. fields_block(opts, spec.kind == "interface" and "()" or "")
   end

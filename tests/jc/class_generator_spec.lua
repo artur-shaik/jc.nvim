@@ -156,6 +156,20 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("enum values", function()
+    it("the (...) slot becomes enum constants, not fields", function()
+      local d = cg.parse("enum:/p.Day(MON, TUE, WED)", { "p" }, { "p" })
+      assert.are.equal("Day", d.class)
+      assert.are.same({ "MON", "TUE", "WED" }, d.values)
+      assert.is_nil(d.fields)
+    end)
+
+    it("parse_enum_values splits and trims names", function()
+      assert.are.same({ "A", "B" }, cg.parse_enum_values("(A, B)"))
+      assert.are.same({}, cg.parse_enum_values("()"))
+    end)
+  end)
+
   describe("build_dsl", function()
     it("reassembles a parsed DSL back to its one-line form", function()
       local dsl = "singleton:[main]:/com.foo.Bar extends B implements I(String s):constructor:equals"

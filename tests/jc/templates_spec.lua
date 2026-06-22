@@ -31,6 +31,12 @@ describe("templates", function()
     assert.is_nil(out:find("implements", 1, true))
   end)
 
+  it("enum: renders constants from values", function()
+    local out = templates.render("enum", { name = "Day", package = "p", values = { "MON", "TUE", "WED" } })
+    assert.is_truthy(out:find("public enum Day {", 1, true))
+    assert.is_truthy(out:find("MON, TUE, WED;", 1, true))
+  end)
+
   it("enum: no extends, but implements is honoured", function()
     local out = templates.render("enum", { name = "E", package = "p", fields = { opts.fields[1] }, extends = "X" })
     assert.is_truthy(out:find("public enum E {", 1, true))

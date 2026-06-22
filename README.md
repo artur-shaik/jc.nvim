@@ -223,7 +223,7 @@ Without `/` the package is relative to the current file's package;
 
 D: (optional) extends and implements classes will be automatically imported;
 
-E: (optional) private str variable, and public i variable will be added to class;
+E: (optional) private str variable, and public i variable will be added to class. For the `enum` template the same `(...)` slot lists the constants instead, e.g. `enum:/p.Day(MON, TUE, WED)`;
 
 F: (optional) contructor using all fields and toString will be created. Also hashCode and equals can be used.
 

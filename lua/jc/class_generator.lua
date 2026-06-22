@@ -154,6 +154,22 @@ local function split_top_level(s, sep)
   return parts
 end
 
+-- parse the "(...)" slot of an enum as a list of constant names ("MON, TUE")
+function M.parse_enum_values(fieldstr)
+  local inner = trim(fieldstr:sub(2, -2))
+  if inner == "" then
+    return {}
+  end
+  local values = {}
+  for _, part in ipairs(split_top_level(inner, ",")) do
+    part = trim(part)
+    if part ~= "" then
+      values[#values + 1] = part
+    end
+  end
+  return values
+end
+
 -- parse "(mods type name, ...)" -> array of { mod, type, name }; the type may
 -- contain generics with their own commas/spaces ("Map<String, Long>")
 function M.parse_fields(fieldstr)
@@ -373,9 +389,14 @@ local function decorate(data, parsed)
   data.extends = parsed.extends
   data.implements = parsed.implements
   if parsed.fields_str then
-    local fields = M.parse_fields(parsed.fields_str)
-    if #fields > 0 then
-      data.fields = fields
+    if parsed.template == "enum" then
+      -- for an enum the "(...)" slot lists the constants, not fields
+      data.values = M.parse_enum_values(parsed.fields_str)
+    else
+      local fields = M.parse_fields(parsed.fields_str)
+      if #fields > 0 then
+        data.fields = fields
+      end
     end
   end
   if parsed.flags then
@@ -436,6 +457,7 @@ local function template_options(data)
     implements = data.implements,
     annotations = data.annotations, -- lombok @-annotations, if any
     imports = data.imports,
+    values = data.values, -- enum constants, if any
   }
 end
 
@@ -1257,6 +1279,7 @@ end
 -- method-flag completion for the wizard (space-separated): the current word
 -- against the known flags, minus the ones already typed
 -- jdtls code-gen flags first, then the lombok flags (sorted)
+-- all flag names for completion: jdtls code-gen flags first, then lombok
 local ALL_FLAGS
 local function all_flags()
   if not ALL_FLAGS then

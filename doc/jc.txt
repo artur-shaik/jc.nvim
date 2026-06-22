@@ -187,7 +187,8 @@ Prompt scheme: >
   source root (/com.foo.Bar -> src/main/java/com/foo/Bar.java); no `/` =
   relative to the current file's package;
 - extends/implements classes are imported automatically;
-- field list: `private` by default, modifiers can be given;
+- field list: `private` by default, modifiers can be given. For the `enum`
+  template the (...) slot lists constants instead: enum:/p.Day(MON, TUE);
 - trailing flags: constructor, toString, equals, hashCode.
 
 The prompt completes with <Tab>: templates and project packages for the
