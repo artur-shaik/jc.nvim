@@ -69,6 +69,7 @@ require("jc").setup({
   templates_dir = nil,         -- dir of user class templates (see below)
   class_type_exclude = nil,    -- package prefixes to hide from type completion
   class_prompt = "oneline",    -- "oneline" (DSL) | "wizard" (step-by-step)
+  map_gf = true,               -- override gf with FQN-aware go-to-file (see below)
   on_attach = nil,             -- function(client, bufnr) extra hook
 })
 ```
@@ -166,6 +167,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCgenerateAbstractMethods` – generate abstract methods;
 - `JCgenerateClass` – start class generation user input prompt;
 - `JCgotoTest` – jump to the test class of the current class (or back), creating it if missing;
+- `JCgotoFqn` – open the java file for the FQN under the cursor (like `gf` for fully-qualified names);
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
 - `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
 - `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
@@ -207,6 +209,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>n` | new class prompt (DSL or wizard per `class_prompt`) |
 | n | `<p>N` | new class — step-by-step wizard |
 | n | `<p>t` | jump to the test class (or back), creating it if missing |
+| n | `gf` | go to file, or the java file of the FQN under the cursor |
 | n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
 | n | `<p>Ts` / `<p>To` | toggle test summary / open test output |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
@@ -246,6 +249,30 @@ project packages for the path, `[subdir]` after a template, method flags
 (`constructor`/`toString`/...) once the class path is given, and — after
 `extends `/`implements ` — class/interface names resolved live from
 jdtls.
+
+## Go to file by FQN
+
+`JCgotoFqn` (and an overridden `gf`) opens the java source for a
+fully-qualified name under the cursor — handy for jumping out of a terminal,
+a neotest output window or a pasted stack trace into the code. It understands
+
+- a bare FQN: `com.foo.Bar` (and `com.foo.Bar$Inner` → the outer file);
+- an FQN with a member: `com.foo.Bar.method` → the `Bar` file;
+- a line suffix: `com.foo.Bar:42`;
+- a stack-trace frame: `at com.foo.Bar.method(Bar.java:25)` → `Bar` at line 25.
+
+The file opens in the **last window that showed a java buffer** (so you can
+trigger it from a terminal split and land back in your editing window), or a
+new tab when there is none. The FQN is resolved through jdtls' symbol index
+(works from any buffer) with a source-tree fallback.
+
+When `default_mappings` is on, `gf` is overridden globally to do this and
+falls back to the builtin `gf` when the token under the cursor isn't an FQN
+(e.g. a real path). Disable the override with:
+
+```lua
+require("jc").setup({ map_gf = false })
+```
 
 ## Test runner
 

@@ -59,6 +59,23 @@ function M.setup(args)
   end
 
   local group = vim.api.nvim_create_augroup("jc_nvim_attach", { clear = true })
+
+  -- track the last window showing a java buffer so goto_fqn can land there
+  -- (e.g. jumping out of a terminal or neotest output). gf is overridden
+  -- globally to fall back to the builtin when the token isn't an FQN.
+  if vim.g.jc_default_mappings ~= false and vim.g.jc_default_mappings ~= 0 and M.config.map_gf ~= false then
+    require("jc.goto_fqn").install_gf()
+  end
+  vim.api.nvim_create_autocmd({ "BufWinEnter", "WinEnter" }, {
+    group = group,
+    pattern = "*.java",
+    callback = function()
+      if vim.bo.filetype == "java" then
+        require("jc.goto_fqn").remember_win(vim.api.nvim_get_current_win())
+      end
+    end,
+  })
+
   vim.api.nvim_create_autocmd("LspAttach", {
     group = group,
     callback = function(a)

@@ -25,6 +25,7 @@ command! JCgenerateConstructor lua require('jc.jdtls').generate_constructor(nil,
 command! JCgenerateAbstractMethods lua require('jc.jdtls').generate_abstractMethods()
 command! JCgenerateClass lua require('jc.class_generator').generate_class()
 command! JCgotoTest lua require('jc.class_generator').goto_test()
+command! JCgotoFqn lua require('jc.goto_fqn').goto_fqn()
 command! JCtoggleAutoformat call jc#toggleAutoformat()
 command! JCutilUpdateConfig lua require('jc.jdtls').update_project_config()
 command! JCutilWipeWorkspace lua require('jc.jdtls').wipe_workspace()

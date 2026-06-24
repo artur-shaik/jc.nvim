@@ -607,6 +607,9 @@ local function source_roots()
   return roots
 end
 
+-- exposed for goto_fqn's filesystem fallback
+M.source_roots = source_roots
+
 -- subprojects keyed by name: { <name> = { dir, sets = { main=path, test=path } } }
 -- derived from the discovered source roots (.../<module>/src/<set>/java)
 local module_cache = {}

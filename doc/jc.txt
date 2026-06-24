@@ -13,8 +13,9 @@ CONTENTS                                                          *jc-contents*
   5. Mappings ............................... |jc-mappings|
   6. Debugging .............................. |jc-debug|
   7. Class creation ......................... |jc-class-creation|
-  8. Test runner ............................ |jc-test|
-  9. Health ................................. |jc-health|
+  8. Go to file by FQN ...................... |jc-goto-fqn|
+  9. Test runner ............................ |jc-test|
+  10. Health ................................ |jc-health|
 
 ==============================================================================
 1. INTRODUCTION                                               *jc-introduction*
@@ -63,6 +64,7 @@ Call `setup` (or use the `opts` table of lazy.nvim): >lua
     templates_dir = nil,         -- dir of user class templates
     class_type_exclude = nil,    -- package prefixes hidden from completion
     class_prompt = "oneline",    -- "oneline" (DSL) | "wizard" (step-by-step)
+    map_gf = true,               -- override gf with FQN-aware go-to-file
     on_attach = nil,             -- function(client, bufnr) extra hook
   })
 <
@@ -114,6 +116,7 @@ with defaults.
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
   :JCgotoTest                jump to the test class (or back), create if missing
+  :JCgotoFqn                 open the java file for the FQN under the cursor
   :JCtestRun                 run the test at the cursor (neotest)
   :JCtestFile                run every test in the current file
   :JCtestSuite               run every test under the working directory
@@ -161,6 +164,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>n    new class prompt (DSL or wizard per class_prompt)
   n  <p>N    new class - step-by-step wizard
   n  <p>t    jump to the test class (or back), create if missing
+  n  gf      go to file, or the java file of the FQN under the cursor
   n  <p>Tr   run the test at the cursor (neotest)
   n  <p>Tf   run every test in the current file
   n  <p>Ta   run every test under the working directory
@@ -213,7 +217,28 @@ path, `[subdir]` after a template, the trailing flags once the path is
 given, and class/interface names from jdtls after `extends `/`implements `.
 
 ==============================================================================
-8. TEST RUNNER                                                         *jc-test*
+8. GO TO FILE BY FQN                                               *jc-goto-fqn*
+
+`:JCgotoFqn` (and an overridden `gf`) opens the java source for a
+fully-qualified name under the cursor — useful from a terminal, a neotest
+output window or a pasted stack trace. Recognised tokens:
+
+- bare FQN `com.foo.Bar` (and `com.foo.Bar$Inner` -> the outer file);
+- FQN with a member `com.foo.Bar.method` -> the `Bar` file;
+- line suffix `com.foo.Bar:42`;
+- stack frame `at com.foo.Bar.method(Bar.java:25)` -> `Bar`, line 25.
+
+The file opens in the last window that showed a java buffer (so it can be
+triggered from a terminal split and land in the editing window), or a new
+tab when there is none. The FQN is resolved through jdtls' symbol index,
+with a source-tree fallback.
+
+With `default_mappings` enabled, `gf` is overridden globally to do this and
+falls back to the builtin `gf` when the token is not an FQN (e.g. a real
+path). Disable the override with `setup{ map_gf = false }`.
+
+==============================================================================
+9. TEST RUNNER                                                         *jc-test*
 
 jc.nvim provides a neotest (https://github.com/nvim-neotest/neotest)
 adapter. neotest is an OPTIONAL dependency — without it the plugin works
@@ -255,7 +280,7 @@ toasts of one run are debounced into one each. Disable with >lua
 <
 
 ==============================================================================
-9. HEALTH                                                            *jc-health*
+10. HEALTH                                                           *jc-health*
 
 Run `:checkhealth jc` to verify: neovim version, attached jdtls client,
 organize-imports and java-debug availability, debug backends
