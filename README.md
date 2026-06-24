@@ -182,6 +182,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCtestStop` – stop the running test;
 - `JCtestSummary` – toggle the neotest summary panel;
 - `JCtestOutput` – open the output of the test at the cursor;
+- `JCtestPrecompile` – toggle compiling with the build tool before a run;
 - `JCtestInstall` – download the JUnit console launcher jar via maven;
 - `JCutilJshell` – execute java shell with project classpath;
 - `JCutilBytecode` – extract bytecode for class (javap);
@@ -336,19 +337,27 @@ The classpath is built from jdtls and augmented for correctness:
 - **test + runtime scopes are unioned** — jdtls' `test` scope omits
   `runtimeOnly` dependencies that ByteBuddy/Mockito need at run time
   (otherwise "green from the CLI but `NoClassDefFoundError` here");
-- **CLI build outputs are added** alongside jdtls' eclipse `bin` output.
-  jdtls' incremental `bin` can be stale or incomplete; a gradle/maven build
-  under `build/`-`target/` is the complete set. For production classes the
-  CLI build wins (consistency), so editing a **production** class needs a CLI
-  rebuild to take effect; edited **test** classes use jdtls' fresh `bin/test`
-  and take effect immediately;
-- before launching, jc **waits for any in-flight jdtls indexing/compile** to
-  settle (e.g. the recompile triggered by saving the edited test), so a run
-  doesn't pick up stale `.class` files.
+- by default (`precompile = false`) jc forces a jdtls compile
+  (`java/buildWorkspace`) before reading the classpath, uses jdtls' `bin`
+  output first, and keeps the gradle/maven `build/`-`target/` dirs as a
+  fallback. This is fast (no build tool) and fine when jdtls compiles the
+  whole project;
+- some projects have classes jdtls won't put in `bin` (e.g. certain
+  spring-data repositories) — there the run fails with `ClassNotFoundException`
+  for a class that exists in the build tool's output. Set
+  `setup{ test = { precompile = true } }` (or toggle with `:JCtestPrecompile`):
+  jc then runs `gradle :<module>:testClasses` / `mvn test-compile` first and
+  uses the complete `build/`-`target/` output (dropping jdtls' `bin`). Slower
+  (build-tool latency) but reliable;
+- the run JVM is the configured `java.configuration.runtimes` entry matching
+  the **highest** bytecode version among the module's compiled classes (so a
+  test compiled to 17 over an 11 `targetCompatibility` main still runs on a
+  17 JVM, as gradle would). It falls back to `resolveJavaExecutable`, then
+  PATH `java`.
 
-Tests run on the JDK jdtls resolves for the project
-(`vscode.java.resolveJavaExecutable`); configure `java.configuration.runtimes`
-on your jdtls so it matches the project's Java version.
+If jdtls keeps dropping classes from `bin`, a `:JCutilWipeWorkspace` +
+restart (clean re-import) often makes `bin` complete again, letting you stay
+on the fast `precompile = false` path.
 
 The adapter toasts `running...` when a run starts and
 `N passed, M failed, K skipped` when it finishes (error level if anything

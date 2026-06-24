@@ -238,7 +238,12 @@ end
 -- testRuntimeClasspath has them) and its "bin" output can lag a CLI build, so
 -- both gaps show up as "green from the CLI but ClassNotFound here". Order is
 -- preserved (build outputs first), duplicates dropped.
-local function resolve_classpath(file)
+-- drop_bin: when the CLI build tool compiled the project (precompile), the
+-- gradle/maven build/-target/ output is the complete, correct-bytecode source,
+-- so the project's jdtls bin dirs are dropped entirely (jdtls may fail to
+-- compile some classes, and its bin is a newer bytecode level). Otherwise bin
+-- goes first (fresh from java/buildWorkspace) with build/ as a fallback.
+local function resolve_classpath(file, drop_bin)
   local uri = vim.uri_from_fname(file)
   local test = classpath_scope(uri, "test")
   if not test then
@@ -263,19 +268,14 @@ local function resolve_classpath(file)
 
   for _, list in ipairs({ test, runtime }) do
     for _, entry in ipairs(list) do
-      local set = entry:match("[/\\]bin[/\\]([^/\\]+)$")
-      if set == "test" then
-        -- edited test classes must win, so jdtls' fresh bin/test goes first
-        -- and the CLI build is only a fallback
-        add(entry)
-        add_build_outputs(entry)
-      elseif set == "main" or set == "default" then
-        -- jdtls' bin/main can be a stale/incomplete compile; the CLI build is
-        -- a complete, internally consistent set of production classes, so it
-        -- wins (mid-session production edits need a CLI rebuild — rare; tests
-        -- are what people iterate on)
-        add_build_outputs(entry)
-        add(entry)
+      if entry:match("[/\\]bin[/\\][^/\\]+$") then
+        if drop_bin then
+          add_build_outputs(entry)
+        else
+          -- bin first (fresh from java/buildWorkspace), build/ as a fallback
+          add(entry)
+          add_build_outputs(entry)
+        end
       else
         add(entry)
       end
@@ -284,31 +284,190 @@ local function resolve_classpath(file)
   return out
 end
 
--- the project's configured JDK (matching its Java compliance) rather than
--- whatever `java` sits on PATH: running 11-target tests on a newer JVM can
--- break old byte-buddy/Mockito (mock-creation failures the gradle toolchain
--- run doesn't hit). Falls back to "java".
-local function resolve_java()
-  local java
-  require("jc.lsp").executeCommand({
-    command = "vscode.java.resolveJavaExecutable",
-    arguments = { "", "" },
-  }, function(j)
-    java = (type(j) == "string" and j ~= "") and j or "java"
-  end, function()
-    java = "java"
-  end)
-  if not vim.wait(10000, function()
-    return java ~= nil
-  end, 50) then
-    return "java"
+-- gradle/maven module dir for a file (.../<module>/src/<set>/java/...)
+local function module_dir(file)
+  return file:match("^(.*)[/\\]src[/\\][^/\\]+[/\\]java[/\\]")
+end
+
+local function class_major(path)
+  local fd = io.open(path, "rb")
+  if not fd then
+    return nil
   end
+  local head = fd:read(8)
+  fd:close()
+  if head and #head >= 8 then
+    return head:byte(7) * 256 + head:byte(8) - 44 -- feature version: 52->8, 61->17
+  end
+  return nil
+end
+
+-- the HIGHEST java feature version among a module's compiled classes. The JVM
+-- must be >= every bytecode version on the run classpath (Java is backward
+-- compatible), and jdtls' bin output is often compiled to a newer level than
+-- the gradle build/, so a single dir underestimates — take the max.
+function adapter._module_java_version(module, build_only)
+  if not module then
+    return nil
+  end
+  -- build_only: after a CLI precompile, bin is dropped from the classpath, so
+  -- only the build/ bytecode (the project's real target) matters
+  local subs = build_only and { "/build/classes/java/main", "/build/classes/java/test" }
+    or { "/build/classes/java/main", "/bin/main", "/build/classes/java/test", "/bin/test" }
+  local max
+  for _, sub in ipairs(subs) do
+    local hits = vim.fs.find(function(n)
+      return n:match("%.class$")
+    end, { path = module .. sub, type = "file", limit = 1 })
+    local v = hits[1] and class_major(hits[1])
+    if v and (not max or v > max) then
+      max = v
+    end
+  end
+  return max
+end
+
+local function runtime_version(name)
+  local v = name and name:match("^JavaSE%-(.+)$")
+  if not v then
+    return nil
+  end
+  return v == "1.8" and 8 or tonumber(v:match("^(%d+)"))
+end
+
+-- a configured jdtls runtime that can run feature version `ver`: the exact
+-- match, else the smallest configured runtime >= ver (backward compatible).
+function adapter._runtime_for_version(ver)
+  local client = require("jc.lsp").get_jdtls_client()
+  local runtimes = client and vim.tbl_get(client.config or {}, "settings", "java", "configuration", "runtimes")
+  if type(runtimes) ~= "table" then
+    return nil
+  end
+  local best, best_v
+  for _, r in ipairs(runtimes) do
+    local rv = runtime_version(r.name)
+    if rv and type(r.path) == "string" and r.path ~= "" then
+      if rv == ver then
+        return r.path .. "/bin/java"
+      end
+      if rv > ver and (not best_v or rv < best_v) then
+        best, best_v = r.path .. "/bin/java", rv
+      end
+    end
+  end
+  return best
+end
+
+-- the JDK to run a module's tests on. resolveJavaExecutable only ever returns
+-- jdtls' DEFAULT runtime (not the project's compliance), so an 11-target
+-- project would run on a newer default JVM — which breaks old byte-buddy/
+-- Mockito. Instead detect the module's bytecode target and pick the matching
+-- configured runtime; fall back to resolveJavaExecutable, then "java".
+local java_cache = {}
+local function resolve_java(file, build_only)
+  local module = module_dir(file)
+  local key = (build_only and "b:" or "") .. (module or file)
+  if java_cache[key] then
+    return java_cache[key]
+  end
+
+  local ver = adapter._module_java_version(module, build_only)
+  local java = ver and adapter._runtime_for_version(ver) or nil
+
+  if not java then
+    local project = module and vim.fn.fnamemodify(module, ":t") or ""
+    local resolved
+    require("jc.lsp").executeCommand({
+      command = "vscode.java.resolveJavaExecutable",
+      arguments = { "", project },
+    }, function(j)
+      resolved = (type(j) == "string" and j ~= "") and j or false
+    end, function()
+      resolved = false
+    end)
+    vim.wait(10000, function()
+      return resolved ~= nil
+    end, 50)
+    java = resolved or "java"
+  end
+
+  java_cache[key] = java
   return java
 end
 
--- exposed for :JCtestDebugClasspath so the dump reflects the augmented
--- classpath the runner actually launches with
+-- force jdtls to compile the whole workspace (incremental) and wait for it, so
+-- its bin output is fresh and complete before we read the classpath from it.
+-- Both jdtls' bin and the CLI build/ dirs can otherwise be partially compiled.
+local function build_workspace()
+  local client = require("jc.lsp").get_jdtls_client()
+  if not client then
+    return
+  end
+  local done
+  local ok = client:request("java/buildWorkspace", false, function()
+    done = true
+  end)
+  if not ok then
+    return
+  end
+  vim.wait(120000, function()
+    return done
+  end, 100)
+end
+
+-- gradle subproject path for a module dir under the build root (":a:b"), or
+-- nil for a single-module / root project
+local function gradle_path(root, module)
+  if not module or module == root then
+    return nil
+  end
+  local rel = module:sub(#root + 2)
+  return ":" .. rel:gsub("[/\\]", ":")
+end
+
+-- compile the project with its build tool before launching, so the run uses a
+-- complete, correct-bytecode build/ output. jdtls can leave classes out of its
+-- bin (e.g. spring-data repositories), and a CLI build is the source of truth.
+-- Returns ok, output. Enabled via setup{ test = { precompile = true } }.
+local function precompile_enabled()
+  local ok, jc = pcall(require, "jc")
+  local t = ok and jc.config and jc.config.test
+  return t and t.precompile == true
+end
+
+local function precompile(file)
+  local root = adapter.root(file)
+  local module = module_dir(file)
+  local cmd
+  if
+    vim.fn.filereadable(root .. "/settings.gradle") == 1
+    or vim.fn.filereadable(root .. "/settings.gradle.kts") == 1
+    or vim.fn.filereadable(root .. "/build.gradle") == 1
+    or vim.fn.filereadable(root .. "/build.gradle.kts") == 1
+  then
+    local gw = root .. "/gradlew"
+    cmd = vim.fn.executable(gw) == 1 and { gw } or { "gradle" }
+    local gp = gradle_path(root, module)
+    table.insert(cmd, gp and (gp .. ":testClasses") or "testClasses")
+    vim.list_extend(cmd, { "-q", "--console=plain" })
+  elseif vim.fn.filereadable(root .. "/pom.xml") == 1 then
+    local mw = root .. "/mvnw"
+    cmd = { vim.fn.executable(mw) == 1 and mw or "mvn", "-q", "test-compile" }
+    if module and module ~= root then
+      vim.list_extend(cmd, { "-pl", module:sub(#root + 2), "-am" })
+    end
+  else
+    return true, "" -- unknown build system: don't block the run
+  end
+
+  local res = vim.system(cmd, { cwd = root, text = true }):wait(300000)
+  return res.code == 0, (res.stderr or "") .. (res.stdout or "")
+end
+
+-- exposed for :JCtestDebugClasspath / :JCtestDebugJava so the dumps reflect
+-- what the runner actually launches with
 adapter.resolve_classpath = resolve_classpath
+adapter.resolve_java = resolve_java
 
 function adapter.build_spec(args)
   local by_file = selectors_by_file(args.tree)
@@ -328,27 +487,41 @@ function adapter.build_spec(args)
     return nil
   end
 
-  -- let any in-flight jdtls indexing/compile (e.g. the recompile triggered by
-  -- saving the edited test) settle so we launch against fresh bin output
-  if require("jc.lsp").jdtls_busy() then
-    vim.schedule(function()
-      vim.notify("jc: waiting for jdtls to finish indexing...", vim.log.levels.INFO)
-    end)
-    require("jc.lsp").wait_until_idle(60000)
+  local pre = precompile_enabled()
+  if not pre then
+    -- force jdtls to (incrementally) compile the workspace so its bin output is
+    -- fresh and complete before we read the classpath from it
+    build_workspace()
   end
 
-  local java = resolve_java()
-
-  -- one spec per file, each with that file's module classpath
+  -- one spec per file, each with that file's module classpath and project JDK
+  local compiled = {}
   local specs = {}
   for file, selectors in pairs(by_file) do
-    local classpath = resolve_classpath(file)
+    -- precompile the module with its build tool (gradle/maven) once per run;
+    -- the complete build/ output then drives the classpath and JDK
+    local ok_compile = true
+    if pre then
+      local module = module_dir(file) or file
+      if compiled[module] == nil then
+        local out
+        compiled[module], out = precompile(file)
+        if not compiled[module] then
+          vim.schedule(function()
+            vim.notify("jc: build failed before tests:\n" .. vim.trim(out or ""), vim.log.levels.ERROR)
+          end)
+        end
+      end
+      ok_compile = compiled[module]
+    end
+
+    local classpath = ok_compile and resolve_classpath(file, pre)
     if classpath then
       local reports_dir = vim.fn.tempname()
       vim.fn.mkdir(reports_dir, "p")
       specs[#specs + 1] = {
         command = launcher.build_command({
-          java = java,
+          java = resolve_java(file, pre),
           jar = jar,
           classpath = classpath,
           selectors = selectors,

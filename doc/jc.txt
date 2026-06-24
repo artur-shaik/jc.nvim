@@ -124,6 +124,7 @@ with defaults.
   :JCtestStop                stop the running test
   :JCtestSummary             toggle the neotest summary panel
   :JCtestOutput              open the output of the test at the cursor
+  :JCtestPrecompile          toggle build-tool precompile before a run
   :JCtestInstall             download the JUnit console launcher via maven
   :JCtoggleAutoformat        toggle autoformat on save
   :JCdebugAttach             attach debugger (dap or vimspector)
@@ -269,15 +270,22 @@ diagnostic points at the failing source line, parsed from the JUnit XML
 stack trace. Runs open the summary panel unless
 `setup{ test = { open_summary = false } }`.
 
-The classpath comes from jdtls, augmented for correctness: the test and
-runtime scopes are unioned (jdtls' test scope omits runtimeOnly deps that
-ByteBuddy/Mockito need), and gradle/maven CLI build outputs are added next
-to jdtls' eclipse `bin` output (which can be stale/incomplete). Production
-classes prefer the complete CLI build — so editing a production class needs
-a CLI rebuild — while edited test classes use jdtls' fresh `bin/test`. Before
-launching, jc waits for any in-flight jdtls indexing/compile to settle. Tests
-run on the JDK jdtls resolves for the project; set
-`java.configuration.runtimes` so it matches the project's Java version.
+The classpath comes from jdtls, with the test and runtime scopes unioned
+(jdtls' test scope omits runtimeOnly deps that ByteBuddy/Mockito need).
+
+By default (`precompile = false`) jc forces a jdtls compile
+(`java/buildWorkspace`), uses jdtls' `bin` output first and the gradle/maven
+`build/`-`target/` dirs as a fallback — fast, no build tool. When jdtls
+leaves classes out of `bin` (e.g. some spring-data repositories) a run fails
+with ClassNotFoundException; then set `setup{ test = { precompile = true } }`
+(or `:JCtestPrecompile`) to run `gradle :<module>:testClasses` /
+`mvn test-compile` first and use the complete build output instead.
+
+The run JVM is the configured `java.configuration.runtimes` entry matching
+the highest bytecode version among the module's classes (a 17-compiled test
+over an 11-target main still runs on 17, as gradle does), falling back to
+resolveJavaExecutable then PATH java. If jdtls keeps dropping classes from
+`bin`, `:JCutilWipeWorkspace` + restart often makes it complete again.
 
 `:JCtestRun`/`:JCtestFile` also work from a production class: if the current
 buffer is not a test file, jc runs its paired `<Class>Test` file (the same

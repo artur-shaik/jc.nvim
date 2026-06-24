@@ -142,6 +142,80 @@ function M.debug_classpath()
   vim.api.nvim_win_set_buf(0, buf)
 end
 
+-- diagnostic: why the runner picks a given JDK — dump the configured jdtls
+-- runtimes and what resolveJavaExecutable returns for several arg shapes
+function M.debug_java()
+  local lsp = require("jc.lsp")
+  local file = vim.api.nvim_buf_get_name(0)
+  local cls = vim.fn.fnamemodify(file, ":t:r")
+  local pkg = ""
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, 50, false)) do
+    local p = line:match("^%s*package%s+([%w_%.]+)%s*;")
+    if p then
+      pkg = p
+      break
+    end
+  end
+  local fqn = pkg ~= "" and (pkg .. "." .. cls) or cls
+  local module = file:match("^(.*)[/\\]src[/\\][^/\\]+[/\\]java[/\\]")
+  local project = module and vim.fn.fnamemodify(module, ":t") or ""
+
+  local lines = { "file: " .. file, "fqn: " .. fqn, "project (guess): " .. project, "" }
+
+  local client = lsp.get_jdtls_client()
+  local runtimes = client and vim.tbl_get(client.config or {}, "settings", "java", "configuration", "runtimes")
+  lines[#lines + 1] = "configured runtimes in client.config:"
+  if type(runtimes) == "table" and #runtimes > 0 then
+    for _, r in ipairs(runtimes) do
+      lines[#lines + 1] = string.format("  %s -> %s%s", r.name, r.path, r.default and "  (default)" or "")
+    end
+  else
+    lines[#lines + 1] = "  <none — runtimes config did not apply>"
+  end
+  lines[#lines + 1] = ""
+
+  local function exec_sync(args)
+    local done, result
+    lsp.executeCommand({ command = "vscode.java.resolveJavaExecutable", arguments = args }, function(r)
+      result, done = r, true
+    end, function()
+      result, done = "<error>", true
+    end)
+    vim.wait(8000, function()
+      return done
+    end, 50)
+    return vim.inspect(result)
+  end
+
+  lines[#lines + 1] = "resolveJavaExecutable results (jdtls default runtime):"
+  lines[#lines + 1] = '  ("", project)      = ' .. exec_sync({ "", project })
+  lines[#lines + 1] = "  (fqn, project)     = " .. exec_sync({ fqn, project })
+  lines[#lines + 1] = '  (fqn, "")          = ' .. exec_sync({ fqn, "" })
+  lines[#lines + 1] = ""
+
+  local nt = require("jc.neotest")
+  local mod = module and ("module: " .. module) or "module: <unknown>"
+  local ver = nt._module_java_version and module and nt._module_java_version(module)
+  lines[#lines + 1] = mod
+  lines[#lines + 1] = "detected bytecode java version: " .. tostring(ver)
+  lines[#lines + 1] = "=> runner launches with: " .. nt.resolve_java(file)
+
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
+  vim.api.nvim_win_set_buf(0, buf)
+end
+
+-- toggle the build-tool precompile step (setup{ test = { precompile } }) for
+-- the session: on for projects jdtls can't fully compile, off for the fast
+-- jdtls-only path
+function M.toggle_precompile()
+  local jc = require("jc")
+  jc.config.test = jc.config.test or {}
+  jc.config.test.precompile = not jc.config.test.precompile
+  vim.notify("jc: test precompile " .. (jc.config.test.precompile and "ON (gradle/maven)" or "OFF (jdtls)"))
+end
+
 -- download the JUnit Platform Console Standalone jar via maven
 function M.install()
   local launcher = require("jc.neotest.launcher")
