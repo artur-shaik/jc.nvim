@@ -112,6 +112,7 @@ with defaults.
   :JCgenerateConstructor     choose fields for constructor
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
+  :JCgotoTest                jump to the test class (or back), create if missing
   :JCtoggleAutoformat        toggle autoformat on save
   :JCdebugAttach             attach debugger (dap or vimspector)
   :JCdebugLaunch             launch debug session
@@ -150,6 +151,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   i  <C-j>m  generate abstract methods
   n  <p>n    new class prompt (DSL or wizard per class_prompt)
   n  <p>N    new class - step-by-step wizard
+  n  <p>t    jump to the test class (or back), create if missing
   n  <p>da   debug attach
   n  <p>dl   debug launch
   v  <p>re   extract variable, all occurrences (selection)

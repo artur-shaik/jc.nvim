@@ -1433,4 +1433,60 @@ function M.generate_class()
   end
 end
 
+-- the test/source counterpart of a java file: toggles the "Test" suffix and
+-- the src/main<->src/test source set, keeping the package. Pure (no fs).
+function M.test_counterpart(file)
+  local dir = vim.fn.fnamemodify(file, ":h")
+  local class = vim.fn.fnamemodify(file, ":t:r")
+  local target_class, from_set, to_set
+  if class:match("Test$") then
+    target_class, from_set, to_set = (class:gsub("Test$", "")), "test", "main"
+  else
+    target_class, from_set, to_set = class .. "Test", "main", "test"
+  end
+  local from = SEP .. "src" .. SEP .. from_set .. SEP .. "java"
+  local to = SEP .. "src" .. SEP .. to_set .. SEP .. "java"
+  local target_dir = dir:gsub(vim.pesc(from), to)
+  return target_dir .. SEP .. target_class .. ".java", target_class
+end
+
+-- the java package a source file sits in, derived from its path
+-- (.../src/<set>/java/<pkg>/Foo.java -> <pkg>), or "" for the default package
+function M.package_of(file)
+  local dir = vim.fn.fnamemodify(file, ":h")
+  local pkg = dir:match("[/\\]src[/\\][^/\\]+[/\\]java[/\\](.+)$")
+  return pkg and (pkg:gsub("[/\\]", ".")) or ""
+end
+
+-- jump to the test class of the current production class (or back); creates
+-- the file (and dirs) when it doesn't exist, filling it from a template
+-- (junit5 for a new test, class for a new source)
+function M.goto_test()
+  if vim.bo.filetype ~= "java" then
+    vim.notify("jc: not a java buffer", vim.log.levels.WARN)
+    return
+  end
+  local target, target_class = M.test_counterpart(vim.fn.expand("%:p"))
+  if vim.fn.filereadable(target) == 1 then
+    vim.cmd("edit " .. vim.fn.fnameescape(target))
+    return
+  end
+  local dir = vim.fn.fnamemodify(target, ":h")
+  if vim.fn.isdirectory(dir) ~= 1 then
+    pcall(vim.fn.mkdir, dir, "p")
+  end
+  vim.cmd("edit " .. vim.fn.fnameescape(target))
+  -- fill the fresh file from a template
+  local is_test = target_class:match("Test$") ~= nil
+  local rendered = templates.render(is_test and "junit5" or "class", {
+    name = target_class,
+    package = M.package_of(target),
+    fields = {},
+  })
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(rendered, "\n"))
+  vim.cmd("silent! normal! gg=G")
+  vim.cmd("silent! write")
+  vim.b.jc_new_java_file = true -- register with jdtls on first write
+end
+
 return M

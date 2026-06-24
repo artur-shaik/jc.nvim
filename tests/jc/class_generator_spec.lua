@@ -170,6 +170,42 @@ describe("class_generator parsing", function()
     end)
   end)
 
+  describe("test_counterpart", function()
+    it("production -> test: adds Test, src/main -> src/test", function()
+      local t = cg.test_counterpart("/p/app/src/main/java/kz/foo/Service.java")
+      assert.are.equal("/p/app/src/test/java/kz/foo/ServiceTest.java", t)
+    end)
+
+    it("test -> production: strips Test, src/test -> src/main", function()
+      local t = cg.test_counterpart("/p/app/src/test/java/kz/foo/ServiceTest.java")
+      assert.are.equal("/p/app/src/main/java/kz/foo/Service.java", t)
+    end)
+
+    it("non-maven layout: just toggles the Test suffix beside the file", function()
+      local t = cg.test_counterpart("/some/dir/Foo.java")
+      assert.are.equal("/some/dir/FooTest.java", t)
+    end)
+
+    it("package_of derives the package from a source path", function()
+      assert.are.equal("kz.foo.bar", cg.package_of("/p/app/src/test/java/kz/foo/bar/FooTest.java"))
+      assert.are.equal("", cg.package_of("/some/dir/Foo.java"))
+    end)
+
+    it("goto_test creates the test from the junit5 template", function()
+      local root = vim.fn.tempname()
+      vim.fn.mkdir(root .. "/src/main/java/kz/foo", "p")
+      vim.fn.writefile({ "package kz.foo;", "public class Svc {}" }, root .. "/src/main/java/kz/foo/Svc.java")
+      vim.cmd("edit " .. root .. "/src/main/java/kz/foo/Svc.java")
+      cg.goto_test()
+      local created = root .. "/src/test/java/kz/foo/SvcTest.java"
+      assert.are.equal(1, vim.fn.filereadable(created))
+      local body = table.concat(vim.fn.readfile(created), "\n")
+      assert.is_truthy(body:find("package kz.foo;", 1, true))
+      assert.is_truthy(body:find("public class SvcTest", 1, true))
+      assert.is_truthy(body:find("@Test", 1, true))
+    end)
+  end)
+
   describe("build_dsl", function()
     it("reassembles a parsed DSL back to its one-line form", function()
       local dsl = "singleton:[main]:/com.foo.Bar extends B implements I(String s):constructor:equals"

@@ -163,6 +163,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCgenerateConstructor` – choose fields for constructor;
 - `JCgenerateAbstractMethods` – generate abstract methods;
 - `JCgenerateClass` – start class generation user input prompt;
+- `JCgotoTest` – jump to the test class of the current class (or back), creating it if missing;
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
 - `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
 - `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
@@ -195,6 +196,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>m`, i `<C-j>m` | generate abstract methods |
 | n | `<p>n` | new class prompt (DSL or wizard per `class_prompt`) |
 | n | `<p>N` | new class — step-by-step wizard |
+| n | `<p>t` | jump to the test class (or back), creating it if missing |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
 | v | `<p>re` / `<p>rm` | extract variable (all occurrences) / method (selection) |
 | n | `<p>re` | extract variable, all occurrences (inferred at cursor) |
