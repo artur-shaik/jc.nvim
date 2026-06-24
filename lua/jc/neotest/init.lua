@@ -200,12 +200,19 @@ end
 -- jdtls classpath resolution is async; bridge to sync (neotest runs build_spec
 -- off the main loop, so vim.wait pumps the event loop safely).
 local function classpath_scope(uri, scope)
-  local cp
-  require("jc.tools").classpaths_for(uri, function(c)
-    cp = c
-  end, scope)
+  local cp, failed
+  require("jc.tools").classpaths_for(
+    uri,
+    function(c)
+      cp = c
+    end,
+    scope,
+    function()
+      failed = true
+    end
+  )
   if not vim.wait(20000, function()
-    return cp ~= nil
+    return cp ~= nil or failed
   end, 50) then
     return nil
   end
@@ -535,7 +542,12 @@ function adapter.build_spec(args)
 
   if #specs == 0 then
     vim.schedule(function()
-      vim.notify("jc: timed out resolving test classpath from jdtls", vim.log.levels.ERROR)
+      vim.notify(
+        "jc: jdtls couldn't resolve the test classpath — the project may still be "
+          .. "importing (e.g. just after :JCutilWipeWorkspace). Wait for jdtls to "
+          .. "finish, then re-run.",
+        vim.log.levels.WARN
+      )
     end)
     return nil
   end

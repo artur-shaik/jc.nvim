@@ -82,7 +82,16 @@ end
 -- runner always wants the test scope (it only ever launches test files, and a
 -- runtime classpath omits the test output, so the test class itself wouldn't
 -- be found).
-function M.classpaths_for(uri, fn, force_scope)
+-- on_error (optional): called instead of notifying when jdtls can't resolve
+-- the classpath (e.g. the project isn't imported yet) so callers can fail fast
+function M.classpaths_for(uri, fn, force_scope, on_error)
+  local function fail()
+    if on_error then
+      on_error()
+    else
+      vim.notify("jc: couldn't resolve project classpaths", vim.log.levels.ERROR)
+    end
+  end
   local function get(scope)
     lsp.executeCommand({
       command = "java.project.getClasspaths",
@@ -91,9 +100,9 @@ function M.classpaths_for(uri, fn, force_scope)
       if type(resp) == "table" and resp.classpaths then
         fn(resp.classpaths)
       else
-        vim.notify("jc: couldn't resolve project classpaths", vim.log.levels.ERROR)
+        fail()
       end
-    end)
+    end, on_error and fail or nil)
   end
   if force_scope then
     get(force_scope)
