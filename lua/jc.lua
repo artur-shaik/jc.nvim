@@ -51,6 +51,9 @@ function M.setup(args)
   if M.config.templates_dir then
     require("jc.templates").load_dir(M.config.templates_dir)
   end
+  if M.config.test and M.config.test.console_launcher_path then
+    require("jc.neotest.launcher").console_launcher_path = M.config.test.console_launcher_path
+  end
   if M.config.class_type_exclude then
     require("jc.class_generator").set_type_excludes(M.config.class_type_exclude)
   end
@@ -113,6 +116,14 @@ function M.setup(args)
       on_jdtls_attach(client, bufnr)
     end
   end
+end
+
+-- neotest adapter (optional). The user wires it into their own neotest
+-- config: require("neotest").setup({ adapters = { require("jc").neotest_adapter() } }).
+-- jc never requires neotest itself; loading this module presumes neotest is
+-- installed (it pulls in neotest.lib).
+function M.neotest_adapter()
+  return require("jc.neotest")
 end
 
 -- idempotent entry point for the FileType autocmd (autoload/jc.vim):

@@ -80,6 +80,25 @@ function M.check()
     health.info("jol jar not found in ~/.m2 — :JCutilJol will offer to download it via maven")
   end
 
+  -- test runner (optional neotest integration)
+  if #clients > 0 then
+    if client_has_command(clients[1], "java.project.getClasspaths") then
+      health.ok("classpath resolution available (test runner can launch tests)")
+    else
+      health.warn("java.project.getClasspaths not advertised — JCtest* runner won't resolve a classpath")
+    end
+  end
+  if pcall(require, "neotest") then
+    health.ok("neotest installed (wire require('jc').neotest_adapter() into its setup)")
+  else
+    health.info("neotest not installed — JCtest* commands are inert until you add nvim-neotest/neotest")
+  end
+  if require("jc.neotest.launcher").resolve_jar() then
+    health.ok("junit console launcher: " .. require("jc.neotest.launcher").console_launcher_path)
+  else
+    health.info("junit-platform-console-standalone jar not found — :JCtestInstall downloads it via maven")
+  end
+
   -- java treesitter parser (class generator uses it to resolve packages)
   if pcall(vim.treesitter.language.add, "java") then
     health.ok("treesitter java parser available")

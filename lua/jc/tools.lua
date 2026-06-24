@@ -76,10 +76,13 @@ local function resolve_classname()
   return classname
 end
 
--- project classpaths for the current buffer; scope depends on whether the
--- file is a test source
-local function with_classpaths(fn)
-  local uri = vim.uri_from_bufnr(0)
+-- project classpaths for an arbitrary file uri. Exported so the test runner
+-- can resolve a classpath for a file that isn't the current buffer. Pass
+-- force_scope ("test"/"runtime") to skip the isTestFile probe — the test
+-- runner always wants the test scope (it only ever launches test files, and a
+-- runtime classpath omits the test output, so the test class itself wouldn't
+-- be found).
+function M.classpaths_for(uri, fn, force_scope)
   local function get(scope)
     lsp.executeCommand({
       command = "java.project.getClasspaths",
@@ -92,13 +95,20 @@ local function with_classpaths(fn)
       end
     end)
   end
-  if vim.startswith(uri, "jdt://") then
+  if force_scope then
+    get(force_scope)
+  elseif vim.startswith(uri, "jdt://") then
     get("runtime")
   else
     lsp.executeCommand({ command = "java.project.isTestFile", arguments = { uri } }, function(is_test)
       get(is_test == true and "test" or "runtime")
     end)
   end
+end
+
+-- project classpaths for the current buffer
+local function with_classpaths(fn)
+  M.classpaths_for(vim.uri_from_bufnr(0), fn)
 end
 
 -- java executable of the project runtime; falls back to PATH

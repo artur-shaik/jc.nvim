@@ -18,7 +18,9 @@ adds:
 - add abstract methods to implementing class;
 - debug attach/launch via [nvim-dap](https://github.com/mfussenegger/nvim-dap) or [vimspector](https://github.com/puremourning/vimspector), with per-project host/port memory;
 - decompiled `jdt://` class contents view;
-- class creation methods from `jc2`.
+- class creation methods from `jc2`;
+- run JUnit tests through [neotest](https://github.com/nvim-neotest/neotest)
+  with the classpath resolved from jdtls (optional, see below).
 
 ## Installation
 
@@ -171,6 +173,14 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCrefactorExtractMethod` – extract method (visual range);
 - `JCrefactorStaticImport` – convert the call at the cursor to a static import (all occurrences);
 - `JCrefactorStaticImportEnum` – static-import every constant of the enum under the cursor;
+- `JCtestRun` – run the test at the cursor (neotest);
+- `JCtestFile` – run every test in the current file;
+- `JCtestSuite` – run every test under the working directory;
+- `JCtestLast` – re-run the last test position;
+- `JCtestStop` – stop the running test;
+- `JCtestSummary` – toggle the neotest summary panel;
+- `JCtestOutput` – open the output of the test at the cursor;
+- `JCtestInstall` – download the JUnit console launcher jar via maven;
 - `JCutilJshell` – execute java shell with project classpath;
 - `JCutilBytecode` – extract bytecode for class (javap);
 - `JCutilJol` – analyze object layout scheme using `jol.jar`.
@@ -197,6 +207,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>n` | new class prompt (DSL or wizard per `class_prompt`) |
 | n | `<p>N` | new class — step-by-step wizard |
 | n | `<p>t` | jump to the test class (or back), creating it if missing |
+| n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
+| n | `<p>Ts` / `<p>To` | toggle test summary / open test output |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
 | v | `<p>re` / `<p>rm` | extract variable (all occurrences) / method (selection) |
 | n | `<p>re` | extract variable, all occurrences (inferred at cursor) |
@@ -234,3 +246,67 @@ project packages for the path, `[subdir]` after a template, method flags
 (`constructor`/`toString`/...) once the class path is given, and — after
 `extends `/`implements ` — class/interface names resolved live from
 jdtls.
+
+## Test runner
+
+jc.nvim ships a [neotest](https://github.com/nvim-neotest/neotest) adapter.
+**neotest is an optional dependency** — without it the plugin works as
+before and the `JCtest*` commands warn instead of erroring. Unlike the
+gradle/maven-based adapters, this one resolves the test classpath straight
+from jdtls and runs the
+[JUnit Platform Console Standalone](https://junit.org/junit5/docs/current/user-guide/#running-tests-console-launcher)
+launcher, so there is no build-tool daemon to wait for and gradle/maven/plain
+layouts all work the same way.
+
+Add neotest as an optional dependency and wire the adapter into its setup:
+
+```lua
+{
+  "artur-shaik/jc.nvim",
+  ft = { "java" },
+  dependencies = {
+    "nvim-java/nvim-java",
+    {
+      "nvim-neotest/neotest",
+      optional = true,
+      dependencies = { "nvim-neotest/nvim-nio", "nvim-lua/plenary.nvim" },
+      opts = function(_, opts)
+        opts.adapters = opts.adapters or {}
+        table.insert(opts.adapters, require("jc").neotest_adapter())
+      end,
+    },
+  },
+  opts = { keys_prefix = "'j" },
+}
+```
+
+The launcher jar is looked up in `~/.m2`; if it is missing, run
+`:JCtestInstall` once (it downloads
+`org.junit.platform:junit-platform-console-standalone` via maven) or point
+jc at an existing jar:
+
+```lua
+require("jc").setup({
+  test = { console_launcher_path = "/path/to/junit-platform-console-standalone.jar" },
+})
+```
+
+Run tests with `:JCtestRun` (at the cursor), `:JCtestFile`, `:JCtestSuite`
+(everything under the cwd), `:JCtestLast`, or the `<p>T*` mappings; neotest
+paints the gutter green/red and a failed test's diagnostic points at the
+failing line. `:checkhealth jc` reports whether neotest and the launcher jar
+are present.
+
+`JCtestRun`/`JCtestFile` work from a production class too: when the current
+buffer isn't a test file, jc runs its paired `<Class>Test` file (the same
+counterpart `JCgotoTest` uses) if it exists on disk.
+
+The adapter toasts `running...` when a run starts and
+`N passed, M failed, K skipped` when it finishes (error level if anything
+failed) — neotest itself only updates signs, diagnostics and the summary
+panel, so these are the run notifications. The per-class toasts of one run
+are debounced into one each. Opt out with:
+
+```lua
+require("jc").setup({ test = { notify = false } })
+```

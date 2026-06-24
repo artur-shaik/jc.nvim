@@ -13,7 +13,8 @@ CONTENTS                                                          *jc-contents*
   5. Mappings ............................... |jc-mappings|
   6. Debugging .............................. |jc-debug|
   7. Class creation ......................... |jc-class-creation|
-  8. Health ................................. |jc-health|
+  8. Test runner ............................ |jc-test|
+  9. Health ................................. |jc-health|
 
 ==============================================================================
 1. INTRODUCTION                                               *jc-introduction*
@@ -113,6 +114,14 @@ with defaults.
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
   :JCgotoTest                jump to the test class (or back), create if missing
+  :JCtestRun                 run the test at the cursor (neotest)
+  :JCtestFile                run every test in the current file
+  :JCtestSuite               run every test under the working directory
+  :JCtestLast                re-run the last test position
+  :JCtestStop                stop the running test
+  :JCtestSummary             toggle the neotest summary panel
+  :JCtestOutput              open the output of the test at the cursor
+  :JCtestInstall             download the JUnit console launcher via maven
   :JCtoggleAutoformat        toggle autoformat on save
   :JCdebugAttach             attach debugger (dap or vimspector)
   :JCdebugLaunch             launch debug session
@@ -152,6 +161,12 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>n    new class prompt (DSL or wizard per class_prompt)
   n  <p>N    new class - step-by-step wizard
   n  <p>t    jump to the test class (or back), create if missing
+  n  <p>Tr   run the test at the cursor (neotest)
+  n  <p>Tf   run every test in the current file
+  n  <p>Ta   run every test under the working directory
+  n  <p>Tl   re-run the last test position
+  n  <p>Ts   toggle the neotest summary panel
+  n  <p>To   open the output of the test at the cursor
   n  <p>da   debug attach
   n  <p>dl   debug launch
   v  <p>re   extract variable, all occurrences (selection)
@@ -198,11 +213,53 @@ path, `[subdir]` after a template, the trailing flags once the path is
 given, and class/interface names from jdtls after `extends `/`implements `.
 
 ==============================================================================
-8. HEALTH                                                            *jc-health*
+8. TEST RUNNER                                                         *jc-test*
+
+jc.nvim provides a neotest (https://github.com/nvim-neotest/neotest)
+adapter. neotest is an OPTIONAL dependency — without it the plugin works
+unchanged and the `:JCtest*` commands warn instead of erroring.
+
+The adapter resolves the test classpath from jdtls
+(`java.project.getClasspaths`) and runs the JUnit Platform Console
+Standalone launcher, so no gradle/maven daemon is involved and
+gradle/maven/plain layouts behave identically.
+
+Wire the adapter into your neotest setup: >lua
+
+  require("neotest").setup({
+    adapters = { require("jc").neotest_adapter() },
+  })
+<
+The launcher jar is resolved from `~/.m2`. If absent, run `:JCtestInstall`
+once to download `org.junit.platform:junit-platform-console-standalone`
+via maven, or set it explicitly: >lua
+
+  require("jc").setup({
+    test = { console_launcher_path = "/path/to/launcher.jar" },
+  })
+<
+Run tests via `:JCtestRun` / `:JCtestFile` / `:JCtestSuite` / `:JCtestLast`
+or the `<p>T*` mappings. neotest paints the gutter and a failed test's
+diagnostic points at the failing source line, parsed from the JUnit XML
+stack trace.
+
+`:JCtestRun`/`:JCtestFile` also work from a production class: if the current
+buffer is not a test file, jc runs its paired `<Class>Test` file (the same
+counterpart `:JCgotoTest` uses) when it exists.
+
+The adapter toasts `running...` on start and `N passed, M failed, K skipped`
+on completion (neotest itself only paints signs/diagnostics). The per-class
+toasts of one run are debounced into one each. Disable with >lua
+
+  require("jc").setup({ test = { notify = false } })
+<
+
+==============================================================================
+9. HEALTH                                                            *jc-health*
 
 Run `:checkhealth jc` to verify: neovim version, attached jdtls client,
 organize-imports and java-debug availability, debug backends
-(nvim-dap/vimspector), jol jar, treesitter java parser and data dir
-permissions.
+(nvim-dap/vimspector), classpath resolution and neotest/launcher for the
+test runner, jol jar, treesitter java parser and data dir permissions.
 
 vim:tw=78:ts=8:noet:ft=help:norl:

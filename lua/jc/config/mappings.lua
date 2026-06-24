@@ -137,6 +137,15 @@ function M.install_mappings(conf, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rS", "<Cmd>lua require('jc.jdtls').static_import_enum()<CR>", opts)
   -- jump to the test class of the current production class (or back)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "t", "<Cmd>lua require('jc.class_generator').goto_test()<CR>", opts)
+
+  -- test runner (neotest, optional). Capital T to avoid the lowercase t
+  -- (goto_test) and ts (toString) bindings.
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tr", "<Cmd>lua require('jc.test').run_at_cursor()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tf", "<Cmd>lua require('jc.test').run_file()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Ta", "<Cmd>lua require('jc.test').run_all()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tl", "<Cmd>lua require('jc.test').run_last()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Ts", "<Cmd>lua require('jc.test').summary()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "To", "<Cmd>lua require('jc.test').output()<CR>", opts)
 end
 
 return M
