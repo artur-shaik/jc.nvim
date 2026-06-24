@@ -130,14 +130,19 @@ local function schedule_notify(tally)
   end)
 end
 
-adapter.root = lib.files.match_root_pattern(
-  "pom.xml",
-  "build.gradle",
-  "build.gradle.kts",
-  "settings.gradle",
-  "settings.gradle.kts",
-  ".git"
-)
+-- Root at the OUTERMOST project marker so a multi-module build is one neotest
+-- tree, not one per submodule (each submodule's own build.gradle would
+-- otherwise split the same project into several roots in the summary).
+function adapter.root(dir)
+  local settings = vim.fs.find(
+    { "settings.gradle", "settings.gradle.kts" },
+    { path = dir, upward = true, type = "file", limit = math.huge }
+  )
+  if #settings > 0 then
+    return vim.fs.dirname(settings[#settings])
+  end
+  return vim.fs.root(dir, { "build.gradle", "build.gradle.kts", "pom.xml", ".git" }) or dir
+end
 
 function adapter.filter_dir(name)
   return name ~= "build" and name ~= "target" and name ~= ".git" and name ~= "bin"
@@ -194,18 +199,116 @@ end
 
 -- jdtls classpath resolution is async; bridge to sync (neotest runs build_spec
 -- off the main loop, so vim.wait pumps the event loop safely).
-local function resolve_classpath(file)
-  local classpath
-  require("jc.tools").classpaths_for(vim.uri_from_fname(file), function(cp)
-    classpath = cp
-  end, "test")
+local function classpath_scope(uri, scope)
+  local cp
+  require("jc.tools").classpaths_for(uri, function(c)
+    cp = c
+  end, scope)
   if not vim.wait(20000, function()
-    return classpath ~= nil
+    return cp ~= nil
   end, 50) then
     return nil
   end
-  return classpath
+  return cp
 end
+
+-- gradle/maven output dirs paralleling a jdtls eclipse output dir
+-- (.../<module>/bin/<set>). They are added AFTER the jdtls "bin" dir so the
+-- fresh in-editor compile wins (edits take effect on save) and the CLI build
+-- only fills gaps: jdtls' incremental "bin" can be incomplete (missing classes
+-- -> ByteBuddy/Mockito NoClassDefFoundError), a CLI build has the full set
+-- under build/ or target/. The resource dirs also put application.yml etc. on
+-- the classpath for Spring.
+local function build_outputs(bin_dir)
+  local module, set = bin_dir:match("^(.*)[/\\]bin[/\\]([^/\\]+)$")
+  if not module then
+    return {}
+  end
+  local gset = set == "default" and "main" or set
+  local out = {
+    module .. "/build/classes/java/" .. gset,
+    module .. "/build/resources/" .. gset,
+    module .. (gset == "test" and "/target/test-classes" or "/target/classes"),
+  }
+  return out
+end
+
+-- union the test and runtime classpaths and prepend CLI build outputs for each
+-- project module. jdtls' "test" scope omits runtimeOnly deps (gradle's
+-- testRuntimeClasspath has them) and its "bin" output can lag a CLI build, so
+-- both gaps show up as "green from the CLI but ClassNotFound here". Order is
+-- preserved (build outputs first), duplicates dropped.
+local function resolve_classpath(file)
+  local uri = vim.uri_from_fname(file)
+  local test = classpath_scope(uri, "test")
+  if not test then
+    return nil
+  end
+  local runtime = classpath_scope(uri, "runtime") or {}
+
+  local seen, out = {}, {}
+  local function add(entry)
+    if entry ~= "" and not seen[entry] then
+      seen[entry] = true
+      out[#out + 1] = entry
+    end
+  end
+  local function add_build_outputs(entry)
+    for _, extra in ipairs(build_outputs(entry)) do
+      if vim.fn.isdirectory(extra) == 1 then
+        add(extra)
+      end
+    end
+  end
+
+  for _, list in ipairs({ test, runtime }) do
+    for _, entry in ipairs(list) do
+      local set = entry:match("[/\\]bin[/\\]([^/\\]+)$")
+      if set == "test" then
+        -- edited test classes must win, so jdtls' fresh bin/test goes first
+        -- and the CLI build is only a fallback
+        add(entry)
+        add_build_outputs(entry)
+      elseif set == "main" or set == "default" then
+        -- jdtls' bin/main can be a stale/incomplete compile; the CLI build is
+        -- a complete, internally consistent set of production classes, so it
+        -- wins (mid-session production edits need a CLI rebuild — rare; tests
+        -- are what people iterate on)
+        add_build_outputs(entry)
+        add(entry)
+      else
+        add(entry)
+      end
+    end
+  end
+  return out
+end
+
+-- the project's configured JDK (matching its Java compliance) rather than
+-- whatever `java` sits on PATH: running 11-target tests on a newer JVM can
+-- break old byte-buddy/Mockito (mock-creation failures the gradle toolchain
+-- run doesn't hit). Falls back to "java".
+local function resolve_java()
+  local java
+  require("jc.lsp").executeCommand({
+    command = "vscode.java.resolveJavaExecutable",
+    arguments = { "", "" },
+  }, function(j)
+    java = (type(j) == "string" and j ~= "") and j or "java"
+  end, function()
+    java = "java"
+  end)
+  if not vim.wait(10000, function()
+    return java ~= nil
+  end, 50) then
+    return "java"
+  end
+  return java
+end
+
+-- exposed for :JCtestDebugClasspath so the dump reflects the augmented
+-- classpath the runner actually launches with
+adapter.resolve_classpath = resolve_classpath
 
 function adapter.build_spec(args)
   local by_file = selectors_by_file(args.tree)
@@ -225,6 +328,17 @@ function adapter.build_spec(args)
     return nil
   end
 
+  -- let any in-flight jdtls indexing/compile (e.g. the recompile triggered by
+  -- saving the edited test) settle so we launch against fresh bin output
+  if require("jc.lsp").jdtls_busy() then
+    vim.schedule(function()
+      vim.notify("jc: waiting for jdtls to finish indexing...", vim.log.levels.INFO)
+    end)
+    require("jc.lsp").wait_until_idle(60000)
+  end
+
+  local java = resolve_java()
+
   -- one spec per file, each with that file's module classpath
   local specs = {}
   for file, selectors in pairs(by_file) do
@@ -234,6 +348,7 @@ function adapter.build_spec(args)
       vim.fn.mkdir(reports_dir, "p")
       specs[#specs + 1] = {
         command = launcher.build_command({
+          java = java,
           jar = jar,
           classpath = classpath,
           selectors = selectors,

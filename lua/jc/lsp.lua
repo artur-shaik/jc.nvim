@@ -63,6 +63,39 @@ function M.jdtls_notify(method, params)
   end
 end
 
+-- active jdtls work-done progress tokens; jdtls reports indexing/building via
+-- $/progress (surfaced by the LspProgress autocmd). Non-empty => jdtls is busy.
+local progress_tokens = {}
+
+-- fed from an LspProgress autocmd (see jc.setup); tracks only the jdtls client
+function M.note_progress(client_id, token, kind)
+  local jdtls = M.get_jdtls_client()
+  if not jdtls or client_id ~= jdtls.id or token == nil then
+    return
+  end
+  if kind == "end" then
+    progress_tokens[token] = nil
+  else
+    progress_tokens[token] = true
+  end
+end
+
+function M.jdtls_busy()
+  return next(progress_tokens) ~= nil
+end
+
+-- block until jdtls finishes its in-flight work (indexing/build) or the timeout
+-- elapses; returns true if idle. Safe to call from neotest's build_spec (off
+-- the main loop) — vim.wait pumps the event loop.
+function M.wait_until_idle(timeout_ms)
+  if not M.jdtls_busy() then
+    return true
+  end
+  return vim.wait(timeout_ms or 60000, function()
+    return not M.jdtls_busy()
+  end, 100)
+end
+
 function M.get_jdtls_client()
   local clients = vim.lsp.get_clients()
   for _, client in ipairs(clients) do

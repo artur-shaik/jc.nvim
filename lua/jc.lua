@@ -76,6 +76,20 @@ function M.setup(args)
     end,
   })
 
+  -- track jdtls indexing/build progress so the test runner can wait for it to
+  -- settle before launching (fresh classes). Field name differs across nvim
+  -- versions (params vs result).
+  vim.api.nvim_create_autocmd("LspProgress", {
+    group = group,
+    callback = function(a)
+      local d = a.data
+      local p = d and (d.params or d.result)
+      if p and p.value then
+        require("jc.lsp").note_progress(d.client_id, p.token, p.value.kind)
+      end
+    end,
+  })
+
   vim.api.nvim_create_autocmd("LspAttach", {
     group = group,
     callback = function(a)

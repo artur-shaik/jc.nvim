@@ -31,6 +31,27 @@ local function counterpart_test_file()
   return nil
 end
 
+-- open the neotest summary on a run (unless disabled) and expand the run
+-- target so the launched tests are visible without unfolding by hand. target
+-- is the file/dir position id; expansion is deferred so the tree is rendered.
+local function maybe_open_summary(nt, target)
+  local ok, jc = pcall(require, "jc")
+  local t = ok and jc.config and jc.config.test
+  if t and t.open_summary == false then
+    return
+  end
+  pcall(function()
+    nt.summary.open()
+  end)
+  if target then
+    vim.defer_fn(function()
+      pcall(function()
+        nt.summary:expand(target, true)
+      end)
+    end, 300)
+  end
+end
+
 function M.run_at_cursor()
   local nt = neotest()
   if not nt then
@@ -43,6 +64,7 @@ function M.run_at_cursor()
   else
     nt.run.run()
   end
+  maybe_open_summary(nt, counterpart or vim.fn.expand("%:p"))
 end
 
 function M.run_file()
@@ -50,7 +72,9 @@ function M.run_file()
   if not nt then
     return
   end
-  nt.run.run(counterpart_test_file() or vim.fn.expand("%:p"))
+  local file = counterpart_test_file() or vim.fn.expand("%:p")
+  nt.run.run(file)
+  maybe_open_summary(nt, file)
 end
 
 -- run every discovered test under the project root (build file / .git),
@@ -70,13 +94,16 @@ function M.run_all()
   }
   local root = vim.fs.root(0, markers) or vim.fn.getcwd()
   nt.run.run(root)
+  maybe_open_summary(nt, root)
 end
 
 function M.run_last()
   local nt = neotest()
-  if nt then
-    nt.run.run_last()
+  if not nt then
+    return
   end
+  nt.run.run_last()
+  maybe_open_summary(nt, vim.fn.expand("%:p"))
 end
 
 function M.stop()
@@ -100,20 +127,19 @@ function M.output()
   end
 end
 
--- diagnostic: dump the test-scope classpath jdtls resolves for the current
--- buffer (entry count + whether the buffer's own class dir is present)
+-- diagnostic: dump the augmented classpath the runner launches with for the
+-- current buffer (the same test+runtime union plus CLI build outputs)
 function M.debug_classpath()
-  local uri = vim.uri_from_bufnr(0)
-  require("jc.tools").classpaths_for(uri, function(cp)
-    local lines = { "jc test classpath for " .. uri, "entries: " .. #cp, "" }
-    for _, e in ipairs(cp) do
-      lines[#lines + 1] = e
-    end
-    local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
-    vim.api.nvim_win_set_buf(0, buf)
-  end, "test")
+  local file = vim.api.nvim_buf_get_name(0)
+  local cp = require("jc.neotest").resolve_classpath(file) or {}
+  local lines = { "jc test classpath for " .. file, "entries: " .. #cp, "" }
+  for _, e in ipairs(cp) do
+    lines[#lines + 1] = e
+  end
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
+  vim.api.nvim_win_set_buf(0, buf)
 end
 
 -- download the JUnit Platform Console Standalone jar via maven

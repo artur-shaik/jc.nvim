@@ -319,14 +319,36 @@ require("jc").setup({
 ```
 
 Run tests with `:JCtestRun` (at the cursor), `:JCtestFile`, `:JCtestSuite`
-(everything under the cwd), `:JCtestLast`, or the `<p>T*` mappings; neotest
-paints the gutter green/red and a failed test's diagnostic points at the
-failing line. `:checkhealth jc` reports whether neotest and the launcher jar
-are present.
+(everything under the project root), `:JCtestLast`, or the `<p>T*` mappings;
+neotest paints the gutter green/red and a failed test's diagnostic points at
+the failing line. The runs open the neotest summary panel — disable that with
+`setup{ test = { open_summary = false } }`. `:checkhealth jc` reports whether
+neotest and the launcher jar are present.
 
 `JCtestRun`/`JCtestFile` work from a production class too: when the current
 buffer isn't a test file, jc runs its paired `<Class>Test` file (the same
 counterpart `JCgotoTest` uses) if it exists on disk.
+
+### Classpath and freshness
+
+The classpath is built from jdtls and augmented for correctness:
+
+- **test + runtime scopes are unioned** — jdtls' `test` scope omits
+  `runtimeOnly` dependencies that ByteBuddy/Mockito need at run time
+  (otherwise "green from the CLI but `NoClassDefFoundError` here");
+- **CLI build outputs are added** alongside jdtls' eclipse `bin` output.
+  jdtls' incremental `bin` can be stale or incomplete; a gradle/maven build
+  under `build/`-`target/` is the complete set. For production classes the
+  CLI build wins (consistency), so editing a **production** class needs a CLI
+  rebuild to take effect; edited **test** classes use jdtls' fresh `bin/test`
+  and take effect immediately;
+- before launching, jc **waits for any in-flight jdtls indexing/compile** to
+  settle (e.g. the recompile triggered by saving the edited test), so a run
+  doesn't pick up stale `.class` files.
+
+Tests run on the JDK jdtls resolves for the project
+(`vscode.java.resolveJavaExecutable`); configure `java.configuration.runtimes`
+on your jdtls so it matches the project's Java version.
 
 The adapter toasts `running...` when a run starts and
 `N passed, M failed, K skipped` when it finishes (error level if anything
