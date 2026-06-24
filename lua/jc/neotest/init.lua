@@ -87,6 +87,17 @@ local function notify_enabled()
   return not (t and t.notify == false)
 end
 
+-- delay (ms) to auto-close the summary after an all-green run, or nil when
+-- disabled. setup{ test = { autoclose_summary = true | <ms> } }
+local function autoclose_delay()
+  local ok, jc = pcall(require, "jc")
+  local v = ok and jc.config and jc.config.test and jc.config.test.autoclose_summary
+  if v == true then
+    return 2000
+  end
+  return type(v) == "number" and v or nil
+end
+
 -- one "running" toast per logical run: the first build_spec of a run sets the
 -- flag, the completion toast clears it.
 local function notify_start()
@@ -126,6 +137,15 @@ local function schedule_notify(tally)
         string.format("jc tests: %d passed, %d failed, %d skipped", p.passed, p.failed, p.skipped),
         p.failed > 0 and vim.log.levels.ERROR or vim.log.levels.INFO
       )
+      -- all-green run: auto-close the summary after the configured delay
+      local delay = autoclose_delay()
+      if delay and p.failed == 0 and p.passed > 0 then
+        vim.defer_fn(function()
+          pcall(function()
+            require("neotest").summary.close()
+          end)
+        end, delay)
+      end
     end, 400)
   end)
 end

@@ -323,8 +323,10 @@ Run tests with `:JCtestRun` (at the cursor), `:JCtestFile`, `:JCtestSuite`
 (everything under the project root), `:JCtestLast`, or the `<p>T*` mappings;
 neotest paints the gutter green/red and a failed test's diagnostic points at
 the failing line. The runs open the neotest summary panel — disable that with
-`setup{ test = { open_summary = false } }`. `:checkhealth jc` reports whether
-neotest and the launcher jar are present.
+`setup{ test = { open_summary = false } }`, or auto-close it after an
+all-green run with `setup{ test = { autoclose_summary = true } }` (or a delay
+in ms, e.g. `autoclose_summary = 1500`; runs with failures stay open).
+`:checkhealth jc` reports whether neotest and the launcher jar are present.
 
 `JCtestRun`/`JCtestFile` work from a production class too: when the current
 buffer isn't a test file, jc runs its paired `<Class>Test` file (the same
