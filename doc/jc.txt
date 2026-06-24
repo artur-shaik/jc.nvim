@@ -268,8 +268,9 @@ Run tests via `:JCtestRun` / `:JCtestFile` / `:JCtestSuite` / `:JCtestLast`
 or the `<p>T*` mappings. neotest paints the gutter and a failed test's
 diagnostic points at the failing source line, parsed from the JUnit XML
 stack trace. Runs open the summary panel unless
-`setup{ test = { open_summary = false } }`; auto-close it after an all-green
-run with `setup{ test = { autoclose_summary = true } }` (or a delay in ms).
+`setup{ test = { open_summary = false } }`, and auto-close it after an
+all-green run (failures stay open). Disable the auto-close with
+`autoclose_summary = false` or set the delay in ms.
 
 The classpath comes from jdtls, with the test and runtime scopes unioned
 (jdtls' test scope omits runtimeOnly deps that ByteBuddy/Mockito need).
