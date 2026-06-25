@@ -621,26 +621,18 @@ function adapter.results(spec, result, tree)
       elseif runner_failed then
         results[d.id] = {
           status = "failed",
-          short = "test runner produced no report — see :JCtestOutput",
+          short = "test runner produced no report (exit " .. tostring(result.code) .. ") — see :JCtestOutput",
           output = result.output,
         }
+        -- count these so the run isn't treated as all-green (no auto-close)
+        tally.failed = tally.failed + 1
       end
     end
   end
 
-  if runner_failed then
-    if notify_enabled() then
-      running = false
-      vim.schedule(function()
-        vim.notify(
-          "jc tests: runner produced no report (exit " .. tostring(result.code) .. ") — :JCtestOutput for details",
-          vim.log.levels.ERROR
-        )
-      end)
-    end
-  else
-    schedule_notify(tally)
-  end
+  -- every spec's tally feeds the single debounced toast; failures here keep the
+  -- auto-close from firing on a run that actually had red
+  schedule_notify(tally)
 
   -- nothing in the tree was a test (e.g. a bare file/dir node): surface output
   if not next(results) then
