@@ -301,6 +301,9 @@ Add neotest as an optional dependency and wire the adapter into its setup:
       opts = function(_, opts)
         opts.adapters = opts.adapters or {}
         table.insert(opts.adapters, require("jc").neotest_adapter())
+        -- optional: auto-close the summary on green (see below)
+        opts.consumers = opts.consumers or {}
+        opts.consumers.jc = require("jc").neotest_consumer()
       end,
     },
   },
@@ -323,11 +326,22 @@ Run tests with `:JCtestRun` (at the cursor), `:JCtestFile`, `:JCtestSuite`
 (everything under the project root), `:JCtestLast`, or the `<p>T*` mappings;
 neotest paints the gutter green/red and a failed test's diagnostic points at
 the failing line. The runs open the neotest summary panel (disable with
-`setup{ test = { open_summary = false } }`) and auto-close it a moment after
-an all-green run — runs with failures stay open. Turn the auto-close off with
-`setup{ test = { autoclose_summary = false } }` or set the delay in ms
-(`autoclose_summary = 1500`). `:checkhealth jc` reports whether neotest and
-the launcher jar are present.
+`setup{ test = { open_summary = false } }`). `:checkhealth jc` reports whether
+neotest and the launcher jar are present.
+
+Wire the optional `jc` consumer (shown in the spec above) to auto-close the
+summary a moment after an all-green **focused** run (cursor / file / class) —
+runs with failures stay open. `:JCtestSuite` never auto-closes: neotest splits
+a whole-suite run into several independent sub-runs, so there is no reliable
+"the suite finished" moment (and you usually want to read a suite's summary).
+Turn the auto-close off with `setup{ test = { autoclose_summary = false } }`,
+or set the delay in ms (`autoclose_summary = 1500`).
+
+On a **multi-module** project `:JCtestSuite` is best-effort: neotest reruns
+`update_running` over the shared tree per sub-run, which can reset an
+already-failed class back to running in the summary. Iterate with the focused
+`:JCtestRun`/`:JCtestFile` commands, which run as a single neotest run and
+report reliably.
 
 `JCtestRun`/`JCtestFile` work from a production class too: when the current
 buffer isn't a test file, jc runs its paired `<Class>Test` file (the same

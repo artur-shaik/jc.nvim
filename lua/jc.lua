@@ -157,6 +157,14 @@ function M.neotest_adapter()
   return require("jc.neotest")
 end
 
+-- optional neotest consumer (auto-close summary on green). Wire alongside the
+-- adapter: neotest.setup({ consumers = { jc = require("jc").neotest_consumer() } }).
+-- The adapter can't see when a whole run ends; the consumer can, so auto-close
+-- lives here.
+function M.neotest_consumer()
+  return require("jc.neotest.consumer").consumer
+end
+
 -- idempotent entry point for the FileType autocmd (autoload/jc.vim):
 -- doesn't clobber an explicit setup{} done by the user's plugin manager
 function M.ensure_setup()
