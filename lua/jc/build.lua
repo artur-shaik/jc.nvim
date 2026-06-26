@@ -213,10 +213,15 @@ local function describe_goals(runner, root, prefix, on_goals)
   )
 end
 
-local function gradle_tasks(runner, root)
-  local res = vim
-    .system({ runner, "-q", "--console=plain", "tasks", "--all" }, { cwd = root, text = true })
-    :wait(120000)
+-- gradle task list for the whole build (scope nil) or one subproject
+local function gradle_tasks(runner, root, scope)
+  local cmd = { runner, "-q", "--console=plain" }
+  if scope then
+    table.insert(cmd, scope .. ":tasks")
+  else
+    vim.list_extend(cmd, { "tasks", "--all" })
+  end
+  local res = vim.system(cmd, { cwd = root, text = true }):wait(120000)
   local tasks = {}
   local seen = {}
   for line in (res.stdout or ""):gmatch("[^\n]+") do
@@ -307,9 +312,9 @@ local function pick_maven(build, root, run)
   end)
 end
 
-local function pick_gradle(build, root, run)
+local function pick_gradle(build, root, scope, run)
   vim.notify("jc: listing gradle tasks...", vim.log.levels.INFO)
-  local tasks = gradle_tasks(build.runner, root)
+  local tasks = gradle_tasks(build.runner, root, scope)
   if #tasks == 0 then
     vim.notify("jc: no gradle tasks found", vim.log.levels.WARN)
     return
@@ -330,7 +335,7 @@ function M.task()
       if build.tool == "maven" then
         pick_maven(build, root, run)
       else
-        pick_gradle(build, root, run)
+        pick_gradle(build, root, scope, run)
       end
     end
     if #modules == 0 then
