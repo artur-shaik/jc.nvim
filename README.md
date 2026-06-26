@@ -184,6 +184,13 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCtestOutput` – open the output of the test at the cursor;
 - `JCtestPrecompile` – toggle compiling with the build tool before a run;
 - `JCtestInstall` – download the JUnit console launcher jar via maven;
+- `JCbuildRun [args]` – run gradle/maven with the given args (or prompt, defaulting to the last run);
+- `JCbuildTask` – pick a module (or the whole project), then a task: gradle
+  tasks from `gradlew tasks`, or for maven the lifecycle phases, pom
+  profiles/plugin goals, and a plugin drill-down (`mvn help:describe` lists
+  every goal of the chosen plugin). The module scopes the run (gradle
+  `:module:task`, maven `-pl module -am`);
+- `JCbuildLast` – repeat the last build task;
 - `JCutilJshell` – execute java shell with project classpath;
 - `JCutilBytecode` – extract bytecode for class (javap);
 - `JCutilJol` – analyze object layout scheme using `jol.jar`.
@@ -211,6 +218,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>N` | new class — step-by-step wizard |
 | n | `<p>t` | jump to the test class (or back), creating it if missing |
 | n | `gf` | go to file, or the java file of the FQN under the cursor |
+| n | `<p>b` / `<p>B` | run gradle/maven (prompt) / pick a task |
 | n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
 | n | `<p>Ts` / `<p>To` | toggle test summary / open test output |
 | n | `<p>da` / `<p>dl` | debug attach / launch |

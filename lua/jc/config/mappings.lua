@@ -146,6 +146,10 @@ function M.install_mappings(conf, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tl", "<Cmd>lua require('jc.test').run_last()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Ts", "<Cmd>lua require('jc.test').summary()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "To", "<Cmd>lua require('jc.test').output()<CR>", opts)
+
+  -- gradle/maven task runner
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "b", "<Cmd>JCbuildRun<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "B", "<Cmd>JCbuildTask<CR>", opts)
 end
 
 return M

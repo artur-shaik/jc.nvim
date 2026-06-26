@@ -138,6 +138,13 @@ with defaults.
   :JCrefactorExtractMethod   extract method (visual range)
   :JCrefactorStaticImport    convert call at cursor to a static import
   :JCrefactorStaticImportEnum static-import every constant of the enum
+  :JCbuildRun [args]         run gradle/maven with args (or prompt, last default)
+  :JCbuildTask               pick a module (or whole project) then a task:
+                             gradle `tasks`, or for maven the lifecycle, pom
+                             profiles/plugin goals + a plugin drill-down via
+                             `mvn help:describe`; the module scopes the run
+                             (gradle `:mod:task`, maven `-pl mod -am`)
+  :JCbuildLast               repeat the last build task
   :JCutilJshell              run java shell with project classpath
   :JCutilBytecode            show bytecode for current class (javap)
   :JCutilJol                 analyze object layout (jol)
@@ -166,6 +173,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>N    new class - step-by-step wizard
   n  <p>t    jump to the test class (or back), create if missing
   n  gf      go to file, or the java file of the FQN under the cursor
+  n  <p>b    run gradle/maven (prompt, last default)
+  n  <p>B    pick a gradle task / maven goal
   n  <p>Tr   run the test at the cursor (neotest)
   n  <p>Tf   run every test in the current file
   n  <p>Ta   run every test under the working directory
