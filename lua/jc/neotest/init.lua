@@ -475,11 +475,14 @@ local function precompile(file)
   vim.schedule(function()
     vim.notify("jc: precompiling " .. label .. " (" .. tool .. ")...", vim.log.levels.INFO)
   end)
-  local latest = "starting..."
+  -- handlers receive the output, so vim.system no longer fills res.stdout —
+  -- accumulate it ourselves for the failure message
+  local latest, chunks = "starting...", {}
   local function on_data(_, data)
     if not data then
       return
     end
+    chunks[#chunks + 1] = data
     for line in data:gmatch("[^\r\n]+") do
       line = vim.trim(line)
       if line ~= "" then
@@ -507,7 +510,7 @@ local function precompile(file)
   vim.schedule(function()
     vim.api.nvim_echo({ { "", "" } }, false, {})
   end)
-  return res.code == 0, (res.stderr or "") .. (res.stdout or "")
+  return res.code == 0, table.concat(chunks)
 end
 
 -- exposed for :JCtestDebugClasspath / :JCtestDebugJava so the dumps reflect
@@ -553,8 +556,16 @@ function adapter.build_spec(args)
         local out
         compiled[module], out = precompile(file)
         if not compiled[module] then
+          -- build errors are at the tail of the output; show the last lines
+          local tail = vim.trim(out or "")
+          if #tail > 1500 then
+            tail = "..." .. tail:sub(-1500)
+          end
           vim.schedule(function()
-            vim.notify("jc: build failed before tests:\n" .. vim.trim(out or ""), vim.log.levels.ERROR)
+            vim.notify(
+              "jc: build failed for " .. (vim.fn.fnamemodify(module, ":t")) .. ":\n" .. tail,
+              vim.log.levels.ERROR
+            )
           end)
         end
       end
