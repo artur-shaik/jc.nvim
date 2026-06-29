@@ -39,6 +39,14 @@ local function set_suppress_autoclose(on)
   end)
 end
 
+-- fresh precompile each user-initiated run (pick up source edits)
+local function reset_run_state(suite)
+  set_suppress_autoclose(suite)
+  pcall(function()
+    require("jc.neotest").clear_precompile_cache()
+  end)
+end
+
 -- open the neotest summary on a run (unless disabled) and expand the run
 -- target so the launched tests are visible without unfolding by hand. target
 -- is the file/dir position id; expansion is deferred so the tree is rendered.
@@ -65,7 +73,7 @@ function M.run_at_cursor()
   if not nt then
     return
   end
-  set_suppress_autoclose(false)
+  reset_run_state(false)
   local counterpart = counterpart_test_file()
   if counterpart then
     vim.notify("jc: not a test file — running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
@@ -81,7 +89,7 @@ function M.run_file()
   if not nt then
     return
   end
-  set_suppress_autoclose(false)
+  reset_run_state(false)
   local file = counterpart_test_file() or vim.fn.expand("%:p")
   nt.run.run(file)
   maybe_open_summary(nt, file)
@@ -102,7 +110,7 @@ function M.run_all()
     "build.gradle.kts",
     ".git",
   }
-  set_suppress_autoclose(true)
+  reset_run_state(true)
   local root = vim.fs.root(0, markers) or vim.fn.getcwd()
   nt.run.run(root)
   maybe_open_summary(nt, root)
@@ -113,7 +121,7 @@ function M.run_last()
   if not nt then
     return
   end
-  set_suppress_autoclose(false)
+  reset_run_state(false)
   nt.run.run_last()
   maybe_open_summary(nt, vim.fn.expand("%:p"))
 end

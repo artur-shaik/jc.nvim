@@ -4,6 +4,7 @@
 -- the JUnit Platform Console Standalone launcher, then maps the XML report
 -- back onto neotest positions.
 local lib = require("neotest.lib")
+local nio = require("nio")
 
 local report = require("jc.neotest.report")
 local launcher = require("jc.neotest.launcher")
@@ -501,7 +502,13 @@ local function precompile(file)
     )
   end
 
-  local res = vim.system(cmd, { cwd = root, text = true, stdout = on_data, stderr = on_data }):wait(300000)
+  -- run async: a future yields the neotest nio task instead of blocking the UI
+  -- (vim.system():wait() would freeze the editor for the whole compile)
+  local future = nio.control.future()
+  vim.system(cmd, { cwd = root, text = true, stdout = on_data, stderr = on_data }, function(r)
+    future.set(r)
+  end)
+  local res = future.wait()
 
   if timer then
     timer:stop()
@@ -511,6 +518,14 @@ local function precompile(file)
     vim.api.nvim_echo({ { "", "" } }, false, {})
   end)
   return res.code == 0, table.concat(chunks)
+end
+
+-- precompile result per module, persisted across the (broken-down) build_spec
+-- calls of one run so a module is built once and a failure reported once.
+-- Cleared at the start of each user-initiated run (jc.test).
+local precompile_cache = {}
+function adapter.clear_precompile_cache()
+  precompile_cache = {}
 end
 
 -- exposed for :JCtestDebugClasspath / :JCtestDebugJava so the dumps reflect
@@ -544,18 +559,17 @@ function adapter.build_spec(args)
   end
 
   -- one spec per file, each with that file's module classpath and project JDK
-  local compiled = {}
   local specs = {}
   for file, selectors in pairs(by_file) do
-    -- precompile the module with its build tool (gradle/maven) once per run;
-    -- the complete build/ output then drives the classpath and JDK
+    -- precompile the module with its build tool once per run (cached across the
+    -- run's build_spec calls); a failed module isn't retried and reports once
     local ok_compile = true
     if pre then
       local module = module_dir(file) or file
-      if compiled[module] == nil then
-        local out
-        compiled[module], out = precompile(file)
-        if not compiled[module] then
+      if precompile_cache[module] == nil then
+        local ok, out = precompile(file)
+        precompile_cache[module] = { ok = ok }
+        if not ok then
           -- build errors are at the tail of the output; show the last lines
           local tail = vim.trim(out or "")
           if #tail > 1500 then
@@ -569,7 +583,7 @@ function adapter.build_spec(args)
           end)
         end
       end
-      ok_compile = compiled[module]
+      ok_compile = precompile_cache[module].ok
     end
 
     local classpath = ok_compile and resolve_classpath(file, pre)
