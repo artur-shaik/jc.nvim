@@ -445,21 +445,24 @@ end
 local function precompile(file)
   local root = adapter.root(file)
   local module = module_dir(file)
-  local cmd
+  local label = module and vim.fn.fnamemodify(module, ":t") or "project"
+  local tool, cmd
   if
     vim.fn.filereadable(root .. "/settings.gradle") == 1
     or vim.fn.filereadable(root .. "/settings.gradle.kts") == 1
     or vim.fn.filereadable(root .. "/build.gradle") == 1
     or vim.fn.filereadable(root .. "/build.gradle.kts") == 1
   then
+    tool = "gradle"
     local gw = root .. "/gradlew"
     cmd = vim.fn.executable(gw) == 1 and { gw } or { "gradle" }
     local gp = gradle_path(root, module)
     table.insert(cmd, gp and (gp .. ":testClasses") or "testClasses")
-    vim.list_extend(cmd, { "-q", "--console=plain" })
+    vim.list_extend(cmd, { "--console=plain" })
   elseif vim.fn.filereadable(root .. "/pom.xml") == 1 then
+    tool = "maven"
     local mw = root .. "/mvnw"
-    cmd = { vim.fn.executable(mw) == 1 and mw or "mvn", "-q", "test-compile" }
+    cmd = { vim.fn.executable(mw) == 1 and mw or "mvn", "-B", "test-compile" }
     if module and module ~= root then
       vim.list_extend(cmd, { "-pl", module:sub(#root + 2), "-am" })
     end
@@ -467,7 +470,43 @@ local function precompile(file)
     return true, "" -- unknown build system: don't block the run
   end
 
-  local res = vim.system(cmd, { cwd = root, text = true }):wait(300000)
+  -- progress feedback: a start toast, then the latest build line echoed in the
+  -- cmdline (updated in place — no notification spam) while it compiles
+  vim.schedule(function()
+    vim.notify("jc: precompiling " .. label .. " (" .. tool .. ")...", vim.log.levels.INFO)
+  end)
+  local latest = "starting..."
+  local function on_data(_, data)
+    if not data then
+      return
+    end
+    for line in data:gmatch("[^\r\n]+") do
+      line = vim.trim(line)
+      if line ~= "" then
+        latest = line
+      end
+    end
+  end
+  local timer = vim.uv.new_timer()
+  if timer then
+    timer:start(
+      400,
+      400,
+      vim.schedule_wrap(function()
+        vim.api.nvim_echo({ { "jc " .. tool .. " " .. label .. ": " .. latest, "Comment" } }, false, {})
+      end)
+    )
+  end
+
+  local res = vim.system(cmd, { cwd = root, text = true, stdout = on_data, stderr = on_data }):wait(300000)
+
+  if timer then
+    timer:stop()
+    timer:close()
+  end
+  vim.schedule(function()
+    vim.api.nvim_echo({ { "", "" } }, false, {})
+  end)
   return res.code == 0, (res.stderr or "") .. (res.stdout or "")
 end
 
