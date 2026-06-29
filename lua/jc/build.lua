@@ -226,6 +226,11 @@ local function gradle_tasks(runner, root, scope)
   local seen = {}
   for line in (res.stdout or ""):gmatch("[^\n]+") do
     local name = line:match("^([%w:_%-]+) %- ")
+    -- whole project: collapse :sub:task into the base name so picking
+    -- "compileJava" runs it across every subproject (gradle <task> at the root)
+    if name and not scope then
+      name = name:match("([^:]+)$")
+    end
     if name and not seen[name] then
       seen[name] = true
       tasks[#tasks + 1] = name
