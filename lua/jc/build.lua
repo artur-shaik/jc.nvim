@@ -64,13 +64,49 @@ local function detect(root)
   return nil
 end
 
+-- errorformat for javac (gradle) and maven compile errors
+local BUILD_EFM = table.concat({
+  "%E%f:%l: error: %m",
+  "%W%f:%l: warning: %m",
+  "%E[ERROR] %f:[%l\\,%c] %m",
+  "%-G%.%#",
+}, ",")
+
+-- parse the finished build's terminal output into the quickfix list; only
+-- touches the list (and opens it) when there are real file:line errors
+local function collect_errors(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local parsed = vim.fn.getqflist({ lines = lines, efm = BUILD_EFM }).items
+  local valid = vim.tbl_filter(function(item)
+    return item.valid == 1
+  end, parsed)
+  if #valid == 0 then
+    return
+  end
+  vim.fn.setqflist({}, " ", { title = "jc build", items = valid })
+  vim.cmd("botright copen")
+  vim.notify("jc: build has " .. #valid .. " error(s) — see quickfix", vim.log.levels.WARN)
+end
+
 local function term_run(cmd, cwd)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_win_set_buf(0, buf)
+  local opts = {
+    cwd = cwd,
+    on_exit = function()
+      vim.schedule(function()
+        collect_errors(buf)
+      end)
+    end,
+  }
   if vim.fn.has("nvim-0.11") == 1 then
-    vim.fn.jobstart(cmd, { term = true, cwd = cwd })
+    opts.term = true
+    vim.fn.jobstart(cmd, opts)
   else
-    vim.fn.termopen(cmd, { cwd = cwd }) ---@diagnostic disable-line: deprecated
+    vim.fn.termopen(cmd, opts) ---@diagnostic disable-line: deprecated
   end
 end
 

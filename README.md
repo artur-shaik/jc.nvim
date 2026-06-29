@@ -184,7 +184,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCtestOutput` – open the output of the test at the cursor;
 - `JCtestPrecompile` – toggle compiling with the build tool before a run;
 - `JCtestInstall` – download the JUnit console launcher jar via maven;
-- `JCbuildRun [args]` – run gradle/maven with the given args (or prompt, defaulting to the last run);
+- `JCbuildRun [args]` – run gradle/maven with the given args (or prompt, defaulting to the last run); compile errors land in the quickfix list;
 - `JCbuildTask` – pick a module (or the whole project), then a task: gradle
   tasks from `gradlew tasks`, or for maven the lifecycle phases, pom
   profiles/plugin goals, and a plugin drill-down (`mvn help:describe` lists

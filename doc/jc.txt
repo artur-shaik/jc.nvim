@@ -138,7 +138,8 @@ with defaults.
   :JCrefactorExtractMethod   extract method (visual range)
   :JCrefactorStaticImport    convert call at cursor to a static import
   :JCrefactorStaticImportEnum static-import every constant of the enum
-  :JCbuildRun [args]         run gradle/maven with args (or prompt, last default)
+  :JCbuildRun [args]         run gradle/maven with args (or prompt, last
+                             default); compile errors go to the quickfix list
   :JCbuildTask               pick a module (or whole project) then a task:
                              gradle `tasks`, or for maven the lifecycle, pom
                              profiles/plugin goals + a plugin drill-down via
