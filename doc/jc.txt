@@ -295,7 +295,10 @@ By default (`precompile = false`) jc forces a jdtls compile
 leaves classes out of `bin` (e.g. some spring-data repositories) a run fails
 with ClassNotFoundException; then set `setup{ test = { precompile = true } }`
 (or `:JCtestPrecompile`) to run `gradle :<module>:testClasses` /
-`mvn test-compile` first and use the complete build output instead.
+`mvn test-compile` first and use the complete build output instead. The
+precompile runs asynchronously with progress in the cmdline; a compile failure
+fills the quickfix list with the javac/maven errors (file:line) and skips the
+test run.
 
 The run JVM is the configured `java.configuration.runtimes` entry matching
 the highest bytecode version among the module's classes (a 17-compiled test

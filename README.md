@@ -373,7 +373,10 @@ The classpath is built from jdtls and augmented for correctness:
   `setup{ test = { precompile = true } }` (or toggle with `:JCtestPrecompile`):
   jc then runs `gradle :<module>:testClasses` / `mvn test-compile` first and
   uses the complete `build/`-`target/` output (dropping jdtls' `bin`). Slower
-  (build-tool latency) but reliable;
+  (build-tool latency) but reliable. The compile runs asynchronously (the
+  editor stays responsive, with progress in the cmdline) and is cached per
+  module for the run; on a compile failure the javac/maven errors are sent to
+  the quickfix list (jump to `file:line`) instead of running the tests;
 - the run JVM is the configured `java.configuration.runtimes` entry matching
   the **highest** bytecode version among the module's compiled classes (so a
   test compiled to 17 over an 11 `targetCompatibility` main still runs on a

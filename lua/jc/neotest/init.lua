@@ -443,6 +443,37 @@ local function precompile_enabled()
   return t and t.precompile == true
 end
 
+-- errorformat for javac (gradle) and maven compile errors
+local BUILD_EFM = table.concat({
+  "%E%f:%l: error: %m", -- gradle/javac: File.java:87: error: msg
+  "%W%f:%l: warning: %m",
+  "%E[ERROR] %f:[%l\\,%c] %m", -- maven: [ERROR] File.java:[87,16] msg
+  "%-G%.%#", -- ignore everything else
+}, ",")
+
+-- parse a failed build's output into the quickfix list (file:line) and open it;
+-- falls back to a notification with the output tail when nothing parsed
+local function report_build_errors(module, out)
+  local name = vim.fn.fnamemodify(module, ":t")
+  vim.schedule(function()
+    vim.fn.setqflist({}, " ", { title = "jc build: " .. name, lines = vim.split(out or "", "\n"), efm = BUILD_EFM })
+    local valid = vim.tbl_filter(function(item)
+      return item.valid == 1
+    end, vim.fn.getqflist())
+    if #valid > 0 then
+      vim.fn.setqflist({}, "r", { title = "jc build: " .. name, items = valid })
+      vim.cmd("botright copen")
+      vim.notify("jc: build failed for " .. name .. " — " .. #valid .. " error(s) in quickfix", vim.log.levels.ERROR)
+    else
+      local tail = vim.trim(out or "")
+      if #tail > 1500 then
+        tail = "..." .. tail:sub(-1500)
+      end
+      vim.notify("jc: build failed for " .. name .. ":\n" .. tail, vim.log.levels.ERROR)
+    end
+  end)
+end
+
 local function precompile(file)
   local root = adapter.root(file)
   local module = module_dir(file)
@@ -570,17 +601,7 @@ function adapter.build_spec(args)
         local ok, out = precompile(file)
         precompile_cache[module] = { ok = ok }
         if not ok then
-          -- build errors are at the tail of the output; show the last lines
-          local tail = vim.trim(out or "")
-          if #tail > 1500 then
-            tail = "..." .. tail:sub(-1500)
-          end
-          vim.schedule(function()
-            vim.notify(
-              "jc: build failed for " .. (vim.fn.fnamemodify(module, ":t")) .. ":\n" .. tail,
-              vim.log.levels.ERROR
-            )
-          end)
+          report_build_errors(module, out)
         end
       end
       ok_compile = precompile_cache[module].ok
