@@ -537,7 +537,12 @@ local function precompile(file)
   -- (vim.system():wait() would freeze the editor for the whole compile)
   local future = nio.control.future()
   vim.system(cmd, { cwd = root, text = true, stdout = on_data, stderr = on_data }, function(r)
-    future.set(r)
+    -- resolve on the main loop: vim.system's callback is a fast event context,
+    -- and resuming the task there would run the rest of build_spec (vim.fn.*)
+    -- where vimscript calls are forbidden (E5560)
+    vim.schedule(function()
+      future.set(r)
+    end)
   end)
   local res = future.wait()
 
