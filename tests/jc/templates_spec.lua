@@ -149,6 +149,24 @@ describe("templates", function()
     assert.is_truthy(out:find("@Test", 1, true))
   end)
 
+  it("entity: @Entity, @Id id, @Column on prompt fields, no imports", function()
+    local out = templates.render("entity", {
+      name = "User",
+      package = "p",
+      fields = {
+        { mod = "private", type = "String", name = "firstName" },
+        { mod = "private", type = "Long", name = "taxOrgId" },
+      },
+    })
+    assert.is_truthy(out:find("@Entity", 1, true))
+    -- @Id id comes before the prompt fields
+    assert.is_truthy(out:find('private Long id;.-@Column%(name = "first_name"'))
+    -- a blank line separates the annotated fields
+    assert.is_truthy(out:find('@Column%(name = "first_name"%)\nprivate String firstName;\n\n@Column'))
+    assert.is_truthy(out:find('@Column(name = "tax_org_id")\nprivate Long taxOrgId;', 1, true))
+    assert.is_nil(out:find("import ", 1, true)) -- imports come from the LSP, not the template
+  end)
+
   it("load_dir registers *.lua templates returning a function", function()
     local dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")

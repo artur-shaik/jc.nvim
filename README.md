@@ -92,7 +92,7 @@ slip through — add their prefixes here to suppress them, e.g.
 
 Built-in class templates: `class`, `interface`, `enum`, `record`,
 `annotation`, `exception`, `main`, `singleton`, `servlet`, `junit`,
-`junit5`, `service`, `component`, `repository`, `controller` and the
+`junit5`, `entity`, `service`, `component`, `repository`, `controller` and the
 `android_*` family.
 
 ### Custom templates

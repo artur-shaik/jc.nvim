@@ -43,13 +43,30 @@ local function package_line(opts)
 end
 
 -- field declarations; `suffix` is "" for "type name;" or "()" for interface
--- method-style "type name();"
-local function fields_block(opts, suffix)
+-- method-style "type name();". `annotate(field)` may return an annotation to
+-- place above each field (e.g. @Column for an entity).
+local function fields_block(opts, suffix, annotate)
+  local fields = opts.fields or {}
   local result = ""
-  for _, field in ipairs(opts.fields or {}) do
+  for i, field in ipairs(fields) do
+    if annotate then
+      local a = annotate(field)
+      if a and a ~= "" then
+        result = result .. a .. "\n"
+      end
+    end
     result = result .. field.mod .. " " .. field.type .. " " .. field.name .. (suffix or "") .. ";\n"
+    -- blank line between annotated fields for readability
+    if annotate and i < #fields then
+      result = result .. "\n"
+    end
   end
   return result
+end
+
+-- camelCase -> snake_case (for @Column names)
+local function snake_case(s)
+  return (s:gsub("(%l)(%u)", "%1_%2"):gsub("(%u)(%u%l)", "%1_%2")):lower()
 end
 
 -- spec values may be a string, a list of strings or a function returning
@@ -123,8 +140,13 @@ local function assemble(spec, opts)
   if kind.keyword == "enum" and opts.values and #opts.values > 0 then
     out = out .. table.concat(opts.values, ", ") .. ";\n"
   end
+  -- members that must precede the prompt fields (e.g. an entity's @Id id)
+  local pre = resolve_str(spec.pre_fields, opts)
+  if pre then
+    out = out .. pre .. "\n\n"
+  end
   if not kind.record then
-    out = out .. fields_block(opts, spec.kind == "interface" and "()" or "")
+    out = out .. fields_block(opts, spec.kind == "interface" and "()" or "", spec.field_annotation)
   end
   local body = resolve_str(spec.body, opts)
   if body then
@@ -216,6 +238,19 @@ local templates = {
       "static org.junit.jupiter.api.Assertions.*",
     },
     body = "@BeforeEach\nvoid setUp() {\n\n}\n\n@Test\nvoid test() {\n\n}",
+  },
+
+  -- JPA entity: @Entity with an @Id. Imports are intentionally omitted — the
+  -- creation chain runs organize-imports, which pulls the project's own
+  -- persistence package (jakarta.* or javax.*), so the template stays portable.
+  entity = {
+    annotations = "@Entity",
+    -- @Id id comes before the prompt fields
+    pre_fields = "@Id\n@GeneratedValue(strategy = GenerationType.IDENTITY)\nprivate Long id;",
+    -- annotate each prompt field with @Column(name = "<snake_case>")
+    field_annotation = function(field)
+      return '@Column(name = "' .. snake_case(field.name) .. '")'
+    end,
   },
 }
 

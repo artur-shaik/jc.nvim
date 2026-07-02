@@ -74,7 +74,7 @@ fields/flags), each step a short clean list — handy when long package
 paths get truncated in the cmdline completion popup.
                                                             *jc-templates*
 Built-in templates: class, interface, enum, record, annotation,
-exception, main, singleton, servlet, junit, junit5, service, component,
+exception, main, singleton, servlet, junit, junit5, entity, service, component,
 repository, controller, android_*.
 
 Custom templates live in `templates_dir` as `<name>.lua` files, each
