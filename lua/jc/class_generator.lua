@@ -1068,32 +1068,29 @@ local function current_source_root()
   return nil
 end
 
--- the source root an absolute package should be created under. Completion
--- offers packages from every module, so a picked package may belong to another
--- subproject; create the class where the package actually lives. Prefers the
--- current source root (a package shared by name, or a brand-new package),
--- otherwise the single module that already has it.
-local function source_root_for_package(pkg, fallback)
+-- source roots whose directory already contains `pkg` (completion offers
+-- packages from every module, so a picked one may live in another subproject)
+function M.roots_with_package(pkg)
   local rel = (pkg or ""):gsub("%.", SEP)
+  local out = {}
   if rel == "" then
-    return fallback
+    return out
   end
-  local cur = current_source_root()
-  local matches = {}
   for _, sr in ipairs(source_roots()) do
     if vim.fn.isdirectory(sr .. SEP .. rel) == 1 then
-      if sr == cur then
-        return cur
-      end
-      matches[#matches + 1] = sr
+      out[#out + 1] = sr
     end
   end
-  if #matches == 1 then
-    return matches[1]
-  end
-  return fallback
+  return out
 end
-M.source_root_for_package = source_root_for_package
+
+-- short module label for a source root: <module>[/<set>] (set omitted for main)
+local function module_label(sr)
+  local moddir = sr:gsub("[/\\]src[/\\][^/\\]+[/\\]java$", "")
+  local set = sr:match("[/\\]src[/\\]([^/\\]+)[/\\]java$")
+  local name = vim.fn.fnamemodify(moddir, ":t")
+  return (set and set ~= "main") and (name .. "/" .. set) or name
+end
 
 -- when the [..] slot names a subproject, resolve straight into its source
 -- root (no backtracking). returns data, nil (not a module) or false (module
@@ -1140,6 +1137,15 @@ local function restore_cmdline_pairs(saved)
   end
 end
 
+-- validate the class name and materialize the file
+local function finalize(data)
+  if not M.is_class_name(data.class) then
+    vim.notify("jc: no class name given (looks like a package) — request ignored", vim.log.levels.WARN)
+    return
+  end
+  create_class(data)
+end
+
 -- resolve a parsed DSL to class data and create the file (shared by the
 -- one-line prompt and the wizard)
 local function resolve_and_create(parsed)
@@ -1147,16 +1153,38 @@ local function resolve_and_create(parsed)
   if data == false then
     return -- module named but its source set is missing
   end
-  -- absolute path "/pkg.Class" -> the package literally, in the current
-  -- file's source root (predictable; no backtracking)
+
+  -- absolute path "/pkg.Class" -> the package literally, no backtracking. The
+  -- package may exist in another subproject (completion spans all modules); if
+  -- so, ask which module to create it in. Otherwise the current source root.
   local src_root = current_source_root()
   if data == nil and parsed.path_str:sub(1, 1) == "/" and not parsed.subdir and src_root then
-    -- if the picked package already lives in another subproject, create it
-    -- there instead of the current module
     local parts = vim.split(parsed.path_str:gsub("^/", ""), ".", { plain = true })
     local pkg = table.concat(slice(parts, 0, -2), ".")
-    data = direct_data(parsed, source_root_for_package(pkg, src_root))
+    local others = vim.tbl_filter(function(sr)
+      return sr ~= src_root
+    end, M.roots_with_package(pkg))
+    if #others == 0 then
+      return finalize(direct_data(parsed, src_root))
+    end
+    -- prompt: current first, then each module that has the package
+    local choices = { { label = module_label(src_root) .. " (current)", root = src_root } }
+    for _, sr in ipairs(others) do
+      choices[#choices + 1] = { label = module_label(sr), root = sr }
+    end
+    vim.ui.select(choices, {
+      prompt = "Package exists elsewhere — create in:",
+      format_item = function(c)
+        return c.label
+      end,
+    }, function(choice)
+      if choice then
+        finalize(direct_data(parsed, choice.root))
+      end
+    end)
+    return
   end
+
   if data == nil then
     -- relative path: resolve against the current file's package
     local current_package = vim.split(require("jc.treesitter").get_package() or "", ".", { plain = true })
@@ -1171,11 +1199,7 @@ local function resolve_and_create(parsed)
     data.current_path = SEP .. table.concat(current_path, SEP) .. SEP
   end
 
-  if not M.is_class_name(data.class) then
-    vim.notify("jc: no class name given (looks like a package) — request ignored", vim.log.levels.WARN)
-    return
-  end
-  create_class(data)
+  finalize(data)
 end
 
 -- the one-line DSL prompt with cmdline completion
