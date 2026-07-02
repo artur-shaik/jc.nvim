@@ -96,6 +96,10 @@ local function term_run(cmd, cwd)
   vim.api.nvim_win_set_buf(0, buf)
   local opts = {
     cwd = cwd,
+    -- wide pty so long "file:line: error:" lines aren't hard-wrapped by the
+    -- terminal (which would split them across buffer lines and break the efm
+    -- parse); the buffer keeps the full lines, display scrolls horizontally
+    width = math.max(vim.o.columns, 320),
     on_exit = function()
       vim.schedule(function()
         collect_errors(buf)
