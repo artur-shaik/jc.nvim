@@ -92,8 +92,14 @@ local function collect_errors(buf)
 end
 
 local function term_run(cmd, cwd)
+  -- open the build in a dedicated bottom split (not in the current window, so
+  -- the code view is kept); `q` closes just this split
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_win_set_buf(0, buf)
+  vim.cmd("botright split")
+  local win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.api.nvim_win_set_height(win, 15)
+  vim.keymap.set("n", "q", "<Cmd>close<CR>", { buffer = buf, nowait = true, silent = true })
   local opts = {
     cwd = cwd,
     -- wide pty so long "file:line: error:" lines aren't hard-wrapped by the
