@@ -69,14 +69,30 @@ function M.parse(token)
   return nil
 end
 
--- the FQN-ish token at the cursor: the WORD, falling back to the whole line
--- (a stack frame may sit past the cursor's WORD).
+-- the FQN-ish token at the cursor. Tries the WORD, the whole line, then the
+-- line joined with its neighbour — a pty (terminal) hard-wraps a long stack
+-- frame across two buffer lines with no separator, so the FQN can be split.
+-- M.parse validates strictly, so a wrong join simply doesn't match.
 local function token_at_cursor()
-  local word = vim.fn.expand("<cWORD>")
-  if M.parse(word) then
-    return word
+  local row = vim.api.nvim_win_get_cursor(0)[1]
+  local function line(n)
+    return n >= 1 and (vim.api.nvim_buf_get_lines(0, n - 1, n, false))[1] or nil
   end
-  return vim.api.nvim_get_current_line()
+  local cur = vim.api.nvim_get_current_line()
+  local nxt, prev = line(row + 1), line(row - 1)
+  local candidates = { vim.fn.expand("<cWORD>"), cur }
+  if nxt then
+    candidates[#candidates + 1] = cur .. nxt
+  end
+  if prev then
+    candidates[#candidates + 1] = prev .. cur
+  end
+  for _, candidate in ipairs(candidates) do
+    if M.parse(candidate) then
+      return candidate
+    end
+  end
+  return cur
 end
 
 -- filesystem fallback: map the FQN onto <source-root>/<pkg>/Class.java
