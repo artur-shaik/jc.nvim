@@ -1068,6 +1068,33 @@ local function current_source_root()
   return nil
 end
 
+-- the source root an absolute package should be created under. Completion
+-- offers packages from every module, so a picked package may belong to another
+-- subproject; create the class where the package actually lives. Prefers the
+-- current source root (a package shared by name, or a brand-new package),
+-- otherwise the single module that already has it.
+local function source_root_for_package(pkg, fallback)
+  local rel = (pkg or ""):gsub("%.", SEP)
+  if rel == "" then
+    return fallback
+  end
+  local cur = current_source_root()
+  local matches = {}
+  for _, sr in ipairs(source_roots()) do
+    if vim.fn.isdirectory(sr .. SEP .. rel) == 1 then
+      if sr == cur then
+        return cur
+      end
+      matches[#matches + 1] = sr
+    end
+  end
+  if #matches == 1 then
+    return matches[1]
+  end
+  return fallback
+end
+M.source_root_for_package = source_root_for_package
+
 -- when the [..] slot names a subproject, resolve straight into its source
 -- root (no backtracking). returns data, nil (not a module) or false (module
 -- named but the requested source set is missing -> abort)
@@ -1124,7 +1151,11 @@ local function resolve_and_create(parsed)
   -- file's source root (predictable; no backtracking)
   local src_root = current_source_root()
   if data == nil and parsed.path_str:sub(1, 1) == "/" and not parsed.subdir and src_root then
-    data = direct_data(parsed, src_root)
+    -- if the picked package already lives in another subproject, create it
+    -- there instead of the current module
+    local parts = vim.split(parsed.path_str:gsub("^/", ""), ".", { plain = true })
+    local pkg = table.concat(slice(parts, 0, -2), ".")
+    data = direct_data(parsed, source_root_for_package(pkg, src_root))
   end
   if data == nil then
     -- relative path: resolve against the current file's package

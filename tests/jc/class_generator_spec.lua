@@ -296,6 +296,21 @@ describe("class_generator parsing", function()
       assert.is_nil(cg.module_data(cg.parse_input("[test]:Bar")))
     end)
 
+    it("absolute package existing in another module resolves there", function()
+      local root = make_multimodule() -- current file: app/src/main/java/Cur.java
+      local app_src = root .. "/app/src/main/java"
+      vim.fn.mkdir(root .. "/model/src/main/java/kz/only", "p")
+      vim.fn.mkdir(app_src .. "/kz/shared", "p")
+      vim.fn.mkdir(root .. "/model/src/main/java/kz/shared", "p")
+
+      -- package only in model -> model's source root
+      assert.is_truthy(cg.source_root_for_package("kz.only", app_src):find("model/src/main/java", 1, true))
+      -- shared name, present in current -> current (app)
+      assert.is_truthy(cg.source_root_for_package("kz.shared", app_src):find("app/src/main/java", 1, true))
+      -- brand-new package -> fallback (current)
+      assert.are.equal(app_src, cg.source_root_for_package("kz.brandnew", app_src))
+    end)
+
     it("package completion after [module] is scoped to that module", function()
       local root = make_multimodule()
       vim.fn.mkdir(root .. "/model/src/main/java/m/dto", "p")
