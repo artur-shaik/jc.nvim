@@ -105,6 +105,8 @@ with defaults.
   :JCimportsOrganizeSmart    organize imports, auto-pick remembered
                              candidates
   :JCimportsOrganize         organize imports with manual selection
+  :JCimportsReplace          replace the import of the type under the cursor,
+                             picking among same-named classes
   :JCgenerateToString        generate toString() with field selection
   :JCgenerateHashCodeAndEquals  generate hashCode() and equals()
   :JCgenerateAccessors       choose fields for accessors generation
@@ -188,6 +190,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>re   extract variable, all occurrences (inferred at cursor)
   v  <p>rm   extract method
   n  <p>rs   convert call to a static import (all occurrences)
+  n  <p>rp   replace the import of the type under the cursor (pick same-named)
   n  <p>rS   static-import every constant of the enum at the cursor
 
 ==============================================================================

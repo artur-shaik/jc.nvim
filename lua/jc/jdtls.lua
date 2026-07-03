@@ -537,4 +537,86 @@ function M.read_class_content(uri)
   vim.lsp.buf_attach_client(bufnr, client.id)
 end
 
+-- LSP SymbolKind: Class=5, Enum=10, Interface=11 (annotations are interfaces)
+local TYPE_KINDS = { [5] = true, [10] = true, [11] = true }
+
+-- replace the buffer's import for the simple type `name` with `fqn`, or add one
+local function set_import(bufnr, name, fqn)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local pkg_line, last_import, existing
+  for i, l in ipairs(lines) do
+    if l:match("^%s*package%s+") then
+      pkg_line = i
+    elseif l:match("^%s*import%s+") then
+      last_import = i
+      if l:match("^%s*import%s+[%w_.]+%." .. name .. "%s*;") then
+        existing = i
+      end
+    end
+  end
+  local new = "import " .. fqn .. ";"
+  if existing then
+    vim.api.nvim_buf_set_lines(bufnr, existing - 1, existing, false, { new })
+  elseif last_import then
+    vim.api.nvim_buf_set_lines(bufnr, last_import, last_import, false, { new })
+  else
+    local at = pkg_line or 0
+    vim.api.nvim_buf_set_lines(bufnr, at, at, false, { pkg_line and "" or nil, new })
+  end
+end
+
+M._set_import = set_import
+
+-- replace the imported package of the type under the cursor: find every class
+-- with the same simple name via jdtls and pick which one to import instead
+-- (e.g. cursor on @Value -> choose between lombok.Value and spring's Value).
+function M.replace_import()
+  local name = vim.fn.expand("<cword>")
+  if name == "" or not name:match("^%u[%w_$]*$") then
+    vim.notify("jc: put the cursor on a type name", vim.log.levels.WARN)
+    return
+  end
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+  client:request("workspace/symbol", { query = name }, function(err, result)
+    if err or type(result) ~= "table" then
+      vim.schedule(function()
+        vim.notify("jc: no types named " .. name .. " found", vim.log.levels.WARN)
+      end)
+      return
+    end
+    local seen, fqns = {}, {}
+    for _, sym in ipairs(result) do
+      local uri = sym.location and sym.location.uri or ""
+      local container = sym.containerName or ""
+      local enclosing = container:match("[^.]+$")
+      local nested = uri:find("%$") ~= nil or (enclosing ~= nil and enclosing:match("^%u") ~= nil)
+      local importable = uri:match("^jdt:") ~= nil or uri:match("^file:") ~= nil
+      if sym.name == name and TYPE_KINDS[sym.kind] and importable and not nested and container ~= "" then
+        local fqn = container .. "." .. sym.name
+        if not seen[fqn] then
+          seen[fqn] = true
+          fqns[#fqns + 1] = fqn
+        end
+      end
+    end
+    table.sort(fqns)
+    vim.schedule(function()
+      if #fqns == 0 then
+        vim.notify("jc: no importable types named " .. name, vim.log.levels.WARN)
+        return
+      end
+      vim.ui.select(fqns, { prompt = "Import " .. name .. " from:" }, function(choice)
+        if choice then
+          set_import(bufnr, name, choice)
+        end
+      end)
+    end)
+  end)
+end
+
 return M

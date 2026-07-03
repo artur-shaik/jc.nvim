@@ -156,6 +156,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCdebugWithConfig` – start debug session using predefined vimspector's configuration;
 - `JCimportsOrganizeSmart` – automatically organize imports using regular classes list;
 - `JCimportsOrganize` – automatically organize imports choosing from available classes list;
+- `JCimportsReplace` – replace the import of the type under the cursor, picking among same-named classes (e.g. swap `lombok.Value` for spring's `Value`);
 - `JCgenerateToString` – choose fields and method to generate `toString`;
 - `JCgenerateHashCodeAndEquals` – choose fields to generate `hashCode` and `equals`;
 - `JCgenerateAccessors` – choose fields for accessors generation;
@@ -225,6 +226,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | v | `<p>re` / `<p>rm` | extract variable (all occurrences) / method (selection) |
 | n | `<p>re` | extract variable, all occurrences (inferred at cursor) |
 | n | `<p>rs` | convert call to static import (all occurrences) |
+| n | `<p>rp` | replace the import of the type under the cursor (pick same-named) |
 | n | `<p>rS` | static-import every constant of the enum at the cursor |
 
 ## Class creation

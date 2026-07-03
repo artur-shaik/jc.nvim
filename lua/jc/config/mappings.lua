@@ -135,6 +135,8 @@ function M.install_mappings(conf, bufnr)
   )
   -- convert every constant of the enum under the cursor to a static import
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rS", "<Cmd>lua require('jc.jdtls').static_import_enum()<CR>", opts)
+  -- replace the import of the type under the cursor (pick among same-named types)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rp", "<Cmd>JCimportsReplace<CR>", opts)
   -- jump to the test class of the current production class (or back)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "t", "<Cmd>lua require('jc.class_generator').goto_test()<CR>", opts)
 
