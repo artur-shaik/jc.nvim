@@ -137,27 +137,35 @@ function M.generate_abstractMethods()
   local curbuf = vim.api.nvim_get_current_buf()
   local diagnostics = {}
   local line = 0
-  for _, diagnostic in ipairs(vim.diagnostic.get(0)) do
-    if diagnostic.code == "67109264" then
-      if line == 0 then
-        line = diagnostic.lnum
+  local function push(diagnostic)
+    if line == 0 then
+      line = diagnostic.lnum
+    end
+    table.insert(diagnostics, {
+      code = diagnostic.code,
+      message = diagnostic.message,
+      severity = 1,
+      source = "Java",
+      range = {
+        start = { character = diagnostic.col, line = diagnostic.lnum },
+        ["end"] = { character = diagnostic.end_col, line = diagnostic.end_lnum },
+      },
+    })
+  end
+  -- "must implement the inherited abstract method" is code 67109264, but jdtls
+  -- may send it as a number and the code can shift across versions — match it
+  -- loosely, then fall back to any error diagnostic
+  local all = vim.diagnostic.get(0)
+  for _, diagnostic in ipairs(all) do
+    if tostring(diagnostic.code) == "67109264" then
+      push(diagnostic)
+    end
+  end
+  if #diagnostics == 0 then
+    for _, diagnostic in ipairs(all) do
+      if diagnostic.severity == vim.diagnostic.severity.ERROR then
+        push(diagnostic)
       end
-      table.insert(diagnostics, {
-        code = diagnostic.code,
-        message = diagnostic.message,
-        severity = 1,
-        source = "Java",
-        range = {
-          start = {
-            character = diagnostic.col,
-            line = diagnostic.lnum,
-          },
-          ["end"] = {
-            character = diagnostic.end_col,
-            line = diagnostic.end_lnum,
-          },
-        },
-      })
     end
   end
   -- no unimplemented methods -> nothing to do, but keep the chain moving
