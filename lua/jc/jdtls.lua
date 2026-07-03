@@ -133,7 +133,17 @@ function M.generate_accessors(fields)
   end
 end
 
-function M.generate_abstractMethods()
+-- an "implement the inherited abstract method" diagnostic. Code is 67109264
+-- but jdtls may send it as a number and the value can shift across versions,
+-- so also accept the message text (avoids catching transient import errors).
+local function is_abstract_method_diag(d)
+  return tostring(d.code) == "67109264"
+    or (d.message ~= nil and (d.message:find("must implement", 1, true) or d.message:find("must override", 1, true)))
+end
+
+-- wait: when a class was just created with a supertype, jdtls may not have
+-- published the diagnostic yet — retry a few times before giving up
+function M.generate_abstractMethods(wait, attempt)
   local curbuf = vim.api.nvim_get_current_buf()
   local diagnostics = {}
   local line = 0
@@ -152,24 +162,21 @@ function M.generate_abstractMethods()
       },
     })
   end
-  -- "must implement the inherited abstract method" is code 67109264, but jdtls
-  -- may send it as a number and the code can shift across versions — match it
-  -- loosely, then fall back to any error diagnostic
-  local all = vim.diagnostic.get(0)
-  for _, diagnostic in ipairs(all) do
-    if tostring(diagnostic.code) == "67109264" then
+  for _, diagnostic in ipairs(vim.diagnostic.get(0)) do
+    if is_abstract_method_diag(diagnostic) then
       push(diagnostic)
     end
   end
   if #diagnostics == 0 then
-    for _, diagnostic in ipairs(all) do
-      if diagnostic.severity == vim.diagnostic.severity.ERROR then
-        push(diagnostic)
-      end
+    -- on a freshly-created class the diagnostic may not be published yet; retry
+    -- a few times before concluding there are no unimplemented methods
+    attempt = attempt or 0
+    if wait and attempt < 8 then
+      vim.defer_fn(function()
+        M.generate_abstractMethods(true, attempt + 1)
+      end, 400)
+      return
     end
-  end
-  -- no unimplemented methods -> nothing to do, but keep the chain moving
-  if #diagnostics == 0 then
     lsp.advance_chain()
     return
   end

@@ -475,8 +475,10 @@ local function queue_generation(data)
       require("jc.jdtls").generate_constructor(nil, nil, { default = false })
     end)
   end
+  -- wait for jdtls diagnostics on a freshly-created class that has a supertype
+  local has_supertype = (data.extends and data.extends ~= "") or (data.implements and data.implements ~= "")
   chains:add(function()
-    require("jc.jdtls").generate_abstractMethods()
+    require("jc.jdtls").generate_abstractMethods(has_supertype)
   end)
   if not is_interface and data.fields then
     chains:add(function()
