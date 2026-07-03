@@ -567,6 +567,25 @@ end
 
 M._set_import = set_import
 
+-- remember `fqn` as the preferred import for the simple type `name` in
+-- smart-organize: drop any other remembered FQN with the same simple name and
+-- add the chosen one
+local function remember_regular(name, fqn)
+  local regulars = regular_imports()
+  local known = regulars:load()
+  local already = false
+  for _, v in ipairs(known) do
+    if v == fqn then
+      already = true
+    elseif v:match("[^.]+$") == name then
+      regulars:remove(v)
+    end
+  end
+  if not already then
+    regulars:add(fqn)
+  end
+end
+
 -- replace the imported package of the type under the cursor: find every class
 -- with the same simple name via jdtls and pick which one to import instead
 -- (e.g. cursor on @Value -> choose between lombok.Value and spring's Value).
@@ -613,6 +632,8 @@ function M.replace_import()
       vim.ui.select(fqns, { prompt = "Import " .. name .. " from:" }, function(choice)
         if choice then
           set_import(bufnr, name, choice)
+          -- remember it for smart organize-imports
+          remember_regular(name, choice)
         end
       end)
     end)
