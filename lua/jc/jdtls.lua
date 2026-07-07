@@ -479,14 +479,23 @@ end
 -- delete the jdtls workspace (-data dir, i.e. the eclipse index — the
 -- usual fix for a corrupted project state) and restart the server with
 -- the same configuration, whoever owns it (nvim-java, lspconfig, ...)
+-- delete the workspace and bring jdtls back up when no client is attached
+-- (jdtls failed to start — the very case a wipe is meant to fix): reload the
+-- java buffer so FileType/LspAttach starts a fresh server
+local function wipe_without_client(data_dir)
+  vim.fn.delete(data_dir, "rf")
+  vim.notify("jc: workspace wiped: " .. data_dir, vim.log.levels.INFO)
+  if vim.bo.filetype == "java" and not vim.bo.modified then
+    vim.cmd("silent! edit")
+  else
+    vim.notify("jc: reopen a java file (or restart nvim) to start jdtls", vim.log.levels.INFO)
+  end
+end
+
 function M.wipe_workspace()
   local client = lsp.get_jdtls_client()
-  if not client then
-    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
-    return
-  end
   local data_dir
-  if type(client.config.cmd) == "table" then
+  if client and type(client.config.cmd) == "table" then
     data_dir = data_dir_from_args(client.config.cmd)
   end
   data_dir = data_dir or data_dir_from_proc() or data_dir_from_nvim_java()
@@ -495,10 +504,13 @@ function M.wipe_workspace()
     return
   end
   vim.ui.select({ "Yes", "No" }, {
-    prompt = "Delete jdtls workspace " .. data_dir .. " and restart LSP?",
+    prompt = "Delete jdtls workspace " .. data_dir .. (client and " and restart LSP?" or " (no client)?"),
   }, function(choice)
     if choice ~= "Yes" then
       return
+    end
+    if not client then
+      return wipe_without_client(data_dir)
     end
     local config = client.config
     local client_id = client.id

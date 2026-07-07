@@ -171,7 +171,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCgotoFqn` – open the java file for the FQN under the cursor (like `gf` for fully-qualified names);
 - `JCtoggleAutoformat` – enable/disable autoformat file on save;
 - `JCutilUpdateConfig` – re-read project configuration (pom/gradle);
-- `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server;
+- `JCutilWipeWorkspace` – delete the jdtls workspace (eclipse index) and restart the server; works even when no jdtls client is attached (i.e. it failed to start — the case a wipe usually fixes);
 - `JCrefactorExtractVar` – extract variable (all occurrences);
 - `JCrefactorExtractMethod` – extract method (visual range);
 - `JCrefactorStaticImport` – convert the call at the cursor to a static import (all occurrences);
