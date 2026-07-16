@@ -122,6 +122,7 @@ with defaults.
   :JCtestRun                 run the test at the cursor (neotest)
   :JCtestFile                run every test in the current file
   :JCtestSuite               run every test under the working directory
+  :JCtestPick                pick a test class from the whole project and run it
   :JCtestLast                re-run the last test position
   :JCtestStop                stop the running test
   :JCtestSummary             toggle the neotest summary panel
@@ -182,6 +183,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>Tr   run the test at the cursor (neotest)
   n  <p>Tf   run every test in the current file
   n  <p>Ta   run every test under the working directory
+  n  <p>Tp   pick a test class from the whole project and run it
   n  <p>Tl   re-run the last test position
   n  <p>Ts   toggle the neotest summary panel
   n  <p>To   open the output of the test at the cursor

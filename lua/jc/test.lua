@@ -126,6 +126,57 @@ function M.run_last()
   maybe_open_summary(nt, vim.fn.expand("%:p"))
 end
 
+-- project root: the outermost gradle settings (multi-module) or nearest build
+local function project_root()
+  local here = vim.fn.expand("%:p:h")
+  if here == "" then
+    here = vim.fn.getcwd()
+  end
+  local sg = vim.fs.find(
+    { "settings.gradle", "settings.gradle.kts" },
+    { upward = true, path = here, type = "file", limit = math.huge }
+  )
+  if #sg > 0 then
+    return vim.fs.dirname(sg[#sg])
+  end
+  return vim.fs.root(here, { "pom.xml", "build.gradle", "build.gradle.kts", ".git" }) or vim.fn.getcwd()
+end
+
+-- :JCtestPick — pick a test class from every src/test/java in the project
+function M.pick()
+  local nt = neotest()
+  if not nt then
+    return
+  end
+  local root = project_root()
+  local files = vim.fn.glob(root .. "/**/src/test/java/**/*.java", true, true)
+  if #files == 0 then
+    vim.notify("jc: no test sources found under " .. root, vim.log.levels.WARN)
+    return
+  end
+  local items = {}
+  for _, path in ipairs(files) do
+    -- .../src/test/java/<pkg>/Class.java -> pkg.Class
+    local fqn = path:gsub(".*[/\\]src[/\\]test[/\\]java[/\\]", ""):gsub("%.java$", ""):gsub("[/\\]", ".")
+    items[#items + 1] = { label = fqn, path = path }
+  end
+  table.sort(items, function(a, b)
+    return a.label < b.label
+  end)
+  vim.ui.select(items, {
+    prompt = "Run test",
+    format_item = function(item)
+      return item.label
+    end,
+  }, function(item)
+    if item then
+      reset_run_state(false)
+      nt.run.run(item.path)
+      maybe_open_summary(nt, item.path)
+    end
+  end)
+end
+
 function M.stop()
   local nt = neotest()
   if nt then

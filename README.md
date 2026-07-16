@@ -179,6 +179,7 @@ fires `:JCutilUpdateConfig` for them on first write automatically. Set it to
 - `JCtestRun` – run the test at the cursor (neotest);
 - `JCtestFile` – run every test in the current file;
 - `JCtestSuite` – run every test under the working directory;
+- `JCtestPick` – pick a test class from every `src/test/java` in the project and run it;
 - `JCtestLast` – re-run the last test position;
 - `JCtestStop` – stop the running test;
 - `JCtestSummary` – toggle the neotest summary panel;
@@ -221,6 +222,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `gf` | go to file, or the java file of the FQN under the cursor |
 | n | `<p>b` / `<p>B` | run gradle/maven (prompt) / pick a task |
 | n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
+| n | `<p>Tp` | pick a test class from the whole project and run it |
 | n | `<p>Ts` / `<p>To` | toggle test summary / open test output |
 | n | `<p>da` / `<p>dl` | debug attach / launch |
 | v | `<p>re` / `<p>rm` | extract variable (all occurrences) / method (selection) |
