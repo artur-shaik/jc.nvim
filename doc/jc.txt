@@ -1,4 +1,4 @@
-*jc.txt*  Java code generation layer over an external jdtls
+*jc.txt*  A Java productivity layer over an external jdtls
 
 Author:  Artur Shaik
 License: same as the plugin repository
@@ -11,11 +11,13 @@ CONTENTS                                                          *jc-contents*
   3. Setup .................................. |jc-setup|
   4. Commands ............................... |jc-commands|
   5. Mappings ............................... |jc-mappings|
-  6. Debugging .............................. |jc-debug|
-  7. Class creation ......................... |jc-class-creation|
-  8. Go to file by FQN ...................... |jc-goto-fqn|
-  9. Test runner ............................ |jc-test|
-  10. Health ................................ |jc-health|
+  6. Class creation ......................... |jc-class-creation|
+  7. Templates .............................. |jc-templates|
+  8. Test runner ............................ |jc-test|
+  9. Build runner ........................... |jc-build|
+  10. Go to file by FQN ..................... |jc-goto-fqn|
+  11. Debugging ............................. |jc-debug|
+  12. Health ................................ |jc-health|
 
 ==============================================================================
 1. INTRODUCTION                                               *jc-introduction*
@@ -29,10 +31,15 @@ nvim-lspconfig) and provides:
 - code generation: `toString`, `hashCode`/`equals`, constructors,
   accessors, with interactive field selection;
 - adding unimplemented (abstract) methods;
+- template-based class creation (|jc-class-creation|);
+- a JUnit test runner via neotest (|jc-test|);
+- a gradle/maven task runner (|jc-build|);
+- extract variable/method and static-import refactorings;
+- go to a file by its fully-qualified name (|jc-goto-fqn|);
 - debug attach/launch via nvim-dap or vimspector with per-project
-  host/port memory;
+  host/port memory (|jc-debug|);
 - decompiled `jdt://` class contents view;
-- template-based class creation (|jc-class-creation|).
+- classpath-aware javap/jshell/jol utilities.
 
 ==============================================================================
 2. REQUIREMENTS                                               *jc-requirements*
@@ -72,24 +79,17 @@ Call `setup` (or use the `opts` table of lazy.nvim): >lua
 vim.ui flow (template -> module -> package -> name -> extends/implements/
 fields/flags), each step a short clean list — handy when long package
 paths get truncated in the cmdline completion popup.
-                                                            *jc-templates*
-Built-in templates: class, interface, enum, record, annotation,
-exception, main, singleton, servlet, junit, junit5, entity, service, component,
-repository, controller, android_*.
 
-Custom templates live in `templates_dir` as `<name>.lua` files, each
-returning either a declarative spec table or a function(opts) -> string.
-A spec describes only the essence; the engine assembles the package,
-declaration, extends/implements and fields. Example: >lua
+`class_type_exclude` adds package prefixes to hide from the extends/
+implements/field-type completion (workspace symbols include non-importable
+types; nested/shaded/internal ones are dropped automatically, but
+package-private types in ordinary packages can slip through).
 
-  -- jc-templates/dto.lua
-  return { imports = { "lombok.Data" }, annotations = { "@Data" } }
-<
-Spec fields (all optional): kind (class|interface|enum|annotation|
-record), modifiers, extends, implements, imports, annotations, body.
-imports/annotations/body may be a string, list or function(opts). User
-input for extends/implements overrides the spec defaults. opts: name,
-package, fields ({mod,type,name}), extends, implements.
+`test` sub-options (see |jc-test|): `precompile` (compile with the build
+tool before a run, default false), `notify`, `open_summary`,
+`autoclose_summary`, `console_launcher_path`.
+
+For templates see |jc-templates|.
                                                               *jc-legacy-vars*
 The legacy global variables `g:jc_default_mappings`,
 `g:jc_autoformat_on_save`, `g:jc_debug_backend` and `g:jc_basedir` are
@@ -197,27 +197,13 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>rS   static-import every constant of the enum at the cursor
 
 ==============================================================================
-6. DEBUGGING                                                          *jc-debug*
-
-`JCdebugAttach`/`JCdebugLaunch` route to a backend:
-
-1. `debug_backend` option / `g:jc_debug_backend` if set
-   ("dap" or "vimspector");
-2. auto: nvim-dap installed and vimspector absent -> dap;
-3. fallback: vimspector.
-
-Attach asks for host and port (defaults remembered per project under
-the data dir). The adapter port is resolved from jdtls via
-`vscode.java.startDebugSession`, which requires the java-debug bundle.
-
-==============================================================================
-7. CLASS CREATION                                            *jc-class-creation*
+6. CLASS CREATION                                            *jc-class-creation*
 
 Prompt scheme: >
 
   template:[subdir]:/package.ClassName extends Super implements If(String s, public Integer i):constructor:toString:equals
 <
-- template (optional): junit, interface, exception, servlet, ...;
+- template (optional): junit5, record, entity, service, ... (|jc-templates|);
 - subdir (optional): source-set or subproject. `[test]` -> current
   module's src/test/java; `[module]` / `[module/test]` -> that
   subproject's source root (multi-module projects);
@@ -233,29 +219,40 @@ The prompt completes with <Tab>: templates and project packages for the
 path, `[subdir]` after a template, the trailing flags once the path is
 given, and class/interface names from jdtls after `extends `/`implements `.
 
-==============================================================================
-8. GO TO FILE BY FQN                                               *jc-goto-fqn*
-
-`:JCgotoFqn` (and an overridden `gf`) opens the java source for a
-fully-qualified name under the cursor — useful from a terminal, a neotest
-output window or a pasted stack trace. Recognised tokens:
-
-- bare FQN `com.foo.Bar` (and `com.foo.Bar$Inner` -> the outer file);
-- FQN with a member `com.foo.Bar.method` -> the `Bar` file;
-- line suffix `com.foo.Bar:42`;
-- stack frame `at com.foo.Bar.method(Bar.java:25)` -> `Bar`, line 25.
-
-The file opens in the last window that showed a java buffer (so it can be
-triggered from a terminal split and land in the editing window), or a new
-tab when there is none. The FQN is resolved through jdtls' symbol index,
-with a source-tree fallback.
-
-With `default_mappings` enabled, `gf` is overridden globally to do this and
-falls back to the builtin `gf` when the token is not an FQN (e.g. a real
-path). Disable the override with `setup{ map_gf = false }`.
+Completion offers packages from every subproject. If the chosen absolute
+package already lives in another module, jc asks which module to create the
+class in; a brand-new package goes to the current module.
 
 ==============================================================================
-9. TEST RUNNER                                                         *jc-test*
+7. TEMPLATES                                                     *jc-templates*
+
+Built-in: class, interface, enum, record, annotation, exception, main,
+singleton, servlet, junit, junit5, entity, service, component, repository,
+controller, android_*.
+
+The `entity` template carries @Entity and an @Id id, and annotates each
+prompt field with `@Column(name = "<snake_case>")`. Imports are left to
+organize-imports (run automatically after creation), so it works for both
+`jakarta.*` and `javax.*` projects.
+
+Custom templates live in `templates_dir` as `<name>.lua` files, each
+returning either a declarative spec table (recommended) or a
+function(opts) -> string. A spec describes only the essence; the engine
+assembles the package, declaration, extends/implements and fields: >lua
+
+  -- jc-templates/dto.lua
+  return { imports = { "lombok.Data" }, annotations = { "@Data" } }
+<
+Spec fields (all optional): kind (class|interface|enum|annotation|record),
+modifiers, extends, implements, imports, annotations, body, pre_fields
+(members before the prompt fields), field_annotation (function(field) ->
+string). imports/annotations/body may each be a string, list or
+function(opts). User input for extends/implements overrides the spec
+defaults. opts: name, package, fields ({mod,type,name}), extends,
+implements.
+
+==============================================================================
+8. TEST RUNNER                                                         *jc-test*
 
 jc.nvim provides a neotest (https://github.com/nvim-neotest/neotest)
 adapter. neotest is an OPTIONAL dependency — without it the plugin works
@@ -325,7 +322,61 @@ toasts of one run are debounced into one each. Disable with >lua
 <
 
 ==============================================================================
-10. HEALTH                                                           *jc-health*
+9. BUILD RUNNER                                                       *jc-build*
+
+Run gradle/maven tasks from the editor in a dedicated split (`q` closes it);
+compile errors are parsed into the quickfix list (jump to file:line).
+
+- `:JCbuildRun [args]` — run with args, or prompt (defaulting to the last
+  run, remembered per project);
+- `:JCbuildTask` — pick a module (or the whole project), then a task: gradle
+  tasks from `gradlew tasks`, or for maven the lifecycle phases, pom
+  profiles/plugin goals and a plugin drill-down via `mvn help:describe`. The
+  module scopes the run (gradle `:module:task`, maven `-pl module -am`);
+- `:JCbuildLast` — repeat the last task.
+
+Commands run from the reactor root (outermost contiguous pom /
+settings.gradle), so multi-module builds resolve paths and the reactor
+correctly.
+
+==============================================================================
+10. GO TO FILE BY FQN                                              *jc-goto-fqn*
+
+`:JCgotoFqn` (and an overridden `gf`) opens the java source for a
+fully-qualified name under the cursor — useful from a terminal, a neotest
+output window or a pasted stack trace. Recognised tokens:
+
+- bare FQN `com.foo.Bar` (and `com.foo.Bar$Inner` -> the outer file);
+- FQN with a member `com.foo.Bar.method` -> the `Bar` file;
+- line suffix `com.foo.Bar:42`;
+- stack frame `at com.foo.Bar.method(Bar.java:25)` -> `Bar`, line 25
+  (rejoined even when a narrow terminal wrapped it across two lines).
+
+The file opens in the last window that showed a java buffer (so it can be
+triggered from a terminal split and land in the editing window), or a new
+tab when there is none. The FQN is resolved through jdtls' symbol index,
+with a source-tree fallback.
+
+With `default_mappings` enabled, `gf` is overridden globally to do this and
+falls back to the builtin `gf` when the token is not an FQN (e.g. a real
+path). Disable the override with `setup{ map_gf = false }`.
+
+==============================================================================
+11. DEBUGGING                                                        *jc-debug*
+
+`JCdebugAttach`/`JCdebugLaunch` route to a backend:
+
+1. `debug_backend` option / `g:jc_debug_backend` if set
+   ("dap" or "vimspector");
+2. auto: nvim-dap installed and vimspector absent -> dap;
+3. fallback: vimspector.
+
+Attach asks for host and port (defaults remembered per project under
+the data dir). The adapter port is resolved from jdtls via
+`vscode.java.startDebugSession`, which requires the java-debug bundle.
+
+==============================================================================
+12. HEALTH                                                           *jc-health*
 
 Run `:checkhealth jc` to verify: neovim version, attached jdtls client,
 organize-imports and java-debug availability, debug backends
