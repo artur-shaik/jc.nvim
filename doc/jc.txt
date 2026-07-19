@@ -213,8 +213,30 @@ Prompt scheme: >
 - extends/implements classes are imported automatically;
 - field list: `private` by default, modifiers can be given. For the `enum`
   template the (...) slot lists constants instead: enum:/p.Day(MON, TUE);
-- trailing flags: constructor, toString, equals, hashCode.
+- trailing flags (see below).
 
+Trailing `:flag` segments run after the class is created.
+Code-generation flags (via jdtls): constructor, toString, hashCode, equals.
+Lombok flags (add the annotation + import instead of generating code):
+  lombok / lombokData -> @Data           lombokNoArgs      -> @NoArgsConstructor
+  lombokValue         -> @Value          lombokAllArgs     -> @AllArgsConstructor
+  lombokBuilder       -> @Builder        lombokRequiredArgs-> @RequiredArgsConstructor
+  lombokGetter        -> @Getter         lombokToString    -> @ToString
+  lombokSetter        -> @Setter         lombokEqualsHashCode -> @EqualsAndHashCode
+  lombokSlf4j         -> @Slf4j
+Flags combine, e.g. `:lombokData:lombokBuilder`.
+
+Examples: >
+  /com.app.User(String name, int age)           a class with two fields
+  /com.app.User(String s):constructor:toString   + constructor and toString
+  record:/com.app.Point(int x, int y)            a record
+  entity:/com.app.Order(String number)           @Entity with @Id and @Column
+  enum:/com.app.Status(NEW, PAID)                an enum with constants
+  service:/com.app.OrderService                  an @Service class
+  /com.app.Dto(String id):lombokData             a @Data class
+  [test]:/com.app.UserTest                        a class under src/test/java
+  [core]:/com.app.Foo                             a class in the core module
+<
 The prompt completes with <Tab>: templates and project packages for the
 path, `[subdir]` after a template, the trailing flags once the path is
 given, and class/interface names from jdtls after `extends `/`implements `.

@@ -307,37 +307,85 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 
 ## Class creation
 
-The one-line DSL:
+`:JCgenerateClass` (`<p>n`) opens a one-line prompt. The scheme, slot by slot:
 
 ```
-template:[subdir]:/package.ClassName extends Super implements If(String s, public Integer i):constructor:toString:equals
+ template :  [subdir] :  /package.ClassName  extends X implements Y  (fields)  :flags
+ └── 1 ──┘  └── 2 ──┘  └─────── 3 ───────┘  └──────── 4 ───────┘  └── 5 ──┘  └─ 6 ─┘
 ```
 
-| Slot | Meaning |
+| # | Slot | Meaning |
+|---|---|---|
+| 1 | `template:` | *(optional)* a template — `record`, `entity`, `service`, `junit5`, … (see [Templates](#templates)) |
+| 2 | `[subdir]:` | *(optional)* a source-set or subproject (see below) |
+| 3 | `/package.Name` | class name and package. Leading `/` = absolute in the source root; without it, relative to the current file's package |
+| 4 | `extends`/`implements` | *(optional)* supertypes, imported automatically |
+| 5 | `(fields)` | *(optional)* `type name`, comma-separated, `private` by default. For `enum` this slot lists the constants |
+| 6 | `:flags` | *(optional)* code-gen and lombok flags (see below) |
+
+Everything except the class name is optional — `/com.app.User` alone makes an
+empty class.
+
+### Examples
+
+| Prompt | Creates |
 |---|---|
-| `template:` | *(optional)* a template name — `junit5`, `record`, `entity`, `service`, … |
-| `[subdir]:` | *(optional)* a source-set or subproject — see below |
-| `/package.Name` | class name and package (leading `/` = absolute; without it, relative to the current file's package) |
-| `extends`/`implements` | *(optional)* supertypes, imported automatically |
-| `(fields)` | *(optional)* `private` by default; for `enum` this slot lists the constants (`enum:/p.Day(MON, TUE)`) |
-| `:flags` | *(optional)* `constructor`, `toString`, `hashCode`, `equals` |
+| `/com.app.User(String name, int age)` | a `User` class with two fields |
+| `/com.app.User(String name):constructor:toString` | …plus an all-args constructor and `toString` |
+| `record:/com.app.Point(int x, int y)` | a `record Point(int x, int y)` |
+| `entity:/com.app.Order(String number)` | an `@Entity` with an `@Id` id and `@Column` fields |
+| `interface:/com.app.OrderRepo extends CrudRepository` | an interface extending `CrudRepository` |
+| `enum:/com.app.Status(NEW, PAID, SHIPPED)` | an enum with those constants |
+| `service:/com.app.OrderService` | an `@Service` class |
+| `/com.app.UserDto(String id, String name):lombokData` | a class annotated `@Data` |
+| `[test]:/com.app.UserTest` | a class under `src/test/java` |
+| `[core]:/com.app.Foo` | a class in the `core` module (multi-module) |
 
-**`[subdir]`** is a source-set or a subproject:
+### Flags
+
+Trailing `:flag` segments run after the class is created. **Code generation**
+flags go through jdtls:
+
+| Flag | Generates |
+|---|---|
+| `constructor` | an all-fields constructor |
+| `toString` | `toString()` |
+| `hashCode` | `hashCode()` |
+| `equals` | `equals()` |
+
+**Lombok** flags add the annotation (and its import, resolved by
+organize-imports) instead of generating code:
+
+| Flag | Annotation | | Flag | Annotation |
+|---|---|---|---|---|
+| `lombok` / `lombokData` | `@Data` | | `lombokNoArgs` | `@NoArgsConstructor` |
+| `lombokValue` | `@Value` | | `lombokAllArgs` | `@AllArgsConstructor` |
+| `lombokBuilder` | `@Builder` | | `lombokRequiredArgs` | `@RequiredArgsConstructor` |
+| `lombokGetter` | `@Getter` | | `lombokToString` | `@ToString` |
+| `lombokSetter` | `@Setter` | | `lombokEqualsHashCode` | `@EqualsAndHashCode` |
+| `lombokSlf4j` | `@Slf4j` | | | |
+
+Flags combine: `/com.app.User(String name, int age):lombokData:lombokBuilder`
+→ a `@Data @Builder` class.
+
+### Source-set and module (`[subdir]`)
 
 - a source-set name places the class in the current module's `src/<name>/java`
   — `[test]` mirrors the package into `src/test/java`;
 - a subproject name (multi-module) targets that module directly —
   `[core]` or `[core/test]` for its test sources.
 
-**Absolute package into another module.** Completion offers packages from every
-subproject; if you pick a package that lives in another module, jc asks which
-module to create the class in (current vs the one that already has the package).
-A brand-new package is created in the current module.
+When an absolute package you pick already lives in **another** module
+(completion offers packages from every subproject), jc asks which module to
+create the class in; a brand-new package goes to the current module.
 
-**`<Tab>` completion** follows the scheme: templates and project packages for
-the path, `[subdir]` after a template, the method flags once the class path is
-given, and — after `extends `/`implements ` — class/interface names resolved
-live from jdtls.
+### Completion and the wizard
+
+`<Tab>` completes each slot in turn: templates and project packages for the
+path, `[subdir]` after a template, the flags once the class path is given, and —
+after `extends `/`implements ` — class/interface names resolved live from
+jdtls. `<p>N` (or `class_prompt = "wizard"`) runs the same thing as a
+step-by-step `vim.ui` flow instead of the one-liner.
 
 ## Templates
 
