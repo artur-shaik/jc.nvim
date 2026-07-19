@@ -1,55 +1,74 @@
-# jc.nvim
+<div align="center">
 
-**A Java productivity layer for Neovim, on top of an externally managed
-[jdtls](https://github.com/eclipse/eclipse.jdt.ls).**
+# ☕ jc.nvim
+
+**A Java productivity layer for Neovim, on top of an externally managed [jdtls](https://github.com/eclipse/eclipse.jdt.ls).**
+
+Code generation · class creation · test runner · build runner · refactorings · debugging
+
+<a href="https://github.com/artur-shaik/jc.nvim/actions/workflows/default.yml"><img src="https://github.com/artur-shaik/jc.nvim/actions/workflows/default.yml/badge.svg" alt="CI"></a>
+<img src="https://img.shields.io/badge/Neovim-0.10%2B-57A143?logo=neovim&logoColor=white" alt="Neovim 0.10+">
+<img src="https://img.shields.io/badge/Made%20with-Lua-2C2D72?logo=lua&logoColor=white" alt="Lua">
+
+</div>
 
 jc.nvim never starts or installs the language server. You run jdtls with
 [nvim-java](https://github.com/nvim-java/nvim-java),
 [nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls) or nvim-lspconfig, and
-jc.nvim hooks into whatever `jdtls` client attaches and adds code generation,
-class creation, a test runner, a build-tool runner, refactorings, debugging and
-more — the ergonomics of [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2)
-(its predecessor), rebuilt on Neovim's built-in LSP client.
-
-## Demo
-
-Creating classes from the one-line DSL — an interface, an enum with constants
-and an exception (template + `extends` + generated body):
+jc.nvim hooks into whatever `jdtls` client attaches and adds the ergonomics of
+[vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2) (its
+predecessor), rebuilt on Neovim's built-in LSP client.
 
 <!-- Record with `vhs docs/class-creation.tape` (see docs/README.md) -->
 ![class creation](docs/class-creation.gif)
 
-Generating a constructor and `toString` — the picker windows let you choose
-fields and the generation style:
+<details>
+<summary><b>Table of contents</b></summary>
 
-<!-- Record with `vhs docs/code-generation.tape` -->
-![code generation](docs/code-generation.gif)
+- [Features](#-features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Mappings](#mappings)
+- [Class creation](#class-creation) · [Templates](#templates)
+- [Test runner](#test-runner) · [Build runner](#build-runner)
+- [Go to file by FQN](#go-to-file-by-fqn) · [Debugging](#debugging)
+- [Troubleshooting](#troubleshooting)
 
-## Features
+</details>
 
-- **Code generation** — `toString`, `hashCode`/`equals`, constructors,
+## ✨ Features
+
+- 🛠️ **Code generation** — `toString`, `hashCode`/`equals`, constructors,
   accessors, all with interactive field selection; add unimplemented
   (abstract) methods.
-- **Organize imports** — a smart mode that remembers your preferred class per
+- 📦 **Organize imports** — a smart mode that remembers your preferred class per
   ambiguous name, per project; replace an import by picking among same-named
   types.
-- **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
+- 🏗️ **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
   completion, project-aware package/module resolution and a library of
   templates (records, spring stereotypes, JPA entity, JUnit, …).
-- **Test runner** — run JUnit tests through
+- 🧪 **Test runner** — run JUnit tests through
   [neotest](https://github.com/nvim-neotest/neotest) with the classpath
   resolved from jdtls; optional.
-- **Build runner** — run gradle/maven tasks with a module + task picker;
+- ⚙️ **Build runner** — run gradle/maven tasks with a module + task picker;
   compile errors go to the quickfix list.
-- **Refactorings** — extract variable / method, convert to static import.
-- **Debugging** — attach/launch via
+- 🔧 **Refactorings** — extract variable / method, convert to static import.
+- 🐞 **Debugging** — attach/launch via
   [nvim-dap](https://github.com/mfussenegger/nvim-dap) or
   [vimspector](https://github.com/puremourning/vimspector), with per-project
   host/port memory.
-- **Navigation** — jump between a class and its test; go to a file by its
+- 🧭 **Navigation** — jump between a class and its test; go to a file by its
   fully-qualified name (an FQN-aware `gf`).
-- **Utilities** — classpath-aware `javap` / `jshell` / `jol`; decompiled
+- 🧰 **Utilities** — classpath-aware `javap` / `jshell` / `jol`; decompiled
   `jdt://` class view; wipe a corrupted jdtls workspace.
+
+Generating a constructor and `toString` — the picker windows let you pick the
+fields and the style:
+
+<!-- Record with `vhs docs/code-generation.tape` -->
+![code generation](docs/code-generation.gif)
 
 ## Requirements
 
