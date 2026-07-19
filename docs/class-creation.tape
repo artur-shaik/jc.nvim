@@ -6,7 +6,7 @@
 # the `cd` path below. The Sleep calls give jdtls time to index — tune them to
 # your machine.
 
-Output docs/class-creation.gif
+Output "docs/class-creation.gif"
 
 Require nvim
 

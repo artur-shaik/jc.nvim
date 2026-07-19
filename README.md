@@ -355,9 +355,6 @@ overrides the spec defaults. `opts`: `name`, `package`, `fields`
 
 ## Test runner
 
-<!-- Record with `vhs docs/test-runner.tape` -->
-![test runner](docs/test-runner.gif)
-
 jc.nvim ships a [neotest](https://github.com/nvim-neotest/neotest) adapter.
 **neotest is an optional dependency** — without it the plugin works as before
 and the `JCtest*` commands warn instead of erroring. Unlike the gradle/maven

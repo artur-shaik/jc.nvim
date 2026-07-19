@@ -1,7 +1,7 @@
 # vhs script for the test-runner demo GIF.  Record: vhs docs/test-runner.tape
 # Open a test class in a java project with the neotest adapter wired in.
 
-Output docs/test-runner.gif
+Output "docs/test-runner.gif"
 
 Require nvim
 
