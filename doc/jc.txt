@@ -237,9 +237,16 @@ Examples: >
   [test]:/com.app.UserTest                        a class under src/test/java
   [core]:/com.app.Foo                             a class in the core module
 <
-The prompt completes with <Tab>: templates and project packages for the
-path, `[subdir]` after a template, the trailing flags once the path is
-given, and class/interface names from jdtls after `extends `/`implements `.
+Relative paths (no leading `/`) resolve against the current file's package.
+Editing com.app.service.OrderService: >
+  Helper                                          com.app.service.Helper
+  util.Strings                                    com.app.service.util.Strings
+<
+The prompt completes with <Tab>: templates, then packages for the path —
+after `/` existing packages across the whole project, without `/` the
+sub-packages of the current file's package (a new package can still be
+typed); `[subdir]` after a template; the trailing flags once the path is
+given; and class/interface names from jdtls after `extends `/`implements `.
 
 Completion offers packages from every subproject. If the chosen absolute
 package already lives in another module, jc asks which module to create the

@@ -100,6 +100,7 @@ return {
   },
 }
 ```
+
 </details>
 
 <details>
@@ -127,6 +128,7 @@ return {
   opts = { keys_prefix = "<leader>j" },
 }
 ```
+
 </details>
 
 jc.nvim works with any owner of the `jdtls` client — nvim-jdtls or a plain
@@ -310,8 +312,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 `:JCgenerateClass` (`<p>n`) opens a one-line prompt. The scheme, slot by slot:
 
 ```
- template :  [subdir] :  /package.ClassName  extends X implements Y  (fields)  :flags
- └── 1 ──┘  └── 2 ──┘  └─────── 3 ───────┘  └──────── 4 ───────┘  └── 5 ──┘  └─ 6 ─┘
+ template : [subdir] : /package.ClassName  extends X implements Y  (fields) :flags
+ └── 1 ─┘   └── 2 ─┘   └─────── 3 ──────┘  └──────── 4 ─────────┘  └── 5 ─┘  └ 6 ┘
 ```
 
 | # | Slot | Meaning |
@@ -328,6 +330,8 @@ empty class.
 
 ### Examples
 
+Absolute (leading `/`) — the package is taken literally:
+
 | Prompt | Creates |
 |---|---|
 | `/com.app.User(String name, int age)` | a `User` class with two fields |
@@ -340,6 +344,16 @@ empty class.
 | `/com.app.UserDto(String id, String name):lombokData` | a class annotated `@Data` |
 | `[test]:/com.app.UserTest` | a class under `src/test/java` |
 | `[core]:/com.app.Foo` | a class in the `core` module (multi-module) |
+
+Relative (no leading `/`) — the package is resolved against the **current
+file's** package. Editing `com.app.service.OrderService`:
+
+| Prompt | Creates |
+|---|---|
+| `Helper` | `com.app.service.Helper` |
+| `Helper(String name)` | …with a field |
+| `util.Strings` | `com.app.service.util.Strings` (a sub-package) |
+| `record:Money(long amount)` | `com.app.service.Money` from the `record` template |
 
 ### Flags
 
@@ -381,11 +395,18 @@ create the class in; a brand-new package goes to the current module.
 
 ### Completion and the wizard
 
-`<Tab>` completes each slot in turn: templates and project packages for the
-path, `[subdir]` after a template, the flags once the class path is given, and —
-after `extends `/`implements ` — class/interface names resolved live from
-jdtls. `<p>N` (or `class_prompt = "wizard"`) runs the same thing as a
-step-by-step `vim.ui` flow instead of the one-liner.
+`<Tab>` completes each slot in turn:
+
+- the template and, after `/`, **existing packages across the whole project**
+  (every subproject) — without a leading `/`, the **sub-packages of the current
+  file's package** instead; either way you can still type a new package by hand;
+- `[subdir]` after a template — source-sets and module names;
+- the flags once the class path is given;
+- after `extends`/`implements` — class/interface names resolved live from
+  jdtls.
+
+`<p>N` (or `class_prompt = "wizard"`) runs the same thing as a step-by-step
+`vim.ui` flow instead of the one-liner.
 
 ## Templates
 
