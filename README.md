@@ -14,11 +14,17 @@ more — the ergonomics of [vim-javacomplete2](https://github.com/artur-shaik/vi
 
 ## Demo
 
-Creating a class with fields, a constructor and `toString` from the one-line
-DSL:
+Creating classes from the one-line DSL — an interface, an enum with constants
+and an exception (template + `extends` + generated body):
 
 <!-- Record with `vhs docs/class-creation.tape` (see docs/README.md) -->
 ![class creation](docs/class-creation.gif)
+
+Generating a constructor and `toString` — the picker windows let you choose
+fields and the generation style:
+
+<!-- Record with `vhs docs/code-generation.tape` -->
+![code generation](docs/code-generation.gif)
 
 ## Features
 

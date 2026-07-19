@@ -24,5 +24,6 @@ The GIFs in the main README are generated from the [vhs](https://github.com/char
 
 | Script | Shows | Recorded |
 |---|---|---|
-| `class-creation.tape` | `:JCgenerateClass` — the one-line DSL creating a class from a template | ✅ `class-creation.gif` |
+| `class-creation.tape` | `:JCgenerateClass` — the DSL creating an interface, enum and exception | ✅ `class-creation.gif` |
+| `code-generation.tape` | `:JCgenerateConstructor` / `:JCgenerateToString` — the field/style picker windows | ✅ `code-generation.gif` |
 | `test-runner.tape` | `:JCtestFile` — running a test class through neotest | ⬜ record on a built project (junit on the classpath) |
