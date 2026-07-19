@@ -9,7 +9,7 @@ The GIFs in the main README are generated from the [vhs](https://github.com/char
    manager).
 2. Have a small java project that starts jdtls on open (nvim-java) and, for the
    test demo, the neotest adapter wired in (see the main README).
-3. Edit the `cd ~/demo-java` path in each `.tape` to point at that project, and
+3. Edit the `cd /path/to/java-project` path in each `.tape` to point at that project, and
    tune the `Sleep` durations to how fast jdtls indexes on your machine.
 4. Record:
 

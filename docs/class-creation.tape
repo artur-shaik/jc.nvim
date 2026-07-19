@@ -19,7 +19,7 @@ Set TypingSpeed 55ms
 
 # open a source file so jdtls attaches (path: your demo project)
 Hide
-Type "cd ~/demo-java && nvim src/main/java/com/example/App.java" Enter
+Type "cd /path/to/java-project && nvim src/main/java/com/example/App.java" Enter
 Sleep 6s
 Show
 

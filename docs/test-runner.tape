@@ -13,7 +13,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 55ms
 
 Hide
-Type "cd ~/demo-java && nvim src/test/java/com/example/UserTest.java" Enter
+Type "cd /path/to/java-project && nvim src/test/java/com/example/UserTest.java" Enter
 Sleep 6s
 Show
 

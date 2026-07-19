@@ -303,7 +303,7 @@ template:[subdir]:/package.ClassName extends Super implements If(String s, publi
 - a source-set name places the class in the current module's `src/<name>/java`
   — `[test]` mirrors the package into `src/test/java`;
 - a subproject name (multi-module) targets that module directly —
-  `[refunds-model]` or `[refunds-model/test]` for its test sources.
+  `[core]` or `[core/test]` for its test sources.
 
 **Absolute package into another module.** Completion offers packages from every
 subproject; if you pick a package that lives in another module, jc asks which
