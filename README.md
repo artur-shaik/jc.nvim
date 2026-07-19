@@ -9,8 +9,7 @@ jc.nvim never starts or installs the language server. You run jdtls with
 jc.nvim hooks into whatever `jdtls` client attaches and adds code generation,
 class creation, a test runner, a build-tool runner, refactorings, debugging and
 more — the ergonomics of [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2)
-(its predecessor), rebuilt on Neovim's built-in LSP client. There's a
-[blog post](https://shaik.link/posts/javacomplete-to-jc.nvim/) on the why.
+(its predecessor), rebuilt on Neovim's built-in LSP client.
 
 ## Demo
 
