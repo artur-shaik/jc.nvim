@@ -117,12 +117,12 @@ with defaults.
   :JCgenerateConstructor     choose fields for constructor
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
-  :JCgotoTest                jump to the test class (or back), create if missing
+  :JCgotoTest                jump to/from the test class, create if missing
   :JCgotoFqn                 open the java file for the FQN under the cursor
   :JCtestRun                 run the test at the cursor (neotest)
   :JCtestFile                run every test in the current file
   :JCtestSuite               run every test under the working directory
-  :JCtestPick                pick a test class from the whole project and run it
+  :JCtestPick                pick and run a test class from the project
   :JCtestLast                re-run the last test position
   :JCtestStop                stop the running test
   :JCtestSummary             toggle the neotest summary panel
@@ -199,9 +199,9 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 ==============================================================================
 6. CLASS CREATION                                            *jc-class-creation*
 
-Prompt scheme: >
+Prompt scheme (every part but the class name is optional): >
 
-  template:[subdir]:/package.ClassName extends Super implements If(String s, public Integer i):constructor:toString:equals
+  template:[subdir]:/package.Name extends X implements Y (fields):flags
 <
 - template (optional): junit5, record, entity, service, ... (|jc-templates|);
 - subdir (optional): source-set or subproject. `[test]` -> current
@@ -218,12 +218,17 @@ Prompt scheme: >
 Trailing `:flag` segments run after the class is created.
 Code-generation flags (via jdtls): constructor, toString, hashCode, equals.
 Lombok flags (add the annotation + import instead of generating code):
-  lombok / lombokData -> @Data           lombokNoArgs      -> @NoArgsConstructor
-  lombokValue         -> @Value          lombokAllArgs     -> @AllArgsConstructor
-  lombokBuilder       -> @Builder        lombokRequiredArgs-> @RequiredArgsConstructor
-  lombokGetter        -> @Getter         lombokToString    -> @ToString
-  lombokSetter        -> @Setter         lombokEqualsHashCode -> @EqualsAndHashCode
-  lombokSlf4j         -> @Slf4j
+  lombok / lombokData   -> @Data
+  lombokValue           -> @Value
+  lombokBuilder         -> @Builder
+  lombokGetter          -> @Getter
+  lombokSetter          -> @Setter
+  lombokToString        -> @ToString
+  lombokEqualsHashCode  -> @EqualsAndHashCode
+  lombokNoArgs          -> @NoArgsConstructor
+  lombokAllArgs         -> @AllArgsConstructor
+  lombokRequiredArgs    -> @RequiredArgsConstructor
+  lombokSlf4j           -> @Slf4j
 Flags combine, e.g. `:lombokData:lombokBuilder`.
 
 Examples: >
