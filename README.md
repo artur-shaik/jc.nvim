@@ -8,7 +8,7 @@ Code generation · class creation · test runner · build runner · refactorings
 
 <a href="https://github.com/artur-shaik/jc.nvim/actions/workflows/default.yml"><img src="https://github.com/artur-shaik/jc.nvim/actions/workflows/default.yml/badge.svg" alt="CI"></a>
 <img src="https://img.shields.io/badge/Neovim-0.10%2B-57A143?logo=neovim&logoColor=white" alt="Neovim 0.10+">
-<img src="https://img.shields.io/badge/Made%20with-Lua-2C2D72?logo=lua&logoColor=white" alt="Lua">
+<img src="https://img.shields.io/badge/Made%20with-Lua-2C2D72" alt="Made with Lua">
 
 </div>
 
