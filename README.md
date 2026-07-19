@@ -26,15 +26,15 @@ predecessor), rebuilt on Neovim's built-in LSP client.
 <summary><b>Table of contents</b></summary>
 
 - [Features](#-features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Commands](#commands)
-- [Mappings](#mappings)
-- [Class creation](#class-creation) · [Templates](#templates)
-- [Test runner](#test-runner) · [Build runner](#build-runner)
-- [Go to file by FQN](#go-to-file-by-fqn) · [Debugging](#debugging)
-- [Troubleshooting](#troubleshooting)
+- [Requirements](#-requirements)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Commands](#-commands)
+- [Mappings](#-mappings)
+- [Class creation](#-class-creation) · [Templates](#-templates)
+- [Test runner](#-test-runner) · [Build runner](#-build-runner)
+- [Go to file by FQN](#-go-to-file-by-fqn) · [Debugging](#-debugging)
+- [Troubleshooting](#-troubleshooting)
 
 </details>
 
@@ -70,7 +70,7 @@ fields and the style:
 <!-- Record with `vhs docs/code-generation.tape` -->
 ![code generation](docs/code-generation.gif)
 
-## Requirements
+## 📋 Requirements
 
 - Neovim ≥ 0.10 (0.11+ recommended).
 - A running `jdtls` from nvim-java, nvim-jdtls or lspconfig, started with
@@ -82,10 +82,10 @@ fields and the style:
     bundle in jdtls (nvim-java bundles it; nvim-jdtls: add it to
     `init_options.bundles`) and nvim-dap or vimspector.
   - **test runner** — [neotest](https://github.com/nvim-neotest/neotest) (see
-    [Test runner](#test-runner)).
+    [Test runner](#-test-runner)).
   - `:JCutilJol` downloads the jol-cli jar into `~/.m2` on first use.
 
-## Installation
+## 📦 Installation
 
 <details open>
 <summary>lazy.nvim, jdtls managed by nvim-java (recommended)</summary>
@@ -138,7 +138,7 @@ start jdtls your own way.
 If `setup` is never called, opening a java file initializes the plugin with
 defaults.
 
-## Configuration
+## ⚙️ Configuration
 
 All options go through `setup(opts)` (or your plugin manager's `opts`):
 
@@ -206,7 +206,7 @@ to `false` to refresh manually.
 passed to `setup`.
 </details>
 
-## Commands
+## 📜 Commands
 
 `:checkhealth jc` verifies the setup; `:help jc` has the full reference.
 
@@ -278,7 +278,7 @@ passed to `setup`.
 | `JCutilBytecode` | bytecode of the current class (javap) |
 | `JCutilJol` | object layout (jol) |
 
-## Mappings
+## ⌨️ Mappings
 
 Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 `keys_prefix` (default `<leader>j`).
@@ -307,7 +307,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
 
-## Class creation
+## 🏗️ Class creation
 
 `:JCgenerateClass` (`<p>n`) opens a one-line prompt. The scheme, slot by slot:
 
@@ -318,7 +318,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 
 | # | Slot | Meaning |
 |---|---|---|
-| 1 | `template:` | *(optional)* a template — `record`, `entity`, `service`, `junit5`, … (see [Templates](#templates)) |
+| 1 | `template:` | *(optional)* a template — `record`, `entity`, `service`, `junit5`, … (see [Templates](#-templates)) |
 | 2 | `[subdir]:` | *(optional)* a source-set or subproject (see below) |
 | 3 | `/package.Name` | class name and package. Leading `/` = absolute in the source root; without it, relative to the current file's package |
 | 4 | `extends`/`implements` | *(optional)* supertypes, imported automatically |
@@ -408,7 +408,7 @@ create the class in; a brand-new package goes to the current module.
 `<p>N` (or `class_prompt = "wizard"`) runs the same thing as a step-by-step
 `vim.ui` flow instead of the one-liner.
 
-## Templates
+## 🧩 Templates
 
 Built-in: `class`, `interface`, `enum`, `record`, `annotation`, `exception`,
 `main`, `singleton`, `servlet`, `junit`, `junit5`, `entity`, `service`,
@@ -446,7 +446,7 @@ string, a list or a `function(opts)`. User input for `extends`/`implements`
 overrides the spec defaults. `opts`: `name`, `package`, `fields`
 (`{ mod, type, name }`), `extends`, `implements`.
 
-## Test runner
+## 🧪 Test runner
 
 jc.nvim ships a [neotest](https://github.com/nvim-neotest/neotest) adapter.
 **neotest is an optional dependency** — without it the plugin works as before
@@ -455,7 +455,7 @@ adapters, this one resolves the test classpath straight from jdtls and runs the
 [JUnit Platform Console Standalone](https://junit.org/junit5/docs/current/user-guide/#running-tests-console-launcher)
 launcher, so there's no build-tool daemon to wait for and gradle/maven/plain
 layouts all work the same way. Wire it as in
-[Installation](#installation).
+[Installation](#-installation).
 
 The launcher jar is looked up in `~/.m2`; if missing, run `:JCtestInstall` once
 (downloads `org.junit.platform:junit-platform-console-standalone` via maven) or
@@ -509,7 +509,7 @@ already-failed class back to running in the summary. Iterate with the focused
 reliably.
 </details>
 
-## Build runner
+## 🔨 Build runner
 
 Run gradle/maven tasks from the editor, in a dedicated split (`q` closes it);
 compile errors are parsed into the quickfix list.
@@ -528,7 +528,7 @@ Commands run from the **reactor root** (outermost contiguous pom /
 settings.gradle), so multi-module builds resolve paths and the reactor
 correctly.
 
-## Go to file by FQN
+## 🧭 Go to file by FQN
 
 `JCgotoFqn` (and the overridden `gf`) opens the java source for a
 fully-qualified name under the cursor — for jumping out of a terminal, a neotest
@@ -549,7 +549,7 @@ When `default_mappings` is on, `gf` is overridden globally and falls back to the
 builtin `gf` when the token isn't an FQN (e.g. a real path). Disable with
 `setup{ map_gf = false }`.
 
-## Debugging
+## 🐞 Debugging
 
 `JCdebugAttach` / `JCdebugLaunch` route to a backend:
 
@@ -562,7 +562,7 @@ Attach asks for host and port, remembered per project. The adapter port is
 resolved from jdtls via `vscode.java.startDebugSession`, which needs the
 java-debug bundle.
 
-## What it adds over plain nvim-jdtls
+## 🆚 What it adds over plain nvim-jdtls
 
 | Feature | nvim-jdtls | jc.nvim |
 |---|---|---|
@@ -574,7 +574,7 @@ java-debug bundle.
 | Debug attach | manual dap config | `JCdebugAttach` with per-project host/port memory |
 | javap/jshell/jol | yes | classpath-aware, built-in |
 
-## Troubleshooting
+## 🩺 Troubleshooting
 
 - Run `:checkhealth jc` — it verifies the Neovim version, the attached jdtls
   client, organize-imports and java-debug availability, the debug backends,
@@ -586,4 +586,4 @@ java-debug bundle.
 - **jdtls state looks corrupted / won't start** — `:JCutilWipeWorkspace`
   deletes the eclipse index and restarts (works even with no client attached).
 - **Tests fail with `ClassNotFoundException`** for classes that exist — enable
-  `test.precompile` (see [Test runner](#test-runner)).
+  `test.precompile` (see [Test runner](#-test-runner)).
