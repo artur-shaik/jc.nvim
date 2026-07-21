@@ -1,6 +1,14 @@
 describe("flip_call_args", function()
   local refactor = require("jc.refactor")
 
+  -- the flip is treesitter-based; skip where the java grammar isn't installed
+  -- (neovim bundles c/lua/vim/markdown but not java, so bare CI has no parser)
+  local has_java = pcall(vim.treesitter.get_parser, vim.api.nvim_create_buf(false, true), "java")
+  if not has_java then
+    it("skipped: java treesitter parser unavailable", function() end)
+    return
+  end
+
   -- put `code` in a java buffer, move the cursor onto (row,col) — 1-based row,
   -- 0-based col — run flip_call_args, return the resulting lines
   local function flip(lines, row, col)
@@ -17,7 +25,7 @@ describe("flip_call_args", function()
 
   it("swaps receiver and argument of equals", function()
     -- cursor on `.equals`
-    local out = flip({ "class C { boolean m() { return a.equals(b); } } " }, 1, 27)
+    local out = flip({ "class C { boolean m() { return a.equals(b); } } " }, 1, 35)
     assert.are.equal("class C { boolean m() { return b.equals(a); } } ", out[1])
   end)
 

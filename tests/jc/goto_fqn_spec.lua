@@ -8,8 +8,7 @@ describe("goto_fqn parse", function()
   end)
 
   it("parses an underscored package frame", function()
-    local fqn, line =
-      goto_fqn.parse("\tat kz.grazhdanin.isna.refund_service.common.FooTest.t(FooTest.java:9)")
+    local fqn, line = goto_fqn.parse("\tat kz.grazhdanin.isna.refund_service.common.FooTest.t(FooTest.java:9)")
     assert.are.equal("kz.grazhdanin.isna.refund_service.common.FooTest", fqn)
     assert.are.equal(9, line)
   end)
