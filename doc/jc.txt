@@ -34,7 +34,7 @@ nvim-lspconfig) and provides:
 - template-based class creation (|jc-class-creation|);
 - a JUnit test runner via neotest (|jc-test|);
 - a gradle/maven task runner (|jc-build|);
-- extract variable/method and static-import refactorings;
+- extract variable/method, static-import and flip-call-arguments refactorings;
 - go to a file by its fully-qualified name (|jc-goto-fqn|);
 - debug attach/launch via nvim-dap or vimspector with per-project
   host/port memory (|jc-debug|);
@@ -142,6 +142,8 @@ with defaults.
   :JCrefactorExtractMethod   extract method (visual range)
   :JCrefactorStaticImport    convert call at cursor to a static import
   :JCrefactorStaticImportEnum static-import every constant of the enum
+  :JCrefactorFlipArgs        swap receiver and argument of the call at the
+                             cursor: a.equals(b) -> b.equals(a)
   :JCbuildRun [args]         run gradle/maven with args (or prompt, last
                              default); compile errors go to the quickfix list
   :JCbuildTask               pick a module (or whole project) then a task:
@@ -194,6 +196,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   v  <p>rm   extract method
   n  <p>rs   convert call to a static import (all occurrences)
   n  <p>rp   replace the import of the type under the cursor (pick same-named)
+  n  <p>rf   flip receiver and argument: a.equals(b) -> b.equals(a)
   n  <p>rS   static-import every constant of the enum at the cursor
 
 ==============================================================================

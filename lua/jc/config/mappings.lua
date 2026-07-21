@@ -137,6 +137,8 @@ function M.install_mappings(conf, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rS", "<Cmd>lua require('jc.jdtls').static_import_enum()<CR>", opts)
   -- replace the import of the type under the cursor (pick among same-named types)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rp", "<Cmd>JCimportsReplace<CR>", opts)
+  -- flip the receiver and argument of the call at the cursor: a.equals(b) -> b.equals(a)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rf", "<Cmd>JCrefactorFlipArgs<CR>", opts)
   -- jump to the test class of the current production class (or back)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "t", "<Cmd>lua require('jc.class_generator').goto_test()<CR>", opts)
 

@@ -128,4 +128,44 @@ function M.extract_method(visual)
   refactor("extractMethod", visual)
 end
 
+-- Climb from the cursor to the nearest method call `receiver.name(arg)` that has
+-- a receiver and exactly one argument.
+local function call_at_cursor()
+  local node = vim.treesitter.get_node()
+  while node do
+    if node:type() == "method_invocation" then
+      local object = node:field("object")[1]
+      local args = node:field("arguments")[1]
+      if object and args and args:named_child_count() == 1 then
+        return object, args:named_child(0)
+      end
+    end
+    node = node:parent()
+  end
+end
+
+-- Swap the receiver and the single argument of the call at the cursor:
+-- `a.equals(b)` -> `b.equals(a)`. Treesitter-based (jdtls has no such
+-- refactoring); works for any one-argument call — equals, compareTo, etc.
+-- A surrounding `!` or the method name are left untouched.
+function M.flip_call_args()
+  local object, arg = call_at_cursor()
+  if not object then
+    vim.notify("jc: no one-argument call at the cursor to flip", vim.log.levels.WARN)
+    return
+  end
+  local buf = vim.api.nvim_get_current_buf()
+  local object_text = vim.treesitter.get_node_text(object, buf)
+  local arg_text = vim.treesitter.get_node_text(arg, buf)
+
+  local function replace(node, text)
+    local sr, sc, er, ec = node:range()
+    vim.api.nvim_buf_set_text(buf, sr, sc, er, ec, vim.split(text, "\n"))
+  end
+  -- edit the argument first (it sits later in the buffer) so the receiver's
+  -- range stays valid for the second edit
+  replace(arg, object_text)
+  replace(object, arg_text)
+end
+
 return M

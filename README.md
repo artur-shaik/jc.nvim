@@ -54,7 +54,8 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   resolved from jdtls; optional.
 - ⚙️ **Build runner** — run gradle/maven tasks with a module + task picker;
   compile errors go to the quickfix list.
-- 🔧 **Refactorings** — extract variable / method, convert to static import.
+- 🔧 **Refactorings** — extract variable / method, convert to static import,
+  flip the receiver and argument of a call (`a.equals(b)` → `b.equals(a)`).
 - 🐞 **Debugging** — attach/launch via
   [nvim-dap](https://github.com/mfussenegger/nvim-dap) or
   [vimspector](https://github.com/puremourning/vimspector), with per-project
@@ -241,6 +242,7 @@ passed to `setup`.
 | `JCrefactorExtractMethod` | extract method (visual range) |
 | `JCrefactorStaticImport` | convert the call at the cursor to a static import |
 | `JCrefactorStaticImportEnum` | static-import every constant of the enum |
+| `JCrefactorFlipArgs` | swap receiver and argument of the call at the cursor (`a.equals(b)` → `b.equals(a)`) |
 
 **Test runner**
 
@@ -306,6 +308,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>re` | extract variable, all occurrences (at cursor) |
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
+| n | `<p>rf` | flip receiver and argument of the call (`a.equals(b)` → `b.equals(a)`) |
 
 ## 🏗️ Class creation
 
