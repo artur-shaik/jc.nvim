@@ -4,6 +4,28 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0]
+
+### Added
+
+- **Flip call arguments** — a treesitter refactoring that swaps the receiver
+  and the single argument of the call at the cursor (`a.equals(b)` →
+  `b.equals(a)`), leaving a surrounding `!` and the method name untouched.
+  `:JCrefactorFlipArgs` / `<p>rf`.
+- **Create a class from a reference** — with the cursor on a class name the code
+  refers to but that doesn't exist yet, pick a package (and module) and land in
+  the DSL prompt pre-filled with the name. `:JCgenerateClassFromCursor` /
+  `<p>nc`.
+- **Add annotations by search** — add an annotation to the enclosing method or
+  class by searching jdtls for matching types by name prefix (`Get` → `Getter`),
+  inserting `@Name` and importing it (remembered for smart organize-imports).
+  A live telescope picker when available, otherwise a prompt + `vim.ui.select`.
+  `:JCannotateMethod` / `:JCannotateClass`, `<p>am` / `<p>ac`.
+- **Optional snippet set** — a VS Code-format Java snippet bundle
+  (`snippets/java.json`): field/modifier combos (`psfL` → `private static final
+  Long`, …) and NetBeans-style abbreviations (`fori`, `soutv`, `ife`, …). jc
+  doesn't run a snippet engine; point your own at the folder.
+
 ## [1.0.0]
 
 First stable release. jc.nvim is now a **pure layer on top of an externally
@@ -59,4 +81,5 @@ client attaches.
 - The class generator, code generators and templates were rewritten from
   vimscript to Lua.
 
+[1.1.0]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.1.0
 [1.0.0]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.0.0
