@@ -54,6 +54,19 @@ function M.get_package()
   return nil
 end
 
+-- the nearest ancestor node of the given type at the cursor (e.g.
+-- "class_declaration" / "method_declaration"), or nil.
+function M.enclosing_declaration(kind)
+  local node = vim.treesitter.get_node()
+  while node do
+    if node:type() == kind then
+      return node
+    end
+    node = node:parent()
+  end
+  return nil
+end
+
 -- the simple type name under the cursor (a capitalized identifier), or nil.
 -- Used to create a class referenced by the code but missing from the project.
 function M.type_at_cursor()

@@ -44,3 +44,51 @@ describe("type_at_cursor", function()
     assert.are.equal("Bar", out)
   end)
 end)
+
+describe("enclosing_declaration", function()
+  local ts = require("jc.treesitter")
+
+  -- node type of the enclosing `kind` for the cursor at (row 1-based, col
+  -- 0-based), or the string "skip" when the java grammar isn't installed.
+  local function enclosing(lines, row, col, kind)
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.bo[buf].filetype = "java"
+    vim.api.nvim_set_current_buf(buf)
+    local ok, parser = pcall(vim.treesitter.get_parser, buf, "java")
+    if not ok or not parser then
+      return "skip"
+    end
+    parser:parse()
+    vim.api.nvim_win_set_cursor(0, { row, col })
+    local node = ts.enclosing_declaration(kind)
+    return node and node:type() or nil
+  end
+
+  local SRC = { "class C {", "  void m() {", "    int x = 1;", "  }", "}" }
+
+  it("finds the enclosing method from inside its body", function()
+    local out = enclosing(SRC, 3, 8, "method_declaration")
+    if out == "skip" then
+      return
+    end
+    assert.are.equal("method_declaration", out)
+  end)
+
+  it("finds the enclosing class from inside a method", function()
+    local out = enclosing(SRC, 3, 8, "class_declaration")
+    if out == "skip" then
+      return
+    end
+    assert.are.equal("class_declaration", out)
+  end)
+
+  it("returns nil for a method when the cursor is at class level", function()
+    -- cursor on the class name, not inside any method
+    local out = enclosing(SRC, 1, 6, "method_declaration")
+    if out == "skip" then
+      return
+    end
+    assert.is_nil(out)
+  end)
+end)

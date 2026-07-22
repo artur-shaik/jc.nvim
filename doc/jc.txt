@@ -146,6 +146,9 @@ with defaults.
   :JCrefactorStaticImportEnum static-import every constant of the enum
   :JCrefactorFlipArgs        swap receiver and argument of the call at the
                              cursor: a.equals(b) -> b.equals(a)
+  :JCannotateMethod          add an annotation to the enclosing method (a
+                             live telescope picker, else a prompt + select)
+  :JCannotateClass           add an annotation to the enclosing class
   :JCbuildRun [args]         run gradle/maven with args (or prompt, last
                              default); compile errors go to the quickfix list
   :JCbuildTask               pick a module (or whole project) then a task:
@@ -200,6 +203,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   n  <p>rs   convert call to a static import (all occurrences)
   n  <p>rp   replace the import of the type under the cursor (pick same-named)
   n  <p>rf   flip receiver and argument: a.equals(b) -> b.equals(a)
+  n  <p>am   add an annotation to the enclosing method (jdtls, name prefix)
+  n  <p>ac   add an annotation to the enclosing class (jdtls, name prefix)
   n  <p>rS   static-import every constant of the enum at the cursor
 
 ==============================================================================

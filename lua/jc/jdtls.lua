@@ -616,18 +616,39 @@ end
 -- replace the imported package of the type under the cursor: find every class
 -- with the same simple name via jdtls and pick which one to import instead
 -- (e.g. cursor on @Value -> choose between lombok.Value and spring's Value).
-function M.replace_import()
-  local name = vim.fn.expand("<cword>")
-  if name == "" or not name:match("^%u[%w_$]*$") then
-    vim.notify("jc: put the cursor on a type name", vim.log.levels.WARN)
-    return
+-- Reduce workspace/symbol results to importable top-level type FQNs matching
+-- `name`: exact simple-name match when `exact`, else a case-insensitive prefix
+-- (so "Get" also finds "Getter"). Pure — shared by the async and live paths.
+function M._filter_type_symbols(result, name, exact)
+  local needle = (name or ""):lower()
+  local seen, fqns = {}, {}
+  for _, sym in ipairs(result or {}) do
+    local uri = sym.location and sym.location.uri or ""
+    local container = sym.containerName or ""
+    local enclosing = container:match("[^.]+$")
+    local nested = uri:find("%$") ~= nil or (enclosing ~= nil and enclosing:match("^%u") ~= nil)
+    local importable = uri:match("^jdt:") ~= nil or uri:match("^file:") ~= nil
+    local matches = exact and sym.name == name or (not exact and sym.name:lower():sub(1, #needle) == needle)
+    if matches and TYPE_KINDS[sym.kind] and importable and not nested and container ~= "" then
+      local fqn = container .. "." .. sym.name
+      if not seen[fqn] then
+        seen[fqn] = true
+        fqns[#fqns + 1] = fqn
+      end
+    end
   end
+  table.sort(fqns)
+  return fqns
+end
+
+-- workspace/symbol search for importable types matching `name`. Calls
+-- on_choices(fqns) on the main loop; notifies and skips when none found.
+local function find_importable_types(name, on_choices, exact)
   local client = lsp.get_jdtls_client()
   if not client then
     vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
     return
   end
-  local bufnr = vim.api.nvim_get_current_buf()
   client:request("workspace/symbol", { query = name }, function(err, result)
     if err or type(result) ~= "table" then
       vim.schedule(function()
@@ -635,35 +656,135 @@ function M.replace_import()
       end)
       return
     end
-    local seen, fqns = {}, {}
-    for _, sym in ipairs(result) do
-      local uri = sym.location and sym.location.uri or ""
-      local container = sym.containerName or ""
-      local enclosing = container:match("[^.]+$")
-      local nested = uri:find("%$") ~= nil or (enclosing ~= nil and enclosing:match("^%u") ~= nil)
-      local importable = uri:match("^jdt:") ~= nil or uri:match("^file:") ~= nil
-      if sym.name == name and TYPE_KINDS[sym.kind] and importable and not nested and container ~= "" then
-        local fqn = container .. "." .. sym.name
-        if not seen[fqn] then
-          seen[fqn] = true
-          fqns[#fqns + 1] = fqn
-        end
-      end
-    end
-    table.sort(fqns)
+    local fqns = M._filter_type_symbols(result, name, exact)
     vim.schedule(function()
       if #fqns == 0 then
-        vim.notify("jc: no importable types named " .. name, vim.log.levels.WARN)
+        vim.notify("jc: no importable types matching " .. name, vim.log.levels.WARN)
         return
       end
-      vim.ui.select(fqns, { prompt = "Import " .. name .. " from:" }, function(choice)
-        if choice then
-          set_import(bufnr, name, choice)
-          -- remember it for smart organize-imports
-          remember_regular(name, choice)
+      on_choices(fqns)
+    end)
+  end)
+end
+
+function M.replace_import()
+  local name = vim.fn.expand("<cword>")
+  if name == "" or not name:match("^%u[%w_$]*$") then
+    vim.notify("jc: put the cursor on a type name", vim.log.levels.WARN)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+  find_importable_types(name, function(fqns)
+    vim.ui.select(fqns, { prompt = "Import " .. name .. " from:" }, function(choice)
+      if choice then
+        set_import(bufnr, name, choice)
+        -- remember it for smart organize-imports
+        remember_regular(name, choice)
+      end
+    end)
+  end, true)
+end
+
+-- A live telescope picker over jdtls types: each keystroke re-queries
+-- workspace/symbol (synchronously, fast) and offers the matches. Returns true
+-- when it opened, false when telescope isn't available (caller falls back).
+local function annotate_live_telescope(apply)
+  local ok, pickers = pcall(require, "telescope.pickers")
+  if not ok then
+    return false
+  end
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return true
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+
+  pickers
+    .new({}, {
+      prompt_title = "Annotation",
+      finder = finders.new_dynamic({
+        fn = function(query)
+          if not query or query == "" then
+            return {}
+          end
+          local resp = client:request_sync("workspace/symbol", { query = query }, 1000, bufnr)
+          if not resp or resp.err or type(resp.result) ~= "table" then
+            return {}
+          end
+          return M._filter_type_symbols(resp.result, query, false)
+        end,
+        entry_maker = function(fqn)
+          return { value = fqn, display = fqn, ordinal = fqn }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          local entry = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if entry then
+            apply(entry.value)
+          end
+        end)
+        return true
+      end,
+    })
+    :find()
+  return true
+end
+
+-- Add an annotation to the enclosing class or method: search jdtls for matching
+-- types, then insert `@Name` above the declaration and add its import
+-- (remembered for smart organize-imports). target: "class"|"method". Uses a live
+-- telescope picker when available, else an input prompt + vim.ui.select.
+function M.add_annotation(target)
+  local kind = target == "method" and "method_declaration" or "class_declaration"
+  local node = require("jc.treesitter").enclosing_declaration(kind)
+  if not node then
+    vim.notify("jc: cursor is not inside a " .. target, vim.log.levels.WARN)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+  -- row/indent of the declaration, captured before the async prompt (the buffer
+  -- doesn't change while the picker is open)
+  local row = node:range()
+  local indent = (vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ""):match("^%s*")
+
+  local function apply(fqn)
+    -- use the chosen type's own simple name (may differ from what was typed)
+    local simple = fqn:match("[^.]+$")
+    -- insert the annotation above the declaration first, then the import; both
+    -- shift the buffer down consistently so `@Name` stays in place
+    vim.api.nvim_buf_set_lines(bufnr, row, row, false, { indent .. "@" .. simple })
+    set_import(bufnr, simple, fqn)
+    remember_regular(simple, fqn)
+  end
+
+  -- live telescope picker (type -> results on the fly), else input -> select
+  if annotate_live_telescope(apply) then
+    return
+  end
+  vim.ui.input({ prompt = "annotation: " }, function(name)
+    if not name or name == "" then
+      return
+    end
+    if not name:match("^%u[%w_]*$") then
+      vim.notify("jc: annotation name must start with a capital letter", vim.log.levels.WARN)
+      return
+    end
+    -- prefix match: typing "Get" also offers Getter, GetMapping, ...
+    find_importable_types(name, function(fqns)
+      vim.ui.select(fqns, { prompt = "annotate with:" }, function(fqn)
+        if fqn then
+          apply(fqn)
         end
       end)
-    end)
+    end, false)
   end)
 end
 

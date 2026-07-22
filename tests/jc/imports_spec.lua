@@ -40,3 +40,49 @@ describe("replace import (set_import)", function()
     assert.are.equal("import lombok.Value;", out[3])
   end)
 end)
+
+describe("_filter_type_symbols", function()
+  local jdtls = require("jc.jdtls")
+  local function sym(name, kind, container, uri)
+    return { name = name, kind = kind, containerName = container, location = { uri = uri } }
+  end
+
+  it("exact match keeps only the exact simple name", function()
+    local r = {
+      sym("Data", 11, "lombok", "file:///x"),
+      sym("DataSource", 11, "javax.sql", "file:///y"),
+    }
+    assert.are.same({ "lombok.Data" }, jdtls._filter_type_symbols(r, "Data", true))
+  end)
+
+  it("prefix match finds longer names, not unrelated ones", function()
+    local r = {
+      sym("Getter", 11, "lombok", "jdt://x"),
+      sym("GetMapping", 11, "org.springframework.web.bind.annotation", "jdt://y"),
+      sym("Target", 11, "java.lang.annotation", "jdt://z"),
+    }
+    local out = jdtls._filter_type_symbols(r, "Get", false)
+    assert.are.equal(2, #out)
+    assert.is_truthy(vim.tbl_contains(out, "lombok.Getter"))
+    assert.is_falsy(vim.tbl_contains(out, "java.lang.annotation.Target"))
+  end)
+
+  it("drops non-importable, non-type and nested symbols", function()
+    local r = {
+      sym("Foo", 11, "pkg", "untitled:x"), -- not importable
+      sym("Bar", 6, "pkg", "file:///x"), -- method kind (not a type)
+      sym("Baz", 11, "Outer", "file:///y"), -- nested (enclosing is a type)
+      sym("Ok", 11, "com.app", "file:///z"), -- valid
+    }
+    -- empty prefix matches every name, isolating the other filters
+    assert.are.same({ "com.app.Ok" }, jdtls._filter_type_symbols(r, "", false))
+  end)
+
+  it("dedupes identical FQNs", function()
+    local r = {
+      sym("Data", 11, "lombok", "file:///a"),
+      sym("Data", 11, "lombok", "file:///b"),
+    }
+    assert.are.equal(1, #jdtls._filter_type_symbols(r, "Data", true))
+  end)
+end)

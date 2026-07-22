@@ -45,7 +45,9 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   (abstract) methods.
 - 📦 **Organize imports** — a smart mode that remembers your preferred class per
   ambiguous name, per project; replace an import by picking among same-named
-  types.
+  types; add an annotation to a method or class by a name prefix (`Get` →
+  `Getter`/`GetMapping`/…, picks and imports the chosen type) — a live telescope
+  picker when available, otherwise a prompt + `vim.ui.select`.
 - 🏗️ **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
   completion, project-aware package/module resolution and a library of
   templates (records, spring stereotypes, JPA entity, JUnit, …).
@@ -246,6 +248,7 @@ passed to `setup`.
 | `JCrefactorStaticImport` | convert the call at the cursor to a static import |
 | `JCrefactorStaticImportEnum` | static-import every constant of the enum |
 | `JCrefactorFlipArgs` | swap receiver and argument of the call at the cursor (`a.equals(b)` → `b.equals(a)`) |
+| `JCannotateMethod` / `JCannotateClass` | add an annotation to the enclosing method / class (search jdtls by name, import remembered) |
 
 **Test runner**
 
@@ -313,6 +316,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
 | n | `<p>rf` | flip receiver and argument of the call (`a.equals(b)` → `b.equals(a)`) |
+| n | `<p>am` / `<p>ac` | add an annotation to the enclosing method / class |
 
 ## 🏗️ Class creation
 
