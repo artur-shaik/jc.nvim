@@ -102,6 +102,14 @@ function M.install_mappings(conf, bufnr)
     "<cmd>lua require('jc.class_generator').generate_class_wizard()<CR>",
     opts
   )
+  -- create a class referenced under the cursor but missing from the project
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    prefix .. "nc",
+    "<cmd>lua require('jc.class_generator').generate_class_from_cursor()<CR>",
+    opts
+  )
 
   -- extract variable defaults to all occurrences
   vim.api.nvim_buf_set_keymap(

@@ -1493,6 +1493,113 @@ function M.generate_class()
   end
 end
 
+-- Package picker entries built from every source root: each existing package,
+-- labelled with its module/source-set when the layout is multi-module or the
+-- set isn't main. Returns a list of { display, pkg, subdir }.
+local function package_choices()
+  local multi = vim.tbl_count(M.modules()) > 1
+  local out, seen = {}, {}
+  for _, sr in ipairs(source_roots()) do
+    local label = module_label(sr) -- "core" | "core/test" | <root-name>
+    local set = label:match("/(.+)$")
+    local subdir
+    if multi then
+      subdir = label
+    elseif set then
+      subdir = set
+    end
+    for _, pkg in ipairs(packages_in({ sr })) do
+      local key = (subdir or "") .. "\0" .. pkg
+      if not seen[key] then
+        seen[key] = true
+        local prefix = (multi and (label .. ": ")) or (set and (set .. ": ")) or ""
+        out[#out + 1] = { display = prefix .. pkg, pkg = pkg, subdir = subdir }
+      end
+    end
+  end
+  table.sort(out, function(a, b)
+    return a.display < b.display
+  end)
+  return out
+end
+
+-- Create a class referenced by the code but missing from the project: with the
+-- cursor on the type name, pick a package (and module, multi-module), then land
+-- in the DSL prompt pre-filled with `[module]:/pkg.Name` for any final edits.
+function M.generate_class_from_cursor()
+  local name = require("jc.treesitter").type_at_cursor()
+  if not name then
+    vim.notify("jc: put the cursor on a class name (a capitalized identifier)", vim.log.levels.WARN)
+    return
+  end
+
+  local function open_dsl(subdir, pkg)
+    local path = "/" .. (pkg ~= "" and (pkg .. ".") or "") .. name
+    local saved = suppress_cmdline_pairs()
+    local ok, edited = pcall(vim.fn.input, {
+      prompt = "create class: ",
+      default = M.build_dsl({ subdir = subdir, path_str = path }),
+      completion = "customlist,v:lua.require'jc.class_generator'.complete",
+    })
+    restore_cmdline_pairs(saved)
+    if not ok or edited == "" then
+      return
+    end
+    local final = M.parse_input(edited)
+    if not final then
+      vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+      return
+    end
+    resolve_and_create(final)
+  end
+
+  local function pick_new_package()
+    local current = require("jc.treesitter").get_package()
+    vim.ui.input({ prompt = "Package: ", default = current or "" }, function(pkg)
+      if not pkg then
+        return
+      end
+      pkg = vim.trim(pkg)
+      local names = vim.tbl_keys(M.modules())
+      if #names > 1 then
+        table.sort(names)
+        vim.ui.select(names, { prompt = "Module:" }, function(mod)
+          if mod then
+            open_dsl(mod, pkg)
+          end
+        end)
+      else
+        open_dsl(nil, pkg)
+      end
+    end)
+  end
+
+  local choices, meta = {}, {}
+  local current = require("jc.treesitter").get_package()
+  if current and current ~= "" then
+    local display = "(current) " .. current
+    choices[#choices + 1] = display
+    meta[display] = { subdir = nil, pkg = current }
+  end
+  for _, c in ipairs(package_choices()) do
+    choices[#choices + 1] = c.display
+    meta[c.display] = c
+  end
+  local NEW = "(new package…)"
+  choices[#choices + 1] = NEW
+
+  vim.ui.select(choices, { prompt = "Package for " .. name .. ":" }, function(choice)
+    if not choice then
+      return
+    end
+    if choice == NEW then
+      pick_new_package()
+    else
+      open_dsl(meta[choice].subdir, meta[choice].pkg)
+    end
+  end)
+end
+
 -- the test/source counterpart of a java file: toggles the "Test" suffix and
 -- the src/main<->src/test source set, keeping the package. Pure (no fs).
 function M.test_counterpart(file)

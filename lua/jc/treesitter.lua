@@ -54,6 +54,23 @@ function M.get_package()
   return nil
 end
 
+-- the simple type name under the cursor (a capitalized identifier), or nil.
+-- Used to create a class referenced by the code but missing from the project.
+function M.type_at_cursor()
+  local node = vim.treesitter.get_node()
+  if not node then
+    return nil
+  end
+  local t = node:type()
+  if t == "type_identifier" or t == "identifier" then
+    local name = vim.treesitter.get_node_text(node, 0)
+    if name:match("^%u[%w_]*$") then
+      return name
+    end
+  end
+  return nil
+end
+
 -- the qualifier of the "Qualifier.member" access under the cursor (e.g. cursor
 -- on MyEnum.A or A returns "MyEnum"), or nil
 function M.qualifier_at_cursor()

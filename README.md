@@ -231,6 +231,7 @@ passed to `setup`.
 | Command | Action |
 |---|---|
 | `JCgenerateClass` | class creation prompt (DSL or wizard per `class_prompt`) |
+| `JCgenerateClassFromCursor` | create the class named under the cursor (pick package/module, then the DSL) |
 | `JCgotoTest` | jump to the test class (or back), creating it if missing |
 | `JCgotoFqn` | open the java file for the FQN under the cursor |
 
@@ -297,6 +298,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>c` / `<p>cc` | constructor (fields) / default constructor |
 | n | `<p>m`, i `<C-j>m` | abstract methods |
 | n | `<p>n` / `<p>N` | new class — prompt / wizard |
+| n | `<p>nc` | create the class named under the cursor (missing from the project) |
 | n | `<p>t` | jump to the test class (or back) |
 | n | `gf` | go to file, or the java file of the FQN under the cursor |
 | n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
@@ -410,6 +412,15 @@ create the class in; a brand-new package goes to the current module.
 
 `<p>N` (or `class_prompt = "wizard"`) runs the same thing as a step-by-step
 `vim.ui` flow instead of the one-liner.
+
+### From a reference under the cursor
+
+With the cursor on a class name the code refers to but that doesn't exist yet,
+`<p>nc` (`:JCgenerateClassFromCursor`) picks up that name, asks for a package
+(every existing project package, the current one, or a new one — and the module
+on a multi-module project), then drops you in the DSL prompt pre-filled with
+`[module]:/pkg.Name` so you can still add `extends`, fields or flags before
+creating it.
 
 ## 🧩 Templates
 

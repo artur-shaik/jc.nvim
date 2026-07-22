@@ -117,6 +117,8 @@ with defaults.
   :JCgenerateConstructor     choose fields for constructor
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
+  :JCgenerateClassFromCursor create the class named under the cursor: pick a
+                             package/module, then edit the pre-filled DSL
   :JCgotoTest                jump to/from the test class, create if missing
   :JCgotoFqn                 open the java file for the FQN under the cursor
   :JCtestRun                 run the test at the cursor (neotest)
@@ -178,6 +180,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   i  <C-j>m  generate abstract methods
   n  <p>n    new class prompt (DSL or wizard per class_prompt)
   n  <p>N    new class - step-by-step wizard
+  n  <p>nc   create the class named under the cursor (missing from project)
   n  <p>t    jump to the test class (or back), create if missing
   n  gf      go to file, or the java file of the FQN under the cursor
   n  <p>b    run gradle/maven (prompt, last default)
