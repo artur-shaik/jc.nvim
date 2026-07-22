@@ -291,6 +291,19 @@ function(opts). User input for extends/implements overrides the spec
 defaults. opts: name, package, fields ({mod,type,name}), extends,
 implements.
 
+Snippets ~
+                                                            *jc-snippets*
+jc.nvim ships an optional Java snippet set in snippets/java.json (VS Code
+format). jc does not run a snippet engine — point your own at the folder.
+Prefix scheme: p/P = private/public, s = static, f = final; a lowercase
+type initial is a primitive (psfl -> private static final long), uppercase
+a wrapper (psfL -> Long). Plus fori, forl, ife, dowhile, whileit, inst,
+pst, soutv, runn, lazy. Load with LuaSnip: >
+
+  require("luasnip.loaders.from_vscode").lazy_load({
+    paths = { vim.fn.stdpath("data") .. "/lazy/jc.nvim/snippets" },
+  })
+<
 ==============================================================================
 8. TEST RUNNER                                                         *jc-test*
 

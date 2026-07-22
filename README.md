@@ -31,7 +31,7 @@ predecessor), rebuilt on Neovim's built-in LSP client.
 - [Configuration](#-configuration)
 - [Commands](#-commands)
 - [Mappings](#-mappings)
-- [Class creation](#-class-creation) · [Templates](#-templates)
+- [Class creation](#-class-creation) · [Templates](#-templates) · [Snippets](#-snippets)
 - [Test runner](#-test-runner) · [Build runner](#-build-runner)
 - [Go to file by FQN](#-go-to-file-by-fqn) · [Debugging](#-debugging)
 - [Troubleshooting](#-troubleshooting)
@@ -56,6 +56,8 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   compile errors go to the quickfix list.
 - 🔧 **Refactorings** — extract variable / method, convert to static import,
   flip the receiver and argument of a call (`a.equals(b)` → `b.equals(a)`).
+- 🧷 **Snippets** — an optional VS Code snippet set (field/modifier combos,
+  NetBeans-style abbreviations) for your snippet engine.
 - 🐞 **Debugging** — attach/launch via
   [nvim-dap](https://github.com/mfussenegger/nvim-dap) or
   [vimspector](https://github.com/puremourning/vimspector), with per-project
@@ -459,6 +461,34 @@ Spec fields (all optional): `kind` (`class`/`interface`/`enum`/`annotation`/
 string, a list or a `function(opts)`. User input for `extends`/`implements`
 overrides the spec defaults. `opts`: `name`, `package`, `fields`
 (`{ mod, type, name }`), `extends`, `implements`.
+
+## 🧷 Snippets
+
+jc.nvim ships an **optional** set of Java field/modifier and NetBeans-style
+snippets (`snippets/java.json`, VS Code format). jc doesn't run a snippet engine
+— point your own at the folder. The prefix scheme: `p`/`P` = private/public,
+`s` = static, `f` = final; a lowercase type initial is a primitive (`psfl` →
+`private static final long`), an uppercase one a wrapper (`psfL` → `… Long`).
+Plus `fori`, `forl`, `ife`, `dowhile`, `whileit`, `inst`, `pst`, `soutv`,
+`runn`, `lazy`.
+
+<details>
+<summary>Wiring it into your snippet engine</summary>
+
+Point the loader at the plugin's `snippets/` directory (adjust the path to your
+plugin manager; the lazy.nvim location is shown):
+
+```lua
+-- LuaSnip
+require("luasnip.loaders.from_vscode").lazy_load({
+  paths = { vim.fn.stdpath("data") .. "/lazy/jc.nvim/snippets" },
+})
+
+-- nvim-cmp + vsnip, blink.cmp, or native vim.snippet users: load the same
+-- VS Code snippet folder however your engine consumes `package.json` bundles.
+```
+
+</details>
 
 ## 🧪 Test runner
 
