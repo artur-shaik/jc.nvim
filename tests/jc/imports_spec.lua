@@ -86,3 +86,30 @@ describe("_filter_type_symbols", function()
     assert.are.equal(1, #jdtls._filter_type_symbols(r, "Data", true))
   end)
 end)
+
+describe("_prioritize_types", function()
+  local jdtls = require("jc.jdtls")
+
+  local function with_buffer(lines, fqns)
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    return jdtls._prioritize_types(fqns, buf)
+  end
+
+  it("sorts a type already imported in the buffer to the top", function()
+    local out = with_buffer({
+      "package p;",
+      "",
+      "import org.other.Data;",
+      "",
+      "class C {}",
+    }, { "lombok.Data", "org.other.Data", "com.acme.Data" })
+    assert.are.equal("org.other.Data", out[1])
+  end)
+
+  it("keeps the rest alphabetical after the preferred ones", function()
+    local out = with_buffer({ "class C {}" }, { "z.B", "a.A", "m.M" })
+    -- nothing imported -> pure alphabetical
+    assert.are.same({ "a.A", "m.M", "z.B" }, out)
+  end)
+end)

@@ -641,6 +641,33 @@ function M._filter_type_symbols(result, name, exact)
   return fqns
 end
 
+-- Reorder type FQNs so the ones already imported in `bufnr`, or remembered as a
+-- regular-import preference, come first (alphabetical within each group).
+function M._prioritize_types(fqns, bufnr)
+  local pref = {}
+  for _, fqn in ipairs(regular_imports():load()) do
+    pref[fqn] = true
+  end
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    local imp = line:match("^%s*import%s+static%s+([%w%.]+)") or line:match("^%s*import%s+([%w%.]+)")
+    if imp then
+      pref[imp] = true
+    end
+  end
+  local preferred, rest = {}, {}
+  for _, fqn in ipairs(fqns) do
+    if pref[fqn] then
+      preferred[#preferred + 1] = fqn
+    else
+      rest[#rest + 1] = fqn
+    end
+  end
+  table.sort(preferred)
+  table.sort(rest)
+  vim.list_extend(preferred, rest)
+  return preferred
+end
+
 -- workspace/symbol search for importable types matching `name`. Calls
 -- on_choices(fqns) on the main loop; notifies and skips when none found.
 local function find_importable_types(name, on_choices, exact)
@@ -694,7 +721,7 @@ local function annotate_live_telescope(apply)
     return false
   end
   local finders = require("telescope.finders")
-  local conf = require("telescope.config").values
+  local sorters = require("telescope.sorters")
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
   local client = lsp.get_jdtls_client()
@@ -716,13 +743,15 @@ local function annotate_live_telescope(apply)
           if not resp or resp.err or type(resp.result) ~= "table" then
             return {}
           end
-          return M._filter_type_symbols(resp.result, query, false)
+          return M._prioritize_types(M._filter_type_symbols(resp.result, query, false), bufnr)
         end,
         entry_maker = function(fqn)
           return { value = fqn, display = fqn, ordinal = fqn }
         end,
       }),
-      sorter = conf.generic_sorter({}),
+      -- keep the finder order (imported/remembered first); the finder already
+      -- filters by query, so don't let a fuzzy sorter re-rank it
+      sorter = sorters.highlighter_only({}),
       attach_mappings = function(prompt_bufnr)
         actions.select_default:replace(function()
           local entry = action_state.get_selected_entry()
@@ -779,7 +808,8 @@ function M.add_annotation(target)
     end
     -- prefix match: typing "Get" also offers Getter, GetMapping, ...
     find_importable_types(name, function(fqns)
-      vim.ui.select(fqns, { prompt = "annotate with:" }, function(fqn)
+      -- already-imported / remembered types sort to the top
+      vim.ui.select(M._prioritize_types(fqns, bufnr), { prompt = "annotate with:" }, function(fqn)
         if fqn then
           apply(fqn)
         end
