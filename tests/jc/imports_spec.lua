@@ -113,3 +113,35 @@ describe("_prioritize_types", function()
     assert.are.same({ "a.A", "m.M", "z.B" }, out)
   end)
 end)
+
+describe("_format_settings", function()
+  local jdtls = require("jc.jdtls")
+
+  local function in_buffer(expandtab, sw)
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(buf)
+    vim.bo[buf].expandtab = expandtab
+    vim.bo[buf].shiftwidth = sw
+    vim.bo[buf].tabstop = sw
+    return jdtls._format_settings()
+  end
+
+  it("reports spaces from a space-indented buffer", function()
+    local s = in_buffer(true, 4)
+    assert.is_true(s["java.format.insertSpaces"])
+    assert.are.equal(4, s["java.format.tabSize"])
+  end)
+
+  it("reports tabs from a tab-indented buffer", function()
+    local s = in_buffer(false, 8)
+    assert.is_false(s["java.format.insertSpaces"])
+  end)
+
+  it("merges into the given extra settings", function()
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(buf)
+    local s = jdtls._format_settings({ ["java.codeGeneration.insertionLocation"] = "lastMember" })
+    assert.are.equal("lastMember", s["java.codeGeneration.insertionLocation"])
+    assert.is_not_nil(s["java.format.insertSpaces"])
+  end)
+end)

@@ -68,6 +68,18 @@ local function set_configuration(settings)
   lsp.jdtls_notify("workspace/didChangeConfiguration", { settings = settings })
 end
 
+-- jdtls formats generated code (constructors, toString, override stubs, …)
+-- server-side by its formatter profile, which defaults to tabs. Feed it the
+-- current buffer's indentation so inserted code matches the project's tabs vs
+-- spaces. Merge into the settings passed to set_configuration.
+local function format_settings(extra)
+  local settings = extra or {}
+  settings["java.format.insertSpaces"] = vim.bo.expandtab
+  settings["java.format.tabSize"] = vim.lsp.util.get_effective_tabstop()
+  return settings
+end
+M._format_settings = format_settings
+
 local client_commands = {
   ["java.action.organizeImports.chooseImports"] = choose_imports,
 }
@@ -122,9 +134,9 @@ function M.generate_accessors(fields)
       require("jc.generators").accessors(resp)
     end)
   else
-    set_configuration({
+    set_configuration(format_settings({
       ["java.codeGeneration.insertionLocation"] = "lastMember",
-    })
+    }))
 
     lsp.jdtls_request(0, "java/generateAccessors", {
       context = make_range_params(),
@@ -180,6 +192,8 @@ function M.generate_abstractMethods(wait, attempt)
     lsp.advance_chain()
     return
   end
+  -- match the project's tabs/spaces for the inserted stubs
+  set_configuration(format_settings())
   local params = make_range_params()
   params.context = {
     diagnostics = diagnostics,
@@ -220,9 +234,9 @@ function M.generate_constructor(fields, params, opts)
       require("jc.generators").constructor(resp.fields, resp.constructors, opts)
     end)
   else
-    set_configuration({
+    set_configuration(format_settings({
       ["java.codeGeneration.insertionLocation"] = "lastMember",
-    })
+    }))
 
     if params.default_constructor then
       fields = {}
@@ -246,9 +260,9 @@ function M.generate_hashCodeAndEquals(fields)
       require("jc.generators").hashCodeEquals(resp.fields)
     end)
   else
-    set_configuration({
+    set_configuration(format_settings({
       ["java.codeGeneration.insertionLocation"] = "lastMember",
-    })
+    }))
 
     lsp.jdtls_request(0, "java/generateHashCodeEquals", {
       context = make_range_params(),
@@ -264,10 +278,10 @@ function M.generate_toString(fields, params)
       require("jc.generators").toString(resp.fields)
     end)
   else
-    set_configuration({
+    set_configuration(format_settings({
       ["java.codeGeneration.toString.codeStyle"] = params.code_style,
       ["java.codeGeneration.insertionLocation"] = "lastMember",
-    })
+    }))
 
     lsp.jdtls_request(0, "java/generateToString", {
       context = make_range_params(),
