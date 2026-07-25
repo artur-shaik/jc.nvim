@@ -74,3 +74,47 @@ describe("flip_call_args", function()
     assert.are.equal("class C { int m() { return Math.max(a, b); } }", out[1])
   end)
 end)
+
+describe("move destination derivation", function()
+  local refactor = require("jc.refactor")
+
+  it("_strip_package strips segments off a workspace path", function()
+    assert.are.equal(
+      "/proj/src/main/java",
+      refactor._strip_package("/proj/src/main/java/com/app/model", "com.app.model")
+    )
+  end)
+
+  it("_strip_package strips segments off an absolute uri", function()
+    assert.are.equal(
+      "file:///home/u/proj/src/main/java",
+      refactor._strip_package("file:///home/u/proj/src/main/java/com/app/model", "com.app.model")
+    )
+  end)
+
+  it("_strip_package returns the location itself for the default package", function()
+    assert.are.equal("/proj/src/main/java", refactor._strip_package("/proj/src/main/java", ""))
+  end)
+
+  local base = {
+    project = "app",
+    displayName = "com.app.model",
+    path = "/app/src/main/java/com/app/model",
+    uri = "file:///home/u/app/src/main/java/com/app/model",
+  }
+
+  it("_derive_destination builds path and uri for a new sub-package", function()
+    local d = refactor._derive_destination("com.app.model.dto", base)
+    assert.are.equal("/app/src/main/java/com/app/model/dto", d.path)
+    assert.are.equal("file:///home/u/app/src/main/java/com/app/model/dto", d.uri)
+    assert.are.equal("com.app.model.dto", d.displayName)
+    assert.are.equal("app", d.project)
+    assert.is_false(d.isDefaultPackage)
+  end)
+
+  it("_derive_destination builds a sibling package under the same root", function()
+    local d = refactor._derive_destination("com.app.other", base)
+    assert.are.equal("/app/src/main/java/com/app/other", d.path)
+    assert.are.equal("file:///home/u/app/src/main/java/com/app/other", d.uri)
+  end)
+end)

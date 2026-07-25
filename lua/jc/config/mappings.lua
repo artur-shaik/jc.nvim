@@ -150,6 +150,8 @@ function M.install_mappings(conf, bufnr)
   -- add an annotation to the enclosing method / class (search jdtls by name)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "am", "<Cmd>JCannotateMethod<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "ac", "<Cmd>JCannotateClass<CR>", opts)
+  -- move the current class to another package/source root (updates references)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rM", "<Cmd>JCrefactorMove<CR>", opts)
   -- jump to the test class of the current production class (or back)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "t", "<Cmd>lua require('jc.class_generator').goto_test()<CR>", opts)
 

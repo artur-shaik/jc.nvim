@@ -168,4 +168,152 @@ function M.flip_call_args()
   replace(object, arg_text)
 end
 
+-- Strip a destination's package segments off one of its location strings (its
+-- workspace `path` or its absolute `uri`) to get the source root. Both end with
+-- the package rendered as a path; the default package is already the root.
+function M._strip_package(location, display_name)
+  if not location then
+    return nil
+  end
+  local rel = (display_name or ""):gsub("%.", "/")
+  if rel == "" then
+    return location
+  end
+  return (location:gsub("/" .. vim.pesc(rel) .. "$", ""))
+end
+
+-- Build a destination for a not-yet-existing package by deriving both the
+-- workspace path and the absolute uri from `base` (they strip to different
+-- roots, so keep them separate). Returns nil when they can't be derived.
+function M._derive_destination(pkg, base)
+  local root_path = M._strip_package(base.path, base.displayName)
+  local root_uri = M._strip_package(base.uri, base.displayName)
+  if not root_path or not root_uri then
+    return nil
+  end
+  local seg = pkg == "" and "" or ("/" .. pkg:gsub("%.", "/"))
+  return {
+    project = base.project,
+    displayName = pkg,
+    path = root_path .. seg,
+    uri = root_uri .. seg,
+    isDefaultPackage = pkg == "",
+    isParentOfSelectedFile = false,
+  }
+end
+
+-- Move the current file (class) to another package/source root, updating every
+-- reference. jdtls' two-step protocol: getMoveDestinations -> pick -> move.
+-- This is the moveResource kind; nvim-jdtls handled it before jc dropped that
+-- dependency, so it's reimplemented natively here. A package that doesn't exist
+-- yet is created on disk (and announced to jdtls) first, since java/move only
+-- targets existing folders.
+function M.move()
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+  local uri = vim.uri_from_bufnr(bufnr)
+  local dest_params = {
+    moveKind = "moveResource",
+    sourceUris = { uri },
+    params = vim.NIL,
+  }
+  client:request("java/getMoveDestinations", dest_params, function(err, result)
+    if err or not result or type(result.destinations) ~= "table" or #result.destinations == 0 then
+      vim.schedule(function()
+        vim.notify("jc: no move destinations available", vim.log.levels.WARN)
+      end)
+      return
+    end
+    local destinations = result.destinations
+    local by_name = {}
+    local items = {}
+    for _, d in ipairs(destinations) do
+      local name = d.isDefaultPackage and "" or (d.displayName or "")
+      by_name[name] = d
+      local label = d.isDefaultPackage and "(default package)" or (name ~= "" and name or d.path)
+      items[#items + 1] = string.format("%s  [%s]", label, d.project or "?")
+    end
+
+    local filename = vim.fn.fnamemodify(vim.uri_to_fname(uri), ":t")
+
+    local function send_move(destination)
+      local move_params = {
+        moveKind = "moveResource",
+        sourceUris = { uri },
+        params = code_action_params(client, false),
+        destination = destination,
+        updateReferences = true,
+      }
+      client:request("java/move", move_params, function(merr, mresult, mctx)
+        if merr then
+          vim.notify("jc: move failed: " .. (merr.message or vim.inspect(merr)), vim.log.levels.ERROR)
+        elseif mresult and mresult.errorMessage then
+          vim.notify("jc: move failed: " .. mresult.errorMessage, vim.log.levels.ERROR)
+        elseif not mresult or not mresult.edit then
+          vim.notify("jc: move returned no changes", vim.log.levels.WARN)
+        else
+          apply_refactor_edit(nil, mresult, mctx)
+          -- open the moved file at its new path and refresh its module's config
+          -- so it's treated as a project file, not a standalone one
+          local new_uri = destination.uri .. "/" .. filename
+          vim.schedule(function()
+            vim.cmd.edit(vim.uri_to_fname(new_uri))
+            client:notify("java/projectConfigurationUpdate", { uri = new_uri })
+          end)
+        end
+      end, bufnr)
+    end
+
+    -- java/move only targets folders jdtls already models. Create the package
+    -- dir on disk, announce it, and force a project-configuration update so the
+    -- new folder becomes a real source package (otherwise the moved file lands
+    -- as a "non-project file"); only then move.
+    local function create_then_move(destination)
+      local dir = vim.uri_to_fname(destination.uri)
+      if vim.fn.isdirectory(dir) == 0 and vim.fn.mkdir(dir, "p") == 0 then
+        vim.notify("jc: could not create package folder " .. dir, vim.log.levels.ERROR)
+        return
+      end
+      client:notify("workspace/didChangeWatchedFiles", {
+        changes = { { uri = destination.uri, type = 1 } }, -- 1 = Created
+      })
+      -- update the config of the source project (the current file's module) so
+      -- jdtls rescans and picks up the freshly-created package
+      client:notify("java/projectConfigurationUpdate", { uri = uri })
+      vim.defer_fn(function()
+        send_move(destination)
+      end, 600)
+    end
+
+    vim.schedule(function()
+      vim.ui.select(items, { prompt = "Move to package:" }, function(_, idx)
+        if not idx then
+          return
+        end
+        -- let the user retype the package or append a new sub-package to it
+        vim.ui.input({ prompt = "Package: ", default = destinations[idx].displayName or "" }, function(input)
+          if not input then
+            return
+          end
+          local pkg = vim.trim(input)
+          if by_name[pkg] then
+            send_move(by_name[pkg])
+            return
+          end
+          local destination = M._derive_destination(pkg, destinations[idx])
+          if not destination then
+            vim.notify("jc: could not resolve destination package", vim.log.levels.WARN)
+            return
+          end
+          create_then_move(destination)
+        end)
+      end)
+    end)
+  end, bufnr)
+end
+
 return M

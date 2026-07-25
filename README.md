@@ -57,7 +57,8 @@ predecessor), rebuilt on Neovim's built-in LSP client.
 - ⚙️ **Build runner** — run gradle/maven tasks with a module + task picker;
   compile errors go to the quickfix list.
 - 🔧 **Refactorings** — extract variable / method, convert to static import,
-  flip the receiver and argument of a call (`a.equals(b)` → `b.equals(a)`).
+  flip the receiver and argument of a call (`a.equals(b)` → `b.equals(a)`), move
+  a class to another package (references updated).
 - 🧷 **Snippets** — an optional VS Code snippet set (field/modifier combos,
   NetBeans-style abbreviations) for your snippet engine.
 - 🐞 **Debugging** — attach/launch via
@@ -248,6 +249,7 @@ passed to `setup`.
 | `JCrefactorStaticImport` | convert the call at the cursor to a static import |
 | `JCrefactorStaticImportEnum` | static-import every constant of the enum |
 | `JCrefactorFlipArgs` | swap receiver and argument of the call at the cursor (`a.equals(b)` → `b.equals(a)`) |
+| `JCrefactorMove` | move the current class to another package/source root, updating references |
 | `JCannotateMethod` / `JCannotateClass` | add an annotation to the enclosing method / class (search jdtls by name, import remembered) |
 
 **Test runner**
@@ -316,6 +318,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
 | n | `<p>rf` | flip receiver and argument of the call (`a.equals(b)` → `b.equals(a)`) |
+| n | `<p>rM` | move the current class to another package (references updated) |
 | n | `<p>am` / `<p>ac` | add an annotation to the enclosing method / class |
 
 ## 🏗️ Class creation

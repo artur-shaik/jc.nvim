@@ -36,6 +36,7 @@ command! -range JCrefactorExtractMethod lua require('jc.refactor').extract_metho
 command! JCrefactorStaticImport lua require('jc.jdtls').convert_static_import(true)
 command! JCrefactorStaticImportEnum lua require('jc.jdtls').static_import_enum()
 command! JCrefactorFlipArgs lua require('jc.refactor').flip_call_args()
+command! JCrefactorMove lua require('jc.refactor').move()
 command! JCannotateClass lua require('jc.jdtls').add_annotation('class')
 command! JCannotateMethod lua require('jc.jdtls').add_annotation('method')
 command! JCtestRun lua require('jc.test').run_at_cursor()
