@@ -44,8 +44,9 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   accessors, all with interactive field selection; add unimplemented
   (abstract) methods.
 - 📦 **Organize imports** — a smart mode that remembers your preferred class per
-  ambiguous name, per project; replace an import by picking among same-named
-  types; add an annotation to a method or class by a name prefix (`Get` →
+  ambiguous name, per project; remove-unused / add-missing without reordering
+  the rest; replace an import by picking among same-named types; add an
+  annotation to a method or class by a name prefix (`Get` →
   `Getter`/`GetMapping`/…, picks and imports the chosen type) — a live telescope
   picker when available, otherwise a prompt + `vim.ui.select`.
 - 🏗️ **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
@@ -224,6 +225,9 @@ passed to `setup`.
 | `JCimportsOrganizeSmart` | organize imports, auto-picking remembered classes |
 | `JCimportsOrganize` | organize imports, choosing from the candidate list |
 | `JCimportsReplace` | replace the import of the type under the cursor (pick among same-named, e.g. `lombok.Value` vs spring's) |
+| `JCimportsRemoveUnused` | remove all unused imports (no reordering) |
+| `JCimportsAddMissing` | add all missing imports (no reordering; smart-picks ambiguous names) |
+| `JCimportsOrganizeNoSort` | add missing + remove unused, without reordering the rest |
 | `JCgenerateToString` | generate `toString()` with field selection |
 | `JCgenerateHashCodeAndEquals` | generate `hashCode()` and `equals()` |
 | `JCgenerateAccessors` | choose fields for accessor generation |
@@ -297,7 +301,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 
 | Mode | Keys | Action |
 |---|---|---|
-| n | `<p>i` / `<p>I` | organize imports — smart / manual |
+| n | `<p>i` / `<p>I` | organize imports — smart (sorted) / no reordering |
 | i | `<C-j>i` | organize imports |
 | n | `<p>ts` | `toString()` |
 | n | `<p>eq` | `hashCode()` and `equals()` |
@@ -320,6 +324,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>re` | extract variable, all occurrences (at cursor) |
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
+| n | `<p>ru` / `<p>ri` | remove unused / add missing imports (no reordering) |
 | n | `<p>rf` | flip receiver and argument of the call (`a.equals(b)` → `b.equals(a)`) |
 | n | `<p>rM` | move the current class to another package (references updated) |
 | n | `<p>am` / `<p>ac` | add an annotation to the enclosing method / class |

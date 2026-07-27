@@ -108,6 +108,9 @@ with defaults.
   :JCimportsOrganize         organize imports with manual selection
   :JCimportsReplace          replace the import of the type under the cursor,
                              picking among same-named classes
+  :JCimportsRemoveUnused     remove all unused imports (no reordering)
+  :JCimportsAddMissing       add all missing imports (no reordering)
+  :JCimportsOrganizeNoSort   add missing + remove unused, no reordering
   :JCgenerateToString        generate toString() with field selection
   :JCgenerateHashCodeAndEquals  generate hashCode() and equals()
   :JCgenerateAccessors       choose fields for accessors generation
@@ -172,8 +175,8 @@ with defaults.
 Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 `keys_prefix` (default `<leader>j`).
 
-  n  <p>i    organize imports (smart)
-  n  <p>I    organize imports (manual selection)
+  n  <p>i    organize imports (smart, sorted)
+  n  <p>I    organize imports without reordering (add missing + remove unused)
   i  <C-j>i  organize imports
   n  <p>ts   generate toString()
   n  <p>eq   generate hashCode() and equals()
@@ -208,6 +211,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
   v  <p>rm   extract method
   n  <p>rs   convert call to a static import (all occurrences)
   n  <p>rp   replace the import of the type under the cursor (pick same-named)
+  n  <p>ru   remove all unused imports (no reordering)
+  n  <p>ri   add all missing imports (no reordering)
   n  <p>rf   flip receiver and argument: a.equals(b) -> b.equals(a)
   n  <p>rM   move the current class to another package (updates references)
   n  <p>am   add an annotation to the enclosing method (jdtls, name prefix)

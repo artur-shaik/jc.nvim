@@ -411,6 +411,77 @@ function M.organize_imports(bn, smart)
   lsp.jdtls_request(bn, "java/organizeImports", make_range_params(), apply_edit)
 end
 
+-- Apply a jdtls import code action by its title over the whole buffer, without
+-- the full organize-imports (which also reorders everything). Used for the
+-- "Remove all unused imports" / "Add all missing imports" bulk actions.
+local function apply_import_action(title, on_done)
+  local client = lsp.get_jdtls_client()
+  if not client then
+    vim.notify("jc: no jdtls client attached", vim.log.levels.ERROR)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
+  -- offer the actions over the whole file, with every diagnostic as context so
+  -- jdtls surfaces the unused-import / unresolved-type fixes
+  local diagnostics = {}
+  for _, d in ipairs(vim.diagnostic.get(bufnr)) do
+    diagnostics[#diagnostics + 1] = {
+      range = {
+        start = { line = d.lnum, character = d.col },
+        ["end"] = { line = d.end_lnum or d.lnum, character = d.end_col or d.col },
+      },
+      code = d.code,
+      message = d.message,
+      severity = d.severity,
+      source = d.source,
+    }
+  end
+  local params = make_range_params()
+  params.range = {
+    start = { line = 0, character = 0 },
+    ["end"] = { line = vim.api.nvim_buf_line_count(bufnr), character = 0 },
+  }
+  params.context = { diagnostics = diagnostics }
+  client:request("textDocument/codeAction", params, function(err, actions)
+    if err then
+      vim.notify("jc: code action request failed: " .. err.message, vim.log.levels.ERROR)
+      return
+    end
+    for _, action in ipairs(actions or {}) do
+      if action.title == title then
+        apply_action(action, on_done)
+        return
+      end
+    end
+    -- nothing to do for this action is fine (e.g. no unused imports) — still
+    -- continue any chained step
+    if on_done then
+      on_done(false)
+    end
+  end, bufnr)
+end
+
+-- remove unused imports without reordering the rest
+function M.remove_unused_imports()
+  apply_import_action("Remove all unused imports")
+end
+
+-- add the missing imports without reordering the existing ones; ambiguous names
+-- go through the smart-import chooser (java.action.organizeImports.chooseImports)
+function M.add_missing_imports()
+  M.organize_imports_smart = true
+  apply_import_action("Add all missing imports")
+end
+
+-- organize imports WITHOUT reordering: add missing then remove unused, both via
+-- the bulk code actions (java/organizeImports would also sort the whole list)
+function M.organize_imports_nosort()
+  M.organize_imports_smart = true
+  apply_import_action("Add all missing imports", function()
+    apply_import_action("Remove all unused imports")
+  end)
+end
+
 -- jdt.ls declares java/projectConfigurationUpdate as a JsonNotification:
 -- there is never a response, so send a notification (nvim-jdtls sends a
 -- request and its success therefore looks like "nothing happened")
