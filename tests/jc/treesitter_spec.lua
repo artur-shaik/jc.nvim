@@ -91,4 +91,13 @@ describe("enclosing_declaration", function()
     end
     assert.is_nil(out)
   end)
+
+  it("matches any type declaration from a list (enum)", function()
+    local kinds = { "class_declaration", "enum_declaration", "interface_declaration" }
+    local out = enclosing({ "enum E {", "  A, B;", "}" }, 2, 2, kinds)
+    if out == "skip" then
+      return
+    end
+    assert.are.equal("enum_declaration", out)
+  end)
 end)

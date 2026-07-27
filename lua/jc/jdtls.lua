@@ -856,8 +856,18 @@ end
 -- types, then insert `@Name` above the declaration and add its import
 -- (remembered for smart organize-imports). target: "class"|"method". Uses a live
 -- telescope picker when available, else an input prompt + vim.ui.select.
+-- every java type-declaration node, so "class" annotations also land on enums,
+-- interfaces, records and annotation types
+local TYPE_DECLARATIONS = {
+  "class_declaration",
+  "enum_declaration",
+  "interface_declaration",
+  "record_declaration",
+  "annotation_type_declaration",
+}
+
 function M.add_annotation(target)
-  local kind = target == "method" and "method_declaration" or "class_declaration"
+  local kind = target == "method" and "method_declaration" or TYPE_DECLARATIONS
   local node = require("jc.treesitter").enclosing_declaration(kind)
   if not node then
     vim.notify("jc: cursor is not inside a " .. target, vim.log.levels.WARN)

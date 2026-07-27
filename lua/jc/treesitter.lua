@@ -54,12 +54,21 @@ function M.get_package()
   return nil
 end
 
--- the nearest ancestor node of the given type at the cursor (e.g.
--- "class_declaration" / "method_declaration"), or nil.
+-- the nearest ancestor node whose type is `kind` (a string) or is in `kind`
+-- (a list of type names) at the cursor, or nil. A list lets a caller match any
+-- type declaration (class/enum/interface/record/annotation), not just a class.
 function M.enclosing_declaration(kind)
+  local want = {}
+  if type(kind) == "table" then
+    for _, k in ipairs(kind) do
+      want[k] = true
+    end
+  else
+    want[kind] = true
+  end
   local node = vim.treesitter.get_node()
   while node do
-    if node:type() == kind then
+    if want[node:type()] then
       return node
     end
     node = node:parent()
