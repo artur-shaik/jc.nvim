@@ -594,24 +594,29 @@ function adapter.build_spec(args)
     build_workspace()
   end
 
+  -- compile the module of `file` (build-tool precompile) if enabled; returns
+  -- whether the module built. Shared by the DAP and normal paths.
+  local function compile_module(file)
+    if not pre then
+      return true
+    end
+    local module = module_dir(file) or file
+    if precompile_cache[module] == nil then
+      local ok, out = precompile(file)
+      precompile_cache[module] = { ok = ok }
+      if not ok then
+        report_build_errors(module, out)
+      end
+    end
+    return precompile_cache[module].ok
+  end
+
   -- one spec per file, each with that file's module classpath and project JDK
   local specs = {}
   for file, selectors in pairs(by_file) do
     -- precompile the module with its build tool once per run (cached across the
     -- run's build_spec calls); a failed module isn't retried and reports once
-    local ok_compile = true
-    if pre then
-      local module = module_dir(file) or file
-      if precompile_cache[module] == nil then
-        local ok, out = precompile(file)
-        precompile_cache[module] = { ok = ok }
-        if not ok then
-          report_build_errors(module, out)
-        end
-      end
-      ok_compile = precompile_cache[module].ok
-    end
-
+    local ok_compile = compile_module(file)
     local classpath = ok_compile and resolve_classpath(file, pre)
     if classpath then
       local reports_dir = vim.fn.tempname()

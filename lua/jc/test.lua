@@ -95,6 +95,34 @@ function M.run_file()
   maybe_open_summary(nt, file)
 end
 
+-- Debug the test at the cursor. Java test debugging needs the vscode-java-test
+-- runner and a socket back-channel for results — a whole protocol that both
+-- nvim-jdtls and nvim-java already implement (neotest's own DAP strategy can't
+-- carry it: results come over a separate socket, not the dap channel). So jc
+-- delegates to whichever of those is installed rather than reimplementing it.
+function M.debug()
+  -- Prefer nvim-java: when it manages jdtls its bundled vscode-java-test speaks
+  -- the command set its own API expects. nvim-jdtls' test_nearest_method wants
+  -- `vscode.java.test.search.codelens`, which nvim-java's bundle doesn't expose,
+  -- so try nvim-java first and fall back to nvim-jdtls.
+  local ok_java, java = pcall(require, "java")
+  if ok_java and java.test and java.test.debug_current_method then
+    java.test.debug_current_method()
+    return
+  end
+  local ok, jdtls_dap = pcall(require, "jdtls.dap")
+  if ok and jdtls_dap.test_nearest_method then
+    jdtls_dap.test_nearest_method()
+    return
+  end
+  vim.notify(
+    "jc: debugging tests needs nvim-java or nvim-jdtls — neotest's DAP strategy "
+      .. "can't run java tests (vscode-java-test uses a separate result socket). "
+      .. "Install one to use :JCtestDebug.",
+    vim.log.levels.WARN
+  )
+end
+
 -- run every discovered test under the project root (build file / .git),
 -- falling back to the working directory
 function M.run_all()

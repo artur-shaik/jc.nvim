@@ -53,7 +53,7 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   templates (records, spring stereotypes, JPA entity, JUnit, …).
 - 🧪 **Test runner** — run JUnit tests through
   [neotest](https://github.com/nvim-neotest/neotest) with the classpath
-  resolved from jdtls; optional.
+  resolved from jdtls (debug via nvim-jdtls/nvim-java); optional.
 - ⚙️ **Build runner** — run gradle/maven tasks with a module + task picker;
   compile errors go to the quickfix list.
 - 🔧 **Refactorings** — extract variable / method, convert to static import,
@@ -258,6 +258,7 @@ passed to `setup`.
 |---|---|
 | `JCtestRun` | run the test at the cursor |
 | `JCtestFile` | run every test in the current file |
+| `JCtestDebug` | debug the test at the cursor (delegates to nvim-jdtls / nvim-java) |
 | `JCtestSuite` | run every test under the project root |
 | `JCtestPick` | pick a test class from the whole project and run it |
 | `JCtestLast` | re-run the last test position |
@@ -309,6 +310,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>t` | jump to the test class (or back) |
 | n | `gf` | go to file, or the java file of the FQN under the cursor |
 | n | `<p>Tr` / `<p>Tf` / `<p>Ta` / `<p>Tl` | run test at cursor / file / all / last |
+| n | `<p>Td` | debug the test at the cursor (via nvim-jdtls / nvim-java) |
 | n | `<p>Tp` | pick a test class from the project and run it |
 | n | `<p>Ts` / `<p>To` | toggle test summary / open test output |
 | n | `<p>b` / `<p>B` | run gradle/maven (prompt) / pick a task |
@@ -523,6 +525,16 @@ all-green **focused** run (cursor/file/class) — runs with failures stay open.
 The adapter toasts `running…` at the start and `N passed, M failed, K skipped`
 at the end. Knobs: `test.notify`, `test.open_summary`, `test.autoclose_summary`
 (`false`, or a delay in ms).
+
+**Debugging tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor.
+Java test debugging needs the vscode-java-test runner and a socket back-channel
+for results — a whole protocol [nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls)
+and [nvim-java](https://github.com/nvim-java/nvim-java) already implement (and
+neotest's own DAP strategy can't carry, since results arrive over a separate
+socket, not the dap channel). So `:JCtestDebug` delegates to whichever is
+installed — `jdtls.dap.test_nearest_method()` or nvim-java's
+`test.debug_current_method()` — set your breakpoints first. With neither
+installed it prints a hint.
 
 <details>
 <summary>Classpath, JDK selection and freshness</summary>

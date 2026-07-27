@@ -4,6 +4,24 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Move-class refactoring** — `:JCrefactorMove` / `<p>rM` moves the current
+  class to another package (or a new sub-package, created on the fly), updating
+  every reference.
+- **Debug tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor by
+  delegating to nvim-jdtls (`jdtls.dap.test_nearest_method`) or nvim-java
+  (`test.debug_current_method`), whichever is installed — the vscode-java-test
+  runner both wrap can't ride neotest's DAP strategy (results use a separate
+  socket). Fixes #15.
+
+### Fixed
+
+- Generated code (constructors, `toString`, override stubs, …) now follows the
+  current buffer's indentation (tabs vs spaces) instead of jdtls' tab default.
+
 ## [1.1.1]
 
 ### Fixed

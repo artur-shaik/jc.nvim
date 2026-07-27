@@ -162,6 +162,7 @@ function M.install_mappings(conf, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Ta", "<Cmd>lua require('jc.test').run_all()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tp", "<Cmd>lua require('jc.test').pick()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Tl", "<Cmd>lua require('jc.test').run_last()<CR>", opts)
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Td", "<Cmd>lua require('jc.test').debug()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "Ts", "<Cmd>lua require('jc.test').summary()<CR>", opts)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "To", "<Cmd>lua require('jc.test').output()<CR>", opts)
 
