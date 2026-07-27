@@ -95,32 +95,35 @@ function M.run_file()
   maybe_open_summary(nt, file)
 end
 
--- Debug the test at the cursor. Java test debugging needs the vscode-java-test
--- runner and a socket back-channel for results — a whole protocol that both
--- nvim-jdtls and nvim-java already implement (neotest's own DAP strategy can't
--- carry it: results come over a separate socket, not the dap channel). So jc
--- delegates to whichever of those is installed rather than reimplementing it.
-function M.debug()
-  -- Prefer nvim-java: when it manages jdtls its bundled vscode-java-test speaks
-  -- the command set its own API expects. nvim-jdtls' test_nearest_method wants
-  -- `vscode.java.test.search.codelens`, which nvim-java's bundle doesn't expose,
-  -- so try nvim-java first and fall back to nvim-jdtls.
-  local ok_java, java = pcall(require, "java")
-  if ok_java and java.test and java.test.debug_current_method then
-    java.test.debug_current_method()
-    return
-  end
+-- delegate to nvim-jdtls / nvim-java's own test debugger. Returns true if one
+-- was available and invoked. These wrap the eclipse RemoteTestRunner, which is
+-- sensitive to the vscode-java-test bundle's junit version vs the project's.
+local function delegate_debug()
   local ok, jdtls_dap = pcall(require, "jdtls.dap")
   if ok and jdtls_dap.test_nearest_method then
     jdtls_dap.test_nearest_method()
+    return true
+  end
+  local ok_java, java = pcall(require, "java")
+  if ok_java and java.test and java.test.debug_current_method then
+    java.test.debug_current_method()
+    return true
+  end
+  return false
+end
+
+-- Debug the test at the cursor. Default is jc-native (ConsoleLauncher under a
+-- JDWP agent) which works regardless of junit versions; set
+-- `test.debug = "external"` to delegate to nvim-jdtls/nvim-java instead (their
+-- report UI, but breaks when the project's junit differs from their bundle's).
+-- external falls back to jc-native when neither plugin is installed.
+function M.debug()
+  local ok, jc = pcall(require, "jc")
+  local mode = ok and jc.config and jc.config.test and jc.config.test.debug
+  if mode == "external" and delegate_debug() then
     return
   end
-  vim.notify(
-    "jc: debugging tests needs nvim-java or nvim-jdtls — neotest's DAP strategy "
-      .. "can't run java tests (vscode-java-test uses a separate result socket). "
-      .. "Install one to use :JCtestDebug.",
-    vim.log.levels.WARN
-  )
+  require("jc.test_debug").debug_at_cursor()
 end
 
 -- run every discovered test under the project root (build file / .git),

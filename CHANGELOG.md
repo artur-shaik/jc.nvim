@@ -11,11 +11,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Move-class refactoring** — `:JCrefactorMove` / `<p>rM` moves the current
   class to another package (or a new sub-package, created on the fly), updating
   every reference.
-- **Debug tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor by
-  delegating to nvim-jdtls (`jdtls.dap.test_nearest_method`) or nvim-java
-  (`test.debug_current_method`), whichever is installed — the vscode-java-test
-  runner both wrap can't ride neotest's DAP strategy (results use a separate
-  socket). Fixes #15.
+- **Debug tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor.
+  By default jc runs its own debugger (launches the JUnit console launcher under
+  a JDWP agent and attaches nvim-dap), which works on any junit version because
+  the launcher is standalone. `test.debug = "external"` delegates to
+  nvim-jdtls/nvim-java instead (their report UI, but their eclipse runner can
+  discover 0 tests when the project's junit differs from its bundled ~5.11).
+  Fixes #15.
 
 ### Fixed
 

@@ -2,3 +2,4 @@ vendor/plenary.nvim
 .vimrc
 doc/tags
 .claude/
+logs/

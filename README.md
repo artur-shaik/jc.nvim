@@ -167,6 +167,7 @@ require("jc").setup({
     open_summary = true,            -- open the neotest summary on a run
     autoclose_summary = true,       -- close it after an all-green focused run
     console_launcher_path = nil,    -- path to the JUnit console-standalone jar
+    debug = nil,                    -- test debugger: nil = jc-native, "external" = nvim-jdtls/nvim-java
   },
 })
 ```
@@ -527,14 +528,25 @@ at the end. Knobs: `test.notify`, `test.open_summary`, `test.autoclose_summary`
 (`false`, or a delay in ms).
 
 **Debugging tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor.
-Java test debugging needs the vscode-java-test runner and a socket back-channel
-for results — a whole protocol [nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls)
-and [nvim-java](https://github.com/nvim-java/nvim-java) already implement (and
-neotest's own DAP strategy can't carry, since results arrive over a separate
-socket, not the dap channel). So `:JCtestDebug` delegates to whichever is
-installed — `jdtls.dap.test_nearest_method()` or nvim-java's
-`test.debug_current_method()` — set your breakpoints first. With neither
-installed it prints a hint.
+Set your breakpoints first. Needs [nvim-dap](https://github.com/mfussenegger/nvim-dap)
+and the [java-debug](https://github.com/microsoft/java-debug) bundle in jdtls
+(nvim-java bundles it).
+
+By default jc runs its **own** debugger: it launches the JUnit Platform Console
+Launcher under a JDWP agent (same classpath and JDK as a normal run) and attaches
+nvim-dap to it, then reports pass/fail from the XML. Because the console launcher
+is standalone (its own junit-platform), this works on **any** project regardless
+of junit version — including ones where the delegated runner below silently finds
+0 tests.
+
+Set `test.debug = "external"` to delegate to
+[nvim-jdtls](https://github.com/mfussenegger/nvim-jdtls)
+(`jdtls.dap.test_nearest_method`) or
+[nvim-java](https://github.com/nvim-java/nvim-java)
+(`test.debug_current_method`) instead — you get their report UI, but their
+eclipse test runner bundles its own junit (~5.11) and can discover **0 tests** on
+a project whose junit differs from the bundle's. `"external"` falls back to
+jc-native when neither plugin is installed.
 
 <details>
 <summary>Classpath, JDK selection and freshness</summary>

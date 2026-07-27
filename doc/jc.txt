@@ -381,9 +381,19 @@ Debugging tests ~
 needs the vscode-java-test runner and a socket back-channel for results — a
 protocol nvim-jdtls and nvim-java already implement, and one neotest's DAP
 strategy can't carry (results come over a separate socket, not the dap
-channel). So `:JCtestDebug` delegates to whichever is installed:
-jdtls.dap.test_nearest_method() or nvim-java's test.debug_current_method().
-Set your breakpoints first. With neither installed it prints a hint.
+channel). Set your breakpoints first. Needs nvim-dap and the java-debug
+bundle in jdtls (nvim-java bundles it).
+
+By default jc runs its OWN debugger: it launches the JUnit Platform Console
+Launcher under a JDWP agent (same classpath/JDK as a normal run), attaches
+nvim-dap, and reports pass/fail from the XML. The console launcher is
+standalone (its own junit-platform), so this works on ANY project's junit.
+
+Set `test.debug = "external"` to delegate to nvim-jdtls
+(jdtls.dap.test_nearest_method) or nvim-java (test.debug_current_method)
+instead — their report UI, but their eclipse runner bundles its own junit
+(~5.11) and can find 0 tests when the project's junit differs. "external"
+falls back to jc-native when neither is installed.
 
 `:JCtestRun`/`:JCtestFile` also work from a production class: if the current
 buffer is not a test file, jc runs its paired `<Class>Test` file (the same
