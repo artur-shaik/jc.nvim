@@ -594,16 +594,21 @@ local function source_roots()
   if source_root_cache[root] then
     return source_root_cache[root]
   end
-  local roots = {}
+  local roots, seen = {}, {}
+  local function add(p)
+    -- ** can already match the single-module src/<kind>/java; dedup so it isn't
+    -- offered twice (e.g. the "create in" source-set picker)
+    if vim.fn.isdirectory(p) == 1 and not seen[p] then
+      seen[p] = true
+      roots[#roots + 1] = p
+    end
+  end
   for _, kind in ipairs({ "main", "test" }) do
     -- multi-module (**) and single-module (direct) layouts
     for _, p in ipairs(vim.fn.glob(root .. "/**/src/" .. kind .. "/java", true, true)) do
-      roots[#roots + 1] = p
+      add(p)
     end
-    local direct = root .. "/src/" .. kind .. "/java"
-    if vim.fn.isdirectory(direct) == 1 then
-      roots[#roots + 1] = direct
-    end
+    add(root .. "/src/" .. kind .. "/java")
   end
   source_root_cache[root] = roots
   return roots
@@ -1169,13 +1174,19 @@ local function resolve_and_create(parsed)
     if #others == 0 then
       return finalize(direct_data(parsed, src_root))
     end
-    -- prompt: current first, then each module that has the package
-    local choices = { { label = module_label(src_root) .. " (current)", root = src_root } }
+    -- prompt: current first, then each source root that has the package. Label
+    -- by the root path relative to the project (…/src/test/java), so the choice
+    -- reads as a source set (main vs test), not a repeated project/module pick.
+    local proot = project_root_dir()
+    local function set_label(sr)
+      return (proot and sr:sub(1, #proot) == proot) and sr:sub(#proot + 2) or sr
+    end
+    local choices = { { label = set_label(src_root) .. "  (current)", root = src_root } }
     for _, sr in ipairs(others) do
-      choices[#choices + 1] = { label = module_label(sr), root = sr }
+      choices[#choices + 1] = { label = set_label(sr), root = sr }
     end
     vim.ui.select(choices, {
-      prompt = "Package exists elsewhere — create in:",
+      prompt = "Package exists in several source sets — create in:",
       format_item = function(c)
         return c.label
       end,

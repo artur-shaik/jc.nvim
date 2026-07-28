@@ -121,6 +121,7 @@ with defaults.
   :JCgenerateConstructor     choose fields for constructor
   :JCgenerateAbstractMethods generate unimplemented methods
   :JCgenerateClass           start class generation prompt
+  :JCgenerateClassWizard     class generation, always the step-by-step wizard
   :JCgenerateClassFromCursor create the class named under the cursor: pick a
                              package/module, then edit the pre-filled DSL
   :JCgotoTest                jump to/from the test class, create if missing
