@@ -19,7 +19,6 @@ jc.nvim hooks into whatever `jdtls` client attaches and adds the ergonomics of
 [vim-javacomplete2](https://github.com/artur-shaik/vim-javacomplete2) (its
 predecessor), rebuilt on Neovim's built-in LSP client.
 
-<!-- Record with `vhs docs/class-creation.tape` (see docs/README.md) -->
 ![class creation](docs/class-creation.gif)
 
 <details>
@@ -74,8 +73,17 @@ predecessor), rebuilt on Neovim's built-in LSP client.
 Generating a constructor and `toString` — the picker windows let you pick the
 fields and the style:
 
-<!-- Record with `vhs docs/code-generation.tape` -->
 ![code generation](docs/code-generation.gif)
+
+Adding an annotation by name — a live search over jdtls' types inserts the
+`@Annotation` and its import:
+
+![annotate](docs/annotate.gif)
+
+Replacing an import — pick a different same-named type and the import line is
+swapped in place:
+
+![import replace](docs/import-replace.gif)
 
 ## 📋 Requirements
 
@@ -241,6 +249,7 @@ passed to `setup`.
 | Command | Action |
 |---|---|
 | `JCgenerateClass` | class creation prompt (DSL or wizard per `class_prompt`) |
+| `JCgenerateClassWizard` | class creation, always the step-by-step wizard |
 | `JCgenerateClassFromCursor` | create the class named under the cursor (pick package/module, then the DSL) |
 | `JCgotoTest` | jump to the test class (or back), creating it if missing |
 | `JCgotoFqn` | open the java file for the FQN under the cursor |
@@ -516,6 +525,8 @@ launcher, so there's no build-tool daemon to wait for and gradle/maven/plain
 layouts all work the same way. Wire it as in
 [Installation](#-installation).
 
+![test runner](docs/test-run.gif)
+
 The launcher jar is looked up in `~/.m2`; if missing, run `:JCtestInstall` once
 (downloads `org.junit.platform:junit-platform-console-standalone` via maven) or
 set `test.console_launcher_path`.
@@ -619,6 +630,8 @@ output window or a pasted stack trace into the code. It understands:
 - a line suffix `com.foo.Bar:42`;
 - a stack frame `at com.foo.Bar.method(Bar.java:25)` → `Bar`, line 25 (rejoined
   even when a narrow terminal wrapped it across two lines).
+
+![go to FQN](docs/goto-fqn.gif)
 
 The file opens in the **last window that showed a java buffer** (so you can
 trigger it from a terminal split and land back in your editing window), or a new
