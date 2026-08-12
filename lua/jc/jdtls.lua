@@ -406,9 +406,38 @@ function M.static_import_enum()
   step()
 end
 
+-- push the project's remembered IDE import-sort preset to jdtls (a no-op when
+-- none is set); organize-imports then sorts the way that IDE would
+function M.push_import_style()
+  local style = require("jc.import_style")
+  local settings = style.settings_for(style.load() or "")
+  if settings then
+    set_configuration(settings)
+  end
+end
+
 function M.organize_imports(bn, smart)
   M.organize_imports_smart = smart
+  M.push_import_style()
   lsp.jdtls_request(bn, "java/organizeImports", make_range_params(), apply_edit)
+end
+
+-- pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / …), remember it for
+-- the project, and organize the current buffer with it right away
+function M.set_import_style()
+  local style = require("jc.import_style")
+  local current = style.load()
+  vim.ui.select(style.order, {
+    prompt = "Import sort style:",
+    format_item = function(name)
+      return name == current and (name .. "  (current)") or name
+    end,
+  }, function(choice)
+    if choice then
+      style.save(choice)
+      M.organize_imports(0, false)
+    end
+  end)
 end
 
 -- Apply a jdtls import code action by its title over the whole buffer, without

@@ -44,8 +44,9 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   (abstract) methods.
 - 📦 **Organize imports** — a smart mode that remembers your preferred class per
   ambiguous name, per project; remove-unused / add-missing without reordering
-  the rest; replace an import by picking among same-named types; add an
-  annotation to a method or class by a name prefix (`Get` →
+  the rest; replace an import by picking among same-named types; pick an IDE
+  sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per
+  project; add an annotation to a method or class by a name prefix (`Get` →
   `Getter`/`GetMapping`/…, picks and imports the chosen type) — a live telescope
   picker when available, otherwise a prompt + `vim.ui.select`.
 - 🏗️ **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
@@ -236,6 +237,7 @@ passed to `setup`.
 | `JCimportsRemoveUnused` | remove all unused imports (no reordering) |
 | `JCimportsAddMissing` | add all missing imports (no reordering; smart-picks ambiguous names) |
 | `JCimportsOrganizeNoSort` | add missing + remove unused, without reordering the rest |
+| `JCimportsStyle` | pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per project |
 | `JCgenerateToString` | generate `toString()` with field selection |
 | `JCgenerateHashCodeAndEquals` | generate `hashCode()` and `equals()` |
 | `JCgenerateAccessors` | choose fields for accessor generation |
@@ -311,6 +313,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | Mode | Keys | Action |
 |---|---|---|
 | n | `<p>i` / `<p>I` | organize imports — smart (sorted) / no reordering |
+| n | `<p>ro` | pick an IDE import-sort preset, remembered per project |
 | i | `<C-j>i` | organize imports |
 | n | `<p>ts` | `toString()` |
 | n | `<p>eq` | `hashCode()` and `equals()` |

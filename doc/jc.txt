@@ -111,6 +111,8 @@ with defaults.
   :JCimportsRemoveUnused     remove all unused imports (no reordering)
   :JCimportsAddMissing       add all missing imports (no reordering)
   :JCimportsOrganizeNoSort   add missing + remove unused, no reordering
+  :JCimportsStyle            pick an IDE import-sort preset (Eclipse /
+                             IntelliJ IDEA / VS Code / Google), per project
   :JCgenerateToString        generate toString() with field selection
   :JCgenerateHashCodeAndEquals  generate hashCode() and equals()
   :JCgenerateAccessors       choose fields for accessors generation
@@ -178,6 +180,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 
   n  <p>i    organize imports (smart, sorted)
   n  <p>I    organize imports without reordering (add missing + remove unused)
+  n  <p>ro   pick an IDE import-sort preset (remembered per project)
   i  <C-j>i  organize imports
   n  <p>ts   generate toString()
   n  <p>eq   generate hashCode() and equals()
