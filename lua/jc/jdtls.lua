@@ -826,9 +826,44 @@ function M.replace_import()
   end, true)
 end
 
--- A live telescope picker over jdtls types: each keystroke re-queries
--- workspace/symbol (synchronously, fast) and offers the matches. Returns true
--- when it opened, false when telescope isn't available (caller falls back).
+-- Split a picker prompt into the type name jdtls should search for (first word)
+-- and the terms that narrow the results down by package. workspace/symbol only
+-- matches simple names, so "Service spring" can't go to the server as one query:
+-- jdtls gets "Service", "spring" filters the FQNs here.
+function M._split_type_query(prompt)
+  local words = {}
+  for w in (prompt or ""):gmatch("%S+") do
+    words[#words + 1] = w
+  end
+  return words[1] or "", { unpack(words, 2) }
+end
+
+-- keep the FQNs matching every narrowing term (case-insensitive, plain substring)
+function M._narrow_types(fqns, terms)
+  if #terms == 0 then
+    return fqns
+  end
+  local out = {}
+  for _, fqn in ipairs(fqns) do
+    local lower = fqn:lower()
+    local hit = true
+    for _, term in ipairs(terms) do
+      if not lower:find(term:lower(), 1, true) then
+        hit = false
+        break
+      end
+    end
+    if hit then
+      out[#out + 1] = fqn
+    end
+  end
+  return out
+end
+
+-- A live telescope picker over jdtls types: the first word is queried against
+-- workspace/symbol (cached until it changes), any further words narrow the FQNs
+-- locally — "Service spring" → org.springframework...Service. Returns true when
+-- it opened, false when telescope isn't available (caller falls back).
 local function annotate_live_telescope(apply)
   local ok, pickers = pcall(require, "telescope.pickers")
   if not ok then
@@ -844,20 +879,27 @@ local function annotate_live_telescope(apply)
     return true
   end
   local bufnr = vim.api.nvim_get_current_buf()
+  local cache = { name = nil, fqns = {} }
 
   pickers
     .new({}, {
-      prompt_title = "Annotation",
+      prompt_title = "Annotation (type name, then words to narrow: Service spring)",
       finder = finders.new_dynamic({
-        fn = function(query)
-          if not query or query == "" then
+        fn = function(prompt)
+          local name, terms = M._split_type_query(prompt)
+          if name == "" then
             return {}
           end
-          local resp = client:request_sync("workspace/symbol", { query = query }, 1000, bufnr)
-          if not resp or resp.err or type(resp.result) ~= "table" then
-            return {}
+          -- only hit jdtls when the searched name changed; the extra words just
+          -- filter what we already have
+          if cache.name ~= name then
+            cache.name, cache.fqns = name, {}
+            local resp = client:request_sync("workspace/symbol", { query = name }, 1000, bufnr)
+            if resp and not resp.err and type(resp.result) == "table" then
+              cache.fqns = M._prioritize_types(M._filter_type_symbols(resp.result, name, false), bufnr)
+            end
           end
-          return M._prioritize_types(M._filter_type_symbols(resp.result, query, false), bufnr)
+          return M._narrow_types(cache.fqns, terms)
         end,
         entry_maker = function(fqn)
           return { value = fqn, display = fqn, ordinal = fqn }
@@ -922,10 +964,12 @@ function M.add_annotation(target)
   if annotate_live_telescope(apply) then
     return
   end
-  vim.ui.input({ prompt = "annotation: " }, function(name)
-    if not name or name == "" then
+  vim.ui.input({ prompt = "annotation (e.g. Service spring): " }, function(input)
+    if not input or input == "" then
       return
     end
+    -- same shape as the telescope picker: "Service spring" -> name + narrowing
+    local name, terms = M._split_type_query(input)
     if not name:match("^%u[%w_]*$") then
       vim.notify("jc: annotation name must start with a capital letter", vim.log.levels.WARN)
       return
@@ -933,7 +977,8 @@ function M.add_annotation(target)
     -- prefix match: typing "Get" also offers Getter, GetMapping, ...
     find_importable_types(name, function(fqns)
       -- already-imported / remembered types sort to the top
-      vim.ui.select(M._prioritize_types(fqns, bufnr), { prompt = "annotate with:" }, function(fqn)
+      local choices = M._narrow_types(M._prioritize_types(fqns, bufnr), terms)
+      vim.ui.select(choices, { prompt = "annotate with:" }, function(fqn)
         if fqn then
           apply(fqn)
         end

@@ -145,3 +145,36 @@ describe("_format_settings", function()
     assert.is_not_nil(s["java.format.insertSpaces"])
   end)
 end)
+
+describe("type query narrowing", function()
+  local jdtls = require("jc.jdtls")
+
+  it("splits a prompt into the searched name and narrowing terms", function()
+    local name, terms = jdtls._split_type_query("Service spring stereotype")
+    assert.are.equal("Service", name)
+    assert.are.same({ "spring", "stereotype" }, terms)
+  end)
+
+  it("treats a bare name as no narrowing", function()
+    local name, terms = jdtls._split_type_query("Service")
+    assert.are.equal("Service", name)
+    assert.are.same({}, terms)
+    assert.are.equal("", (jdtls._split_type_query("")))
+  end)
+
+  local FQNS = {
+    "org.springframework.stereotype.Service",
+    "jakarta.inject.Service",
+    "com.acme.internal.Service",
+  }
+
+  it("keeps only the FQNs matching every term, case-insensitively", function()
+    assert.are.same({ "org.springframework.stereotype.Service" }, jdtls._narrow_types(FQNS, { "SPRING" }))
+    assert.are.same({ "org.springframework.stereotype.Service" }, jdtls._narrow_types(FQNS, { "spring", "stereotype" }))
+    assert.are.same({}, jdtls._narrow_types(FQNS, { "spring", "inject" }))
+  end)
+
+  it("returns everything when there is nothing to narrow by", function()
+    assert.are.same(FQNS, jdtls._narrow_types(FQNS, {}))
+  end)
+end)
