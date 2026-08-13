@@ -158,7 +158,11 @@ with defaults.
                              updating references; pick a package then edit it
                              to append a new sub-package (created on the fly)
   :JCannotateMethod          add an annotation to the enclosing method (a
-                             live telescope picker, else a prompt + select)
+                             live telescope picker, else a prompt + select).
+                             The first word is the type name; further words
+                             narrow by package: `Service spring` picks
+                             org.springframework...Service out of every
+                             same-named type
   :JCannotateClass           add an annotation to the enclosing class
   :JCbuildRun [args]         run gradle/maven with args (or prompt, last
                              default); compile errors go to the quickfix list

@@ -47,8 +47,9 @@ predecessor), rebuilt on Neovim's built-in LSP client.
   the rest; replace an import by picking among same-named types; pick an IDE
   sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per
   project; add an annotation to a method or class by a name prefix (`Get` →
-  `Getter`/`GetMapping`/…, picks and imports the chosen type) — a live telescope
-  picker when available, otherwise a prompt + `vim.ui.select`.
+  `Getter`/`GetMapping`/…, picks and imports the chosen type; `Service spring`
+  narrows same-named types by package) — a live telescope picker when
+  available, otherwise a prompt + `vim.ui.select`.
 - 🏗️ **Class creation** — a one-line DSL (or a step-by-step wizard) with `<Tab>`
   completion, project-aware package/module resolution and a library of
   templates (records, spring stereotypes, JPA entity, JUnit, …).
@@ -266,7 +267,7 @@ passed to `setup`.
 | `JCrefactorStaticImportEnum` | static-import every constant of the enum |
 | `JCrefactorFlipArgs` | swap receiver and argument of the call at the cursor (`a.equals(b)` → `b.equals(a)`) |
 | `JCrefactorMove` | move the current class to another package/source root, updating references |
-| `JCannotateMethod` / `JCannotateClass` | add an annotation to the enclosing method / class (search jdtls by name, import remembered) |
+| `JCannotateMethod` / `JCannotateClass` | add an annotation to the enclosing method / class (search jdtls by name, import remembered); type `Service spring` to narrow same-named types by package |
 
 **Test runner**
 

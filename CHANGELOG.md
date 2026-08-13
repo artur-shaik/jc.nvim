@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Narrowed annotation search** — in `:JCannotateClass` / `:JCannotateMethod`
+  the first word is the type name and any further words filter the candidates by
+  package, so `Service spring` goes straight to
+  `org.springframework.stereotype.Service`. The jdtls symbol query is cached
+  while only the narrowing words change.
 - **Import-sort styles** — `:JCimportsStyle` (`<p>ro`) picks a named IDE preset
   (Eclipse / IntelliJ IDEA / VS Code / Google) for the import order, static
   position and wildcard thresholds. The choice is remembered per project and
