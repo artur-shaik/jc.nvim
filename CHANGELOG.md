@@ -4,10 +4,18 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0]
 
 ### Added
 
+- **Import commands that don't reorder** — `:JCimportsRemoveUnused` (`<p>ru`)
+  and `:JCimportsAddMissing` (`<p>ri`) apply jdtls' bulk code actions, and
+  `:JCimportsOrganizeNoSort` (`<p>I`) chains both, so missing imports are added
+  and unused ones dropped while the existing list keeps its order. Ambiguous
+  names still go through the smart-import chooser.
+- **Class-creation wizard command** — `:JCgenerateClassWizard` runs the
+  step-by-step wizard regardless of the `class_prompt` setting (previously only
+  reachable through `<p>N`).
 - **Narrowed annotation search** — in `:JCannotateClass` / `:JCannotateMethod`
   the first word is the type name and any further words filter the candidates by
   package, so `Service spring` goes straight to
@@ -17,6 +25,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (Eclipse / IntelliJ IDEA / VS Code / Google) for the import order, static
   position and wildcard thresholds. The choice is remembered per project and
   applied on every organize-imports.
+
+### Fixed
+
+- `:JCannotateClass` now also annotates enums, interfaces, records and
+  annotation types (it only recognised plain classes before).
+- The source-set picker shown when a package exists in several source roots no
+  longer lists the same root twice, and labels the choices by their path
+  (`src/main/java` / `src/test/java`) instead of repeating the project name.
+
+### Changed
+
+- The demo GIFs in the README were re-recorded on a light theme, and previews
+  for go-to-FQN, annotations, import replacement and the test runner were
+  added. The vhs `.tape` scripts are no longer kept in the repository.
 
 ## [1.2.0]
 
@@ -125,6 +147,7 @@ client attaches.
 - The class generator, code generators and templates were rewritten from
   vimscript to Lua.
 
+[1.3.0]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.3.0
 [1.2.0]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.2.0
 [1.1.1]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.1.1
 [1.1.0]: https://github.com/artur-shaik/jc.nvim/releases/tag/v1.1.0
