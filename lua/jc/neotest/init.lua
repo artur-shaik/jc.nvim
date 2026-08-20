@@ -451,27 +451,80 @@ local BUILD_EFM = table.concat({
   "%-G%.%#", -- ignore everything else
 }, ",")
 
+-- why a build failed when no file:line error was parsed: javac prints some
+-- errors without a location ("error: warnings found and -Werror specified"),
+-- and gradle explains itself under "* What went wrong:". Fall back to the tail.
+local function build_failure_reason(out)
+  local text = out or ""
+  local lines = {}
+  for line in text:gmatch("[^\r\n]+") do
+    if line:find("error:", 1, true) and #lines < 10 then
+      lines[#lines + 1] = vim.trim(line)
+    end
+  end
+  if #lines == 0 then
+    local what = text:match("%* What went wrong:%s*\n(.-)\n%s*%* Try:")
+    if what then
+      for line in what:gmatch("[^\r\n]+") do
+        lines[#lines + 1] = vim.trim(line)
+      end
+    end
+  end
+  if #lines > 0 then
+    return table.concat(lines, "\n")
+  end
+  local tail = vim.trim(text)
+  return #tail > 1500 and ("..." .. tail:sub(-1500)) or tail
+end
+
+adapter._build_failure_reason = build_failure_reason
+
 -- parse a failed build's output into the quickfix list (file:line) and open it;
 -- falls back to a notification with the output tail when nothing parsed
 local function report_build_errors(module, out)
   local name = vim.fn.fnamemodify(module, ":t")
   vim.schedule(function()
     vim.fn.setqflist({}, " ", { title = "jc build: " .. name, lines = vim.split(out or "", "\n"), efm = BUILD_EFM })
-    local valid = vim.tbl_filter(function(item)
-      return item.valid == 1
+    -- only real errors explain the failure: a build can emit plenty of warnings
+    -- (lombok's @EqualsAndHashCode note, deprecations) and still fail for a
+    -- reason javac printed without a file:line, so warnings must not stand in
+    -- for the cause
+    local errors = vim.tbl_filter(function(item)
+      return item.valid == 1 and item.type == "E"
     end, vim.fn.getqflist())
-    if #valid > 0 then
-      vim.fn.setqflist({}, "r", { title = "jc build: " .. name, items = valid })
+    if #errors > 0 then
+      vim.fn.setqflist({}, "r", { title = "jc build: " .. name, items = errors })
       vim.cmd("botright copen")
-      vim.notify("jc: build failed for " .. name .. " — " .. #valid .. " error(s) in quickfix", vim.log.levels.ERROR)
+      vim.notify("jc: build failed for " .. name .. " — " .. #errors .. " error(s) in quickfix", vim.log.levels.ERROR)
     else
-      local tail = vim.trim(out or "")
-      if #tail > 1500 then
-        tail = "..." .. tail:sub(-1500)
-      end
-      vim.notify("jc: build failed for " .. name .. ":\n" .. tail, vim.log.levels.ERROR)
+      vim.notify("jc: build failed for " .. name .. ":\n" .. build_failure_reason(out), vim.log.levels.ERROR)
     end
   end)
+end
+
+-- JDK for the build tool. Gradle/maven inherit nvim's JAVA_HOME otherwise,
+-- which is routinely the wrong one: an older gradle on a JDK 16+ dies with
+-- "IllegalAccessError: ... jdk.compiler does not export com.sun.tools.javac.*"
+-- because its incremental compiler reaches into javac internals. Build with the
+-- same JDK the tests are launched with (what an IDE does); setup{ test = {
+-- build_java_home = "/path/to/jdk" } } overrides.
+local function build_java_home(file)
+  local ok, jc = pcall(require, "jc")
+  local cfg = ok and jc.config and jc.config.test
+  local override = cfg and cfg.build_java_home
+  if type(override) == "string" and override ~= "" then
+    return vim.fn.expand(override)
+  end
+  -- false keeps whatever JAVA_HOME nvim was started with
+  if override == false then
+    return nil
+  end
+  local java = resolve_java(file, false)
+  -- a bare "java" means it wasn't resolved: leave the environment alone
+  if type(java) == "string" and java ~= "" and java ~= "java" then
+    return vim.fn.fnamemodify(java, ":h:h")
+  end
+  return nil
 end
 
 local function precompile(file)
@@ -536,7 +589,9 @@ local function precompile(file)
   -- run async: a future yields the neotest nio task instead of blocking the UI
   -- (vim.system():wait() would freeze the editor for the whole compile)
   local future = nio.control.future()
-  vim.system(cmd, { cwd = root, text = true, stdout = on_data, stderr = on_data }, function(r)
+  local java_home = build_java_home(file)
+  local env = java_home and { JAVA_HOME = java_home } or nil
+  vim.system(cmd, { cwd = root, env = env, text = true, stdout = on_data, stderr = on_data }, function(r)
     -- resolve on the main loop: vim.system's callback is a fast event context,
     -- and resuming the task there would run the rest of build_spec (vim.fn.*)
     -- where vimscript calls are forbidden (E5560)
@@ -560,8 +615,12 @@ end
 -- calls of one run so a module is built once and a failure reported once.
 -- Cleared at the start of each user-initiated run (jc.test).
 local precompile_cache = {}
+-- one "nothing to run" report per run: neotest calls build_spec for every node
+-- of the broken-down tree, and the cause is the same every time
+local empty_reported = false
 function adapter.clear_precompile_cache()
   precompile_cache = {}
+  empty_reported = false
 end
 
 -- exposed for :JCtestDebugClasspath / :JCtestDebugJava so the dumps reflect
@@ -613,10 +672,12 @@ function adapter.build_spec(args)
 
   -- one spec per file, each with that file's module classpath and project JDK
   local specs = {}
+  local build_failed = false
   for file, selectors in pairs(by_file) do
     -- precompile the module with its build tool once per run (cached across the
     -- run's build_spec calls); a failed module isn't retried and reports once
     local ok_compile = compile_module(file)
+    build_failed = build_failed or not ok_compile
     local classpath = ok_compile and resolve_classpath(file, pre)
     if classpath then
       local reports_dir = vim.fn.tempname()
@@ -636,14 +697,26 @@ function adapter.build_spec(args)
   end
 
   if #specs == 0 then
-    vim.schedule(function()
-      vim.notify(
-        "jc: jdtls couldn't resolve the test classpath — the project may still be "
-          .. "importing (e.g. just after :JCutilWipeWorkspace). Wait for jdtls to "
-          .. "finish, then re-run.",
-        vim.log.levels.WARN
-      )
-    end)
+    -- a failed precompile already reported itself (quickfix + notification), so
+    -- say what actually stopped the run instead of blaming the classpath
+    if not empty_reported then
+      empty_reported = true
+      vim.schedule(function()
+        if build_failed then
+          vim.notify(
+            "jc: build failed — nothing was run. Fix the errors in the quickfix list, then re-run.",
+            vim.log.levels.ERROR
+          )
+        else
+          vim.notify(
+            "jc: jdtls couldn't resolve the test classpath — the project may still be "
+              .. "importing (e.g. just after :JCutilWipeWorkspace). Wait for jdtls to "
+              .. "finish, then re-run.",
+            vim.log.levels.WARN
+          )
+        end
+      end)
+    end
     return nil
   end
 

@@ -80,3 +80,52 @@ describe("neotest launcher", function()
     }, cmd)
   end)
 end)
+
+describe("build failure reason", function()
+  -- the adapter pulls in neotest.lib, which bare CI doesn't have; skip there
+  local ok, adapter = pcall(require, "jc.neotest")
+  local function reason(out)
+    return ok and adapter._build_failure_reason(out) or nil
+  end
+
+  it("prefers error: lines, including ones without a file:line", function()
+    local out = table.concat({
+      "Foo.java:13: warning: lombok note",
+      "error: warnings found and -Werror specified",
+      "1 error",
+      "BUILD FAILED in 3s",
+    }, "\n")
+    local r = reason(out)
+    if r == nil then
+      return
+    end
+    assert.are.equal("error: warnings found and -Werror specified", r)
+  end)
+
+  it("falls back to gradle's 'What went wrong' block", function()
+    local out = table.concat({
+      "> Task :app:compileJava FAILED",
+      "FAILURE: Build failed with an exception.",
+      "",
+      "* What went wrong:",
+      "Execution failed for task ':app:compileJava'.",
+      "> Compilation failed; see the compiler error output for details.",
+      "",
+      "* Try:",
+      "> Run with --stacktrace",
+    }, "\n")
+    local r = reason(out)
+    if r == nil then
+      return
+    end
+    assert.is_truthy(r:find("Execution failed for task ':app:compileJava'.", 1, true))
+    assert.is_falsy(r:find("Run with --stacktrace", 1, true))
+  end)
+
+  it("falls back to the output tail when nothing is recognised", function()
+    local r = reason("weird output")
+    if r ~= nil then
+      assert.are.equal("weird output", r)
+    end
+  end)
+end)

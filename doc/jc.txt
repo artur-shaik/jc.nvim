@@ -87,8 +87,9 @@ types; nested/shaded/internal ones are dropped automatically, but
 package-private types in ordinary packages can slip through).
 
 `test` sub-options (see |jc-test|): `precompile` (compile with the build
-tool before a run, default false), `notify`, `open_summary`,
-`autoclose_summary`, `console_launcher_path`.
+tool before a run, default false), `build_java_home` (JDK for that build;
+default is the project's own, false keeps nvim's JAVA_HOME), `notify`,
+`open_summary`, `autoclose_summary`, `console_launcher_path`.
 
 For templates see |jc-templates|.
                                                               *jc-legacy-vars*
@@ -381,6 +382,12 @@ with ClassNotFoundException; then set `setup{ test = { precompile = true } }`
 precompile runs asynchronously with progress in the cmdline; a compile failure
 fills the quickfix list with the javac/maven errors (file:line) and skips the
 test run.
+
+That build runs on the project's own JDK — the one the tests launch with —
+rather than the JAVA_HOME nvim inherited, since an older gradle on a JDK 16+
+fails with "IllegalAccessError: ... jdk.compiler does not export
+com.sun.tools.javac.*". Set `test.build_java_home` to a JDK path to override,
+or to false to keep nvim's environment.
 
 The run JVM is the configured `java.configuration.runtimes` entry matching
 the highest bytecode version among the module's classes (a 17-compiled test

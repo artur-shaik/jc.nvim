@@ -174,6 +174,7 @@ require("jc").setup({
   on_attach = nil,                  -- function(client, bufnr) extra hook
   test = {                          -- test runner (see Test runner)
     precompile = false,             -- compile with gradle/maven before a run
+    build_java_home = nil,          -- JDK for that build (default: the project's; false = inherit)
     notify = true,                  -- toast run start / result
     open_summary = true,            -- open the neotest summary on a run
     autoclose_summary = true,       -- close it after an all-green focused run
@@ -588,6 +589,11 @@ The classpath is built from jdtls and augmented for correctness:
   compile is async (editor stays responsive, progress in the cmdline), cached
   per module for the run, and on failure the javac/maven errors go to the
   quickfix list instead of running the tests.
+- That build runs on the **project's** JDK (the same one the tests launch with),
+  not on whatever `JAVA_HOME` nvim inherited — an older gradle on a JDK 16+
+  otherwise dies with `IllegalAccessError: ... jdk.compiler does not export
+  com.sun.tools.javac.*`. Override with `test.build_java_home = "/path/to/jdk"`,
+  or set it to `false` to keep nvim's environment.
 - The run JVM is the configured `java.configuration.runtimes` entry matching the
   **highest** bytecode version among the module's classes (a 17-compiled test
   over an 11-target main still runs on 17, as gradle does), falling back to

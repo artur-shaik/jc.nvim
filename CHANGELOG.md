@@ -4,6 +4,25 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Precompiled test runs on an older gradle** — the build tool now runs on the
+  project's own JDK (the one the tests launch with) instead of whatever
+  `JAVA_HOME` nvim inherited, which made e.g. gradle 6.x on a JDK 17 fail with
+  `IllegalAccessError: ... jdk.compiler does not export com.sun.tools.javac.*`.
+  Override with `test.build_java_home`, or set it to `false` to keep nvim's
+  environment.
+- **Build failures now say what actually failed** — warnings (lombok's
+  `@EqualsAndHashCode` note, deprecations) are no longer counted as errors and
+  no longer hide the cause; when no `file:line` error was parsed, jc reports the
+  javac `error:` lines (including ones without a location) or gradle's
+  "What went wrong" block.
+- A run stopped by a failed build no longer blames the classpath ("jdtls
+  couldn't resolve the test classpath"), and reports once per run instead of
+  once per node of the test tree.
+
 ## [1.3.0]
 
 ### Added
