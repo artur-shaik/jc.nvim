@@ -358,7 +358,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | 2 | `[subdir]:` | *(optional)* a source-set or subproject (see below) |
 | 3 | `/package.Name` | class name and package. Leading `/` = absolute in the source root; without it, relative to the current file's package |
 | 4 | `extends`/`implements` | *(optional)* supertypes, imported automatically |
-| 5 | `(fields)` | *(optional)* `type name`, comma-separated, `private` by default. For `enum` this slot lists the constants |
+| 5 | `(fields)` | *(optional)* `type name`, comma-separated, `private` by default. Drop the name and it is derived from the type (`final RiTypeEvent` → `private final RiTypeEvent riTypeEvent`). For `enum` this slot lists the constants |
 | 6 | `:flags` | *(optional)* code-gen and lombok flags (see below) |
 
 Everything except the class name is optional — `/com.app.User` alone makes an
@@ -378,6 +378,7 @@ Absolute (leading `/`) — the package is taken literally:
 | `enum:/com.app.Status(NEW, PAID, SHIPPED)` | an enum with those constants |
 | `service:/com.app.OrderService` | an `@Service` class |
 | `/com.app.UserDto(String id, String name):lombokData` | a class annotated `@Data` |
+| `service:/com.app.JobRunner(final RiTypeEvent, final DictionaryService)` | an `@Service` whose fields are named after their types |
 | `[test]:/com.app.UserTest` | a class under `src/test/java` |
 | `[core]:/com.app.Foo` | a class in the `core` module (multi-module) |
 

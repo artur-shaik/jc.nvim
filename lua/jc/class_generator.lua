@@ -172,35 +172,95 @@ end
 
 -- parse "(mods type name, ...)" -> array of { mod, type, name }; the type may
 -- contain generics with their own commas/spaces ("Map<String, Long>")
+local VISIBILITY = { public = true, private = true, protected = true }
+
+-- names a field can't take
+local JAVA_KEYWORDS = {}
+for w in
+  (
+    "int long short byte char float double boolean void class enum interface "
+    .. "new this super return if else for while do switch case break continue final "
+    .. "static public private protected abstract native transient volatile synchronized "
+    .. "package import throw throws try catch finally instanceof null true false"
+  ):gmatch("%S+")
+do
+  JAVA_KEYWORDS[w] = true
+end
+
+-- A field name derived from its type, the way an IDE would: RiTypeEvent ->
+-- riTypeEvent, DictionaryService -> dictionaryService, URLHandler -> urlHandler
+-- (a leading run of capitals is an acronym), List<String> -> list, String[] ->
+-- strings, int -> i (the plain name would be a keyword).
+function M.field_name_for_type(type_str)
+  local base = (type_str or ""):gsub("%b<>", "")
+  local array = base:find("%[%s*%]") ~= nil
+  base = base:gsub("%[%s*%]", "")
+  base = trim(base):match("[%w_%$]+$") or ""
+  if base == "" then
+    return nil
+  end
+  local name
+  local lead = base:match("^%u+")
+  if lead and #lead > 1 then
+    -- URL -> url, URLHandler -> urlHandler (the last capital starts the word)
+    name = #lead == #base and base:lower() or (lead:sub(1, #lead - 1):lower() .. base:sub(#lead))
+  else
+    name = base:sub(1, 1):lower() .. base:sub(2)
+  end
+  if array then
+    name = name .. "s"
+  end
+  if JAVA_KEYWORDS[name] then
+    name = name:sub(1, 1)
+  end
+  return name
+end
+
 function M.parse_fields(fieldstr)
   local inner = trim(fieldstr:sub(2, -2)) -- drop surrounding ()
   if inner == "" then
     return {}
   end
   local fields = {}
+  local taken = {}
   for _, part in ipairs(split_top_level(inner, ",")) do
     part = trim(part)
-    local name = part:match("[%w_%$]+$") -- the field name = trailing identifier
-    if name and name ~= part then
-      local rest = trim(part:sub(1, #part - #name))
-      -- peel leading modifier words; whatever remains is the type
-      local mods = {}
-      while true do
-        local w, after = rest:match("^([%a]+)%s+(.*)$")
-        if w and MODS[w] then
-          mods[#mods + 1] = w
-          rest = after
-        else
-          break
-        end
+    -- peel leading modifier words; what remains is "Type name" or a bare "Type"
+    local mods, rest = {}, part
+    while true do
+      local w, after = rest:match("^([%a]+)%s+(.*)$")
+      if w and MODS[w] then
+        mods[#mods + 1] = w
+        rest = trim(after)
+      else
+        break
       end
-      if rest ~= "" then
-        fields[#fields + 1] = {
-          mod = #mods > 0 and table.concat(mods, " ") or "private",
-          type = infer_generics(rest),
-          name = name,
-        }
+    end
+    local name = rest:match("[%w_%$]+$")
+    local type_str
+    if name and name ~= rest then
+      type_str = trim(rest:sub(1, #rest - #name))
+    else
+      -- no name given ("final RiTypeEvent"): the type names the field
+      type_str, name = rest, M.field_name_for_type(rest)
+    end
+    if type_str ~= "" and not MODS[type_str] and name then
+      -- two fields of the same type would collide: RiTypeEvent, RiTypeEvent2
+      local unique, n = name, 1
+      while taken[unique] do
+        n = n + 1
+        unique = name .. n
       end
+      taken[unique] = true
+      -- a visibility is always spelled out: "final X" means "private final X"
+      if not (mods[1] and VISIBILITY[mods[1]]) then
+        table.insert(mods, 1, "private")
+      end
+      fields[#fields + 1] = {
+        mod = table.concat(mods, " "),
+        type = infer_generics(type_str),
+        name = unique,
+      }
     end
   end
   return fields

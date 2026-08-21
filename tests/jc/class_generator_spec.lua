@@ -681,3 +681,42 @@ describe("type completion ranking", function()
     assert.are.same({ "Beta", "Alpha" }, names({ { "Alpha", 2 }, { "Beta", 1 } }, ""))
   end)
 end)
+
+describe("field names derived from the type", function()
+  local cg = require("jc.class_generator")
+
+  it("lowercases the first letter", function()
+    assert.are.equal("riTypeEvent", cg.field_name_for_type("RiTypeEvent"))
+    assert.are.equal("dictionaryService", cg.field_name_for_type("DictionaryService"))
+  end)
+
+  it("treats a leading run of capitals as an acronym", function()
+    assert.are.equal("urlHandler", cg.field_name_for_type("URLHandler"))
+    assert.are.equal("url", cg.field_name_for_type("URL"))
+  end)
+
+  it("drops generics and pluralises arrays", function()
+    assert.are.equal("list", cg.field_name_for_type("List<String>"))
+    assert.are.equal("strings", cg.field_name_for_type("String[]"))
+  end)
+
+  it("uses the FQN's last segment and avoids java keywords", function()
+    assert.are.equal("instant", cg.field_name_for_type("java.time.Instant"))
+    assert.are.equal("i", cg.field_name_for_type("int"))
+  end)
+
+  it("names unnamed fields in the DSL, keeping the modifiers", function()
+    assert.are.same({
+      { mod = "private final", type = "RiTypeEvent", name = "riTypeEvent" },
+      { mod = "private final", type = "DictionaryService", name = "dictionaryService" },
+    }, cg.parse_fields("(final RiTypeEvent, final DictionaryService)"))
+  end)
+
+  it("still honours explicit names and disambiguates repeats", function()
+    assert.are.same({
+      { mod = "private", type = "String", name = "name" },
+      { mod = "private", type = "RiTypeEvent", name = "riTypeEvent" },
+      { mod = "private", type = "RiTypeEvent", name = "riTypeEvent2" },
+    }, cg.parse_fields("(String name, RiTypeEvent, RiTypeEvent)"))
+  end)
+end)

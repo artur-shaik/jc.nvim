@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Field names derived from the type** — a class-creation field written with no
+  name is named after its type, the way an IDE would:
+  `(final RiTypeEvent, final DictionaryService)` becomes
+  `private final RiTypeEvent riTypeEvent;` / `private final DictionaryService
+  dictionaryService;`. Acronyms (`URLHandler` → `urlHandler`), generics, arrays,
+  FQNs and java keywords are handled, and repeated types get a numeric suffix.
+  A field with no visibility modifier is now `private` (`final X` → `private
+  final X`).
+
 ### Changed
 
 - **Type completion ranks what you typed first** — in the class-creation DSL,

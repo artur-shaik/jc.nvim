@@ -243,8 +243,13 @@ Prompt scheme (every part but the class name is optional): >
   source root (/com.foo.Bar -> src/main/java/com/foo/Bar.java); no `/` =
   relative to the current file's package;
 - extends/implements classes are imported automatically;
-- field list: `private` by default, modifiers can be given. For the `enum`
-  template the (...) slot lists constants instead: enum:/p.Day(MON, TUE);
+- field list: `private` by default, modifiers can be given. A field written
+  without a name takes one derived from its type, as an IDE would:
+  (final RiTypeEvent) -> private final RiTypeEvent riTypeEvent. Acronyms,
+  generics, arrays and FQNs are handled (URLHandler -> urlHandler,
+  List<String> -> list, String[] -> strings, java.time.Instant -> instant),
+  and repeats of one type get a numeric suffix. For the `enum` template the
+  (...) slot lists constants instead: enum:/p.Day(MON, TUE);
 - trailing flags (see below).
 
 Trailing `:flag` segments run after the class is created.
