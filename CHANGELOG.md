@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Type completion ranks what you typed first** — in the class-creation DSL,
+  the wizard and the `extends`/`implements` steps, names starting with the typed
+  prefix now come before jdtls' fuzzy matches, shortest first (`RiType` before
+  `RiTypeRegistryFactory`, both before `SomeRiTypeFactory`); the fuzzy remainder
+  keeps the previous package ordering.
+
 ### Fixed
 
 - **Precompiled test runs on an older gradle** — the build tool now runs on the

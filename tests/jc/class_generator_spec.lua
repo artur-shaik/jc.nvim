@@ -639,3 +639,45 @@ describe("class_generator parsing", function()
     end)
   end)
 end)
+
+describe("type completion ranking", function()
+  local cg = require("jc.class_generator")
+
+  local function names(list, query)
+    local matches = {}
+    for _, item in ipairs(list) do
+      matches[#matches + 1] = { name = item[1], rank = item[2] or 3 }
+    end
+    cg._sort_type_matches(matches, query)
+    return vim.tbl_map(function(m)
+      return m.name
+    end, matches)
+  end
+
+  it("puts prefix matches first, shortest first", function()
+    local out = names({
+      { "SomeRiTypeFactory" },
+      { "RiTypeRegistryFactory" },
+      { "RiType" },
+      { "RiTypeRegistry" },
+    }, "RiType")
+    assert.are.same({ "RiType", "RiTypeRegistry", "RiTypeRegistryFactory", "SomeRiTypeFactory" }, out)
+  end)
+
+  it("prefers an exact-case prefix over a case-insensitive one", function()
+    assert.are.same({ "RiType", "ritypeThing" }, names({ { "ritypeThing" }, { "RiType" } }, "RiType"))
+  end)
+
+  it("keeps package rank for the fuzzy remainder", function()
+    local out = names({
+      { "ZzzRiTypeLib", 3 },
+      { "AaaRiTypeProject", 1 },
+      { "RiType", 3 },
+    }, "RiType")
+    assert.are.same({ "RiType", "AaaRiTypeProject", "ZzzRiTypeLib" }, out)
+  end)
+
+  it("falls back to rank then name without a query", function()
+    assert.are.same({ "Beta", "Alpha" }, names({ { "Alpha", 2 }, { "Beta", 1 } }, ""))
+  end)
+end)

@@ -723,6 +723,41 @@ local function blocked_package(container)
 end
 
 -- type names from jdtls matching `query`, as "<prefix><sep><Name>"
+-- Order the candidates jdtls returned for `query`. workspace/symbol answers
+-- fuzzily ("RiType" also matches SomeRiTypeFactory), so what the user actually
+-- typed has to win: names starting with the query come first (exact case before
+-- case-insensitive), shortest first inside that group — typing "RiType" should
+-- offer RiType before RiTypeRegistryFactory — and only then the fuzzy rest,
+-- ordered by package rank as before.
+function M._sort_type_matches(matches, query)
+  local q = (query or ""):lower()
+  for _, m in ipairs(matches) do
+    if q == "" then
+      m.match = 2
+    elseif m.name:sub(1, #query) == query then
+      m.match = 0
+    elseif m.name:lower():sub(1, #q) == q then
+      m.match = 1
+    else
+      m.match = 2
+    end
+  end
+  table.sort(matches, function(a, b)
+    if a.match ~= b.match then
+      return a.match < b.match
+    end
+    -- a prefix hit is judged by how much extra it carries, not by its package
+    if a.match < 2 and #a.name ~= #b.name then
+      return #a.name < #b.name
+    end
+    if (a.rank or 0) ~= (b.rank or 0) then
+      return (a.rank or 0) < (b.rank or 0)
+    end
+    return a.name < b.name
+  end)
+  return matches
+end
+
 local function type_completions(query, prefix, kinds, sep)
   local client = require("jc.lsp").get_jdtls_client()
   if not client then
@@ -763,12 +798,7 @@ local function type_completions(query, prefix, kinds, sep)
       matches[#matches + 1] = { name = sym.name, rank = rank }
     end
   end
-  table.sort(matches, function(a, b)
-    if a.rank ~= b.rank then
-      return a.rank < b.rank
-    end
-    return a.name < b.name
-  end)
+  M._sort_type_matches(matches, query)
   local result = {}
   for _, m in ipairs(matches) do
     result[#result + 1] = prefix .. (sep or " ") .. m.name
