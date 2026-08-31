@@ -306,6 +306,13 @@ prompt field with `@Column(name = "<snake_case>")`. Imports are left to
 organize-imports (run automatically after creation), so it works for both
 `jakarta.*` and `javax.*` projects.
 
+The `repository` template is a spring-data interface over the entity its
+name implies: repository:/p.UserRepository ->
+`public interface UserRepository extends JpaRepository<User, Long>` (a
+trailing Repository/Repo is stripped, `Entity` when nothing is left). No
+@Repository annotation — spring-data builds the bean from the interface.
+Give your own `extends` in the DSL to override the supertype.
+
 Custom templates live in `templates_dir` as `<name>.lua` files, each
 returning either a declarative spec table (recommended) or a
 function(opts) -> string. A spec describes only the essence; the engine

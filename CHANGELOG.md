@@ -4,6 +4,17 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The `repository` template makes a spring-data interface** — it used to be a
+  plain class carrying `@Repository`. It is now
+  `public interface UserRepository extends JpaRepository<User, Long>`, deriving
+  the entity from the class name (a trailing `Repository`/`Repo` is stripped)
+  and leaving the import to organize-imports; the redundant `@Repository` is
+  gone. An `extends` given in the DSL still wins.
+
 ## [1.4.0]
 
 ### Added

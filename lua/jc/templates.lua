@@ -243,6 +243,18 @@ local templates = {
   -- JPA entity: @Entity with an @Id. Imports are intentionally omitted — the
   -- creation chain runs organize-imports, which pulls the project's own
   -- persistence package (jakarta.* or javax.*), so the template stays portable.
+  -- spring-data repository: an interface over the entity its name implies
+  -- (UserRepository -> JpaRepository<User, Long>). No @Repository — spring-data
+  -- creates the bean from the interface itself. Imports are left to
+  -- organize-imports, like `entity`, so spring-boot 2 and 3 both work.
+  repository = {
+    kind = "interface",
+    extends = function(opts)
+      local entity = (opts.name or ""):gsub("Repository$", ""):gsub("Repo$", "")
+      return "JpaRepository<" .. (entity ~= "" and entity or "Entity") .. ", Long>"
+    end,
+  },
+
   entity = {
     annotations = "@Entity",
     -- @Id id comes before the prompt fields
@@ -258,7 +270,6 @@ local templates = {
 for name, annotation in pairs({
   service = "Service",
   component = "Component",
-  repository = "Repository",
   controller = "RestController",
 }) do
   templates[name] = { annotations = "@" .. annotation }

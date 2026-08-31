@@ -220,3 +220,33 @@ describe("templates", function()
     end)
   end)
 end)
+
+describe("repository template", function()
+  local templates = require("jc.templates")
+
+  it("is an interface extending JpaRepository over the implied entity", function()
+    local out = templates.render("repository", { name = "UserRepository", package = "p", fields = {} })
+    assert.is_truthy(out:find("public interface UserRepository extends JpaRepository<User, Long>", 1, true))
+    -- spring-data builds the bean from the interface; no stereotype annotation
+    assert.is_falsy(out:find("@Repository", 1, true))
+    assert.is_falsy(out:find("public class", 1, true))
+  end)
+
+  it("also strips a Repo suffix, and falls back to Entity", function()
+    local repo = templates.render("repository", { name = "OrderRepo", package = "p", fields = {} })
+    assert.is_truthy(repo:find("OrderRepo extends JpaRepository<Order, Long>", 1, true))
+    local bare = templates.render("repository", { name = "Repository", package = "p", fields = {} })
+    assert.is_truthy(bare:find("JpaRepository<Entity, Long>", 1, true))
+  end)
+
+  it("lets the DSL override the supertype", function()
+    local out = templates.render("repository", {
+      name = "UserRepository",
+      package = "p",
+      fields = {},
+      extends = "CrudRepository<User, UUID>",
+    })
+    assert.is_truthy(out:find("extends CrudRepository<User, UUID>", 1, true))
+    assert.is_falsy(out:find("JpaRepository", 1, true))
+  end)
+end)
