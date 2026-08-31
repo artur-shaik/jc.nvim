@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Templates that produced code javac rejects** — an `interface`/`@interface`
+  given fields emitted `private String name();` (an interface method may not be
+  private without a body, and an `@interface` takes elements, not fields); it is
+  now `String name();`. `android_activity` passed `savedInstanceBundle` to
+  `super.onCreate` (the parameter is `savedInstanceState`), and
+  `android_broadcast_receiver` returned `null` from a `void onReceive`.
+- **Thin templates filled out** — `junit` now scaffolds an actual `@Test` (and
+  imports `org.junit.Test`/`Before`) instead of only `setUp`; `exception` gets
+  the four conventional constructors, so it can wrap a cause; `controller` adds
+  `@RequestMapping` for the path its name implies (`UserController` → `/user`);
+  `servlet` drops the page of `out.println` HTML (with its unclosed
+  `<!DOCTYPE HTML`) for empty `doGet`/`doPost` handlers, and maps
+  `MyFileServlet` to `/my-file`.
 - **The `repository` template makes a spring-data interface** — it used to be a
   plain class carrying `@Repository`. It is now
   `public interface UserRepository extends JpaRepository<User, Long>`, deriving

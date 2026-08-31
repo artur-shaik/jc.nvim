@@ -42,10 +42,11 @@ local function package_line(opts)
   return ""
 end
 
--- field declarations; `suffix` is "" for "type name;" or "()" for interface
--- method-style "type name();". `annotate(field)` may return an annotation to
--- place above each field (e.g. @Column for an entity).
-local function fields_block(opts, suffix, annotate)
+-- Field declarations. In a class they are "mod type name;"; in an interface or
+-- an @interface they are members — "type name();" with NO modifier, since an
+-- interface method is implicitly public abstract and a `private` one would need
+-- a body (and an @interface takes elements, not fields).
+local function fields_block(opts, member, annotate)
   local fields = opts.fields or {}
   local result = ""
   for i, field in ipairs(fields) do
@@ -55,13 +56,27 @@ local function fields_block(opts, suffix, annotate)
         result = result .. a .. "\n"
       end
     end
-    result = result .. field.mod .. " " .. field.type .. " " .. field.name .. (suffix or "") .. ";\n"
+    local decl = member and (field.type .. " " .. field.name .. "()")
+      or (field.mod .. " " .. field.type .. " " .. field.name)
+    result = result .. decl .. ";\n"
     -- blank line between annotated fields for readability
     if annotate and i < #fields then
       result = result .. "\n"
     end
   end
   return result
+end
+
+-- "MyFileServlet" + suffix "Servlet" -> "/my-file": the class name minus its
+-- role suffix, camelCase split on capitals, lowercased. Used for the URLs a
+-- servlet/controller template maps itself to.
+local function url_path(name, suffix)
+  local base = (name or ""):gsub(suffix .. "$", "")
+  if base == "" then
+    base = name or ""
+  end
+  base = base:gsub("(%l)(%u)", "%1-%2"):gsub("(%u)(%u%l)", "%1-%2")
+  return "/" .. base:lower()
 end
 
 -- camelCase -> snake_case (for @Column names)
@@ -146,7 +161,8 @@ local function assemble(spec, opts)
     out = out .. pre .. "\n\n"
   end
   if not kind.record then
-    out = out .. fields_block(opts, spec.kind == "interface" and "()" or "", spec.field_annotation)
+    local member = spec.kind == "interface" or spec.kind == "annotation"
+    out = out .. fields_block(opts, member, spec.field_annotation)
   end
   local body = resolve_str(spec.body, opts)
   if body then
@@ -166,8 +182,22 @@ local templates = {
 
   exception = {
     extends = "Exception",
+    -- the four constructors java.lang.Exception itself declares, so the class is
+    -- usable for wrapping a cause, not just a message
     body = function(opts)
-      return "public " .. opts.name .. "() {\n\n}\n\npublic " .. opts.name .. "(String msg) {\nsuper(msg);\n}"
+      local n = opts.name
+      return "public "
+        .. n
+        .. "() {\n\n}\n\n"
+        .. "public "
+        .. n
+        .. "(String message) {\nsuper(message);\n}\n\n"
+        .. "public "
+        .. n
+        .. "(String message, Throwable cause) {\nsuper(message, cause);\n}\n\n"
+        .. "public "
+        .. n
+        .. "(Throwable cause) {\nsuper(cause);\n}"
     end,
   },
 
@@ -195,40 +225,20 @@ local templates = {
   servlet = {
     extends = "HttpServlet",
     annotations = function(opts)
-      local url = vim.fn.tolower(vim.fn.substitute(opts.name, "\\C\\([A-Z]\\)", "/\\1", "g"))
-      return '@WebServlet(name = "' .. opts.name .. '", urlPatterns = {"' .. url .. '"})'
+      return '@WebServlet(name = "' .. opts.name .. '", urlPatterns = {"' .. url_path(opts.name, "Servlet") .. '"})'
     end,
-    body = function(opts)
-      local url = vim.fn.tolower(vim.fn.substitute(opts.name, "\\C\\([A-Z]\\)", "/\\1", "g"))
-      return "protected void processRequest(HttpServletRequest request, HttpServletResponse response)"
-        .. " throws ServletException, IOException {\n"
-        .. 'response.setContentType("text/html;charset=UTF-8");\n'
-        .. "try (PrintWriter out = response.getWriter()) {\n"
-        .. 'out.println("<!DOCTYPE HTML");\n'
-        .. 'out.println("<html>");\n'
-        .. 'out.println("<head>");\n'
-        .. 'out.println("<title>Servlet '
-        .. opts.name
-        .. '</title>");\n'
-        .. 'out.println("</head>");\n'
-        .. 'out.println("<body>");\n'
-        .. 'out.println("<h1>Servlet '
-        .. opts.name
-        .. " at "
-        .. url
-        .. '</h1>");\n'
-        .. 'out.println("</body>");\n'
-        .. 'out.println("</html>");\n'
-        .. "}\n}\n\nprotected void doGet(HttpServletRequest request, HttpServletResponse response)"
-        .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}\n"
-        .. "\nprotected void doPost(HttpServletRequest request, HttpServletResponse response)"
-        .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}"
-    end,
+    -- doGet/doPost funnel into one handler; what it writes is the author's
+    -- business, so the body stays empty instead of printing a page of HTML
+    body = "protected void processRequest(HttpServletRequest request, HttpServletResponse response)"
+      .. " throws ServletException, IOException {\n\n}\n\n"
+      .. "@Override\nprotected void doGet(HttpServletRequest request, HttpServletResponse response)"
+      .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}\n\n"
+      .. "@Override\nprotected void doPost(HttpServletRequest request, HttpServletResponse response)"
+      .. " throws ServletException, IOException {\nprocessRequest(request, response);\n}",
   },
-
   junit = {
-    imports = "static org.junit.Assert.*",
-    body = "@Before\npublic void setUp() {\n\n}",
+    imports = { "org.junit.Before", "org.junit.Test", "static org.junit.Assert.*" },
+    body = "@Before\npublic void setUp() {\n\n}\n\n@Test\npublic void test() {\n\n}",
   },
 
   junit5 = {
@@ -243,6 +253,14 @@ local templates = {
   -- JPA entity: @Entity with an @Id. Imports are intentionally omitted — the
   -- creation chain runs organize-imports, which pulls the project's own
   -- persistence package (jakarta.* or javax.*), so the template stays portable.
+  -- @RestController mapped on the path its name implies (UserController ->
+  -- "/user"), so endpoints below are relative to something meaningful
+  controller = {
+    annotations = function(opts)
+      return { "@RestController", '@RequestMapping("' .. url_path(opts.name, "Controller") .. '")' }
+    end,
+  },
+
   -- spring-data repository: an interface over the entity its name implies
   -- (UserRepository -> JpaRepository<User, Long>). No @Repository — spring-data
   -- creates the bean from the interface itself. Imports are left to
@@ -270,7 +288,6 @@ local templates = {
 for name, annotation in pairs({
   service = "Service",
   component = "Component",
-  controller = "RestController",
 }) do
   templates[name] = { annotations = "@" .. annotation }
 end
@@ -279,7 +296,7 @@ end
 for name, def in pairs({
   android_activity = {
     "Activity",
-    "@Override\npublic void onCreate(Bundle savedInstanceState) {\nsuper.onCreate(savedInstanceBundle);\n}",
+    "@Override\nprotected void onCreate(Bundle savedInstanceState) {\nsuper.onCreate(savedInstanceState);\n}",
   },
   android_fragment = {
     "Fragment",
@@ -288,7 +305,7 @@ for name, def in pairs({
   android_service = { "Service", "@Override\npublic IBinder onBind(Intent intent) {\nreturn null;\n}" },
   android_broadcast_receiver = {
     "BroadcastReceiver",
-    "@Override\npublic void onReceive(Context context, Intent intent) {\nreturn null;\n}",
+    "@Override\npublic void onReceive(Context context, Intent intent) {\n\n}",
   },
 }) do
   templates[name] = { extends = def[1], body = def[2] }

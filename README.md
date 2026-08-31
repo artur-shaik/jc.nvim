@@ -465,6 +465,12 @@ prompt field with `@Column(name = "<snake_case>")`. Imports are left to
 organize-imports (run automatically after creation), so it works whether your
 project uses `jakarta.*` or `javax.*`.
 
+The `controller` template maps the path its name implies
+(`UserController` → `@RequestMapping("/user")`), `servlet` maps `MyFileServlet`
+to `/my-file`, `exception` declares the four conventional constructors, and
+`junit`/`junit5` scaffold a `@Test`. Fields given to `interface` or `annotation`
+become members (`String name();`), not fields.
+
 The `repository` template is a spring-data **interface** over the entity its
 name implies — `repository:/com.app.UserRepository` gives
 `public interface UserRepository extends JpaRepository<User, Long>` (a trailing
