@@ -289,3 +289,48 @@ describe("template regressions", function()
     assert.is_truthy(out:find('@RequestMapping("/user")', 1, true))
   end)
 end)
+
+describe("serializable template", function()
+  local templates = require("jc.templates")
+
+  local function render(o)
+    o = o or {}
+    o.name, o.package, o.fields = o.name or "Foo", "p", o.fields or {}
+    return templates.render("serializable", o)
+  end
+
+  it("implements Serializable and declares a generated UID", function()
+    local out = render()
+    assert.is_truthy(out:find("import java.io.Serializable;", 1, true))
+    assert.is_truthy(out:find("public class Foo implements Serializable {", 1, true))
+    local uid = out:match("private static final long serialVersionUID = (%-?%d+)L;")
+    assert.is_not_nil(uid)
+    -- 18 digits, so it always fits a java long
+    assert.are.equal(18, #uid:gsub("^%-", ""))
+  end)
+
+  it("generates a different UID each time", function()
+    local seen = {}
+    for _ = 1, 5 do
+      seen[render():match("serialVersionUID = (%-?%d+)L")] = true
+    end
+    assert.is_true(vim.tbl_count(seen) > 1)
+  end)
+
+  it("keeps Serializable when the DSL adds its own interface", function()
+    local out = render({ implements = "Comparable<Foo>" })
+    assert.is_truthy(out:find("implements Serializable, Comparable<Foo>", 1, true))
+  end)
+
+  it("does not repeat an interface the user already asked for", function()
+    local out = render({ implements = "Serializable, Cloneable" })
+    assert.is_truthy(out:find("implements Serializable, Cloneable {", 1, true))
+  end)
+
+  it("the UID precedes the prompt fields, right under the declaration", function()
+    local out = render({ fields = { { mod = "private", type = "String", name = "name" } } })
+    assert.is_true(out:find("serialVersionUID", 1, true) < out:find("private String name;", 1, true))
+    -- no blank line between "class Foo ... {" and the UID
+    assert.is_truthy(out:find("implements Serializable {\nprivate static final long serialVersionUID", 1, true))
+  end)
+end)

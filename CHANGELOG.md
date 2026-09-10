@@ -4,6 +4,20 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`serializable` template** - a class implementing `Serializable` with a
+  freshly generated 18-digit `serialVersionUID` declared above the fields.
+- Members a template puts before the prompt fields (an entity's `@Id`, the
+  serialVersionUID) now sit directly under the class declaration instead of
+  after a blank line.
+- A template's own `implements` is now merged with the one given in the DSL
+  instead of being replaced, so
+  `serializable:/com.app.Money implements Comparable<Money>` keeps
+  `Serializable` (duplicates are dropped, generics with commas survive).
+
 ## [1.4.1]
 
 ### Fixed

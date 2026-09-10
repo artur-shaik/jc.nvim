@@ -79,9 +79,60 @@ local function url_path(name, suffix)
   return "/" .. base:lower()
 end
 
+-- A fresh serialVersionUID, the way an IDE writes one: a signed 18-digit long
+-- (the first digit stays 1..8 so the value can never overflow java's long).
+local function serial_version_uid()
+  local digits = tostring(vim.fn.rand() % 8 + 1)
+  for _ = 1, 17 do
+    digits = digits .. tostring(vim.fn.rand() % 10)
+  end
+  return (vim.fn.rand() % 2 == 1 and "-" or "") .. digits .. "L"
+end
+
 -- camelCase -> snake_case (for @Column names)
 local function snake_case(s)
   return (s:gsub("(%l)(%u)", "%1_%2"):gsub("(%u)(%u%l)", "%1_%2")):lower()
+end
+
+-- split "A, Map<String, Long>" on the top-level commas only (generics carry
+-- their own)
+local function split_types(s)
+  local out, depth, start = {}, 0, 1
+  for i = 1, #s do
+    local c = s:sub(i, i)
+    if c == "<" then
+      depth = depth + 1
+    elseif c == ">" then
+      depth = depth - 1
+    elseif c == "," and depth == 0 then
+      out[#out + 1] = vim.trim(s:sub(start, i - 1))
+      start = i + 1
+    end
+  end
+  out[#out + 1] = vim.trim(s:sub(start))
+  return out
+end
+
+-- A template's own interface (Serializable) plus whatever the user asked for,
+-- deduped: giving `implements Comparable<Foo>` to the serializable template
+-- must not drop Serializable.
+local function merge_implements(spec_impl, user_impl)
+  if not spec_impl or spec_impl == "" then
+    return user_impl
+  end
+  if not user_impl or user_impl == "" then
+    return spec_impl
+  end
+  local seen, merged = {}, {}
+  for _, list in ipairs({ split_types(spec_impl), split_types(user_impl) }) do
+    for _, t in ipairs(list) do
+      if t ~= "" and not seen[t] then
+        seen[t] = true
+        merged[#merged + 1] = t
+      end
+    end
+  end
+  return table.concat(merged, ", ")
 end
 
 -- spec values may be a string, a list of strings or a function returning
@@ -144,19 +195,20 @@ local function assemble(spec, opts)
     end
   end
   if kind.implements then
-    local impl = opts.implements or resolve_str(spec.implements, opts)
+    local impl = merge_implements(resolve_str(spec.implements, opts), opts.implements)
     if impl then
       out = out .. " implements " .. impl
     end
   end
 
-  out = out .. " {\n\n"
+  -- members that must precede the prompt fields (an entity's @Id, a
+  -- serialVersionUID); they sit right under the declaration, no blank line
+  local pre = resolve_str(spec.pre_fields, opts)
+  out = out .. " {\n" .. (pre and "" or "\n")
   -- enum constants come first as "A, B, C;"
   if kind.keyword == "enum" and opts.values and #opts.values > 0 then
     out = out .. table.concat(opts.values, ", ") .. ";\n"
   end
-  -- members that must precede the prompt fields (e.g. an entity's @Id id)
-  local pre = resolve_str(spec.pre_fields, opts)
   if pre then
     out = out .. pre .. "\n\n"
   end
@@ -248,6 +300,17 @@ local templates = {
       "static org.junit.jupiter.api.Assertions.*",
     },
     body = "@BeforeEach\nvoid setUp() {\n\n}\n\n@Test\nvoid test() {\n\n}",
+  },
+
+  -- Serializable class with the UID declared up front, so the contract is
+  -- pinned before the class is ever shipped. An `implements` from the DSL is
+  -- merged in, not swapped for this one.
+  serializable = {
+    implements = "Serializable",
+    imports = "java.io.Serializable",
+    pre_fields = function()
+      return "private static final long serialVersionUID = " .. serial_version_uid() .. ";"
+    end,
   },
 
   -- JPA entity: @Entity with an @Id. Imports are intentionally omitted — the

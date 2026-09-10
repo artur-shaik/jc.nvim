@@ -457,8 +457,8 @@ creating it.
 ## 🧩 Templates
 
 Built-in: `class`, `interface`, `enum`, `record`, `annotation`, `exception`,
-`main`, `singleton`, `servlet`, `junit`, `junit5`, `entity`, `service`,
-`component`, `repository`, `controller` and the `android_*` family.
+`main`, `singleton`, `serializable`, `servlet`, `junit`, `junit5`, `entity`,
+`service`, `component`, `repository`, `controller` and the `android_*` family.
 
 The `entity` template carries `@Entity` and an `@Id` id, and annotates each
 prompt field with `@Column(name = "<snake_case>")`. Imports are left to
@@ -470,6 +470,12 @@ The `controller` template maps the path its name implies
 to `/my-file`, `exception` declares the four conventional constructors, and
 `junit`/`junit5` scaffold a `@Test`. Fields given to `interface` or `annotation`
 become members (`String name();`), not fields.
+
+The `serializable` template implements `Serializable` and declares a freshly
+generated `serialVersionUID` above the fields. An `implements` given in the DSL
+is merged with the template's own, so
+`serializable:/com.app.Money implements Comparable<Money>` still keeps
+`Serializable`.
 
 The `repository` template is a spring-data **interface** over the entity its
 name implies — `repository:/com.app.UserRepository` gives

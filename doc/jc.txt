@@ -298,13 +298,18 @@ class in; a brand-new package goes to the current module.
 7. TEMPLATES                                                     *jc-templates*
 
 Built-in: class, interface, enum, record, annotation, exception, main,
-singleton, servlet, junit, junit5, entity, service, component, repository,
-controller, android_*.
+singleton, serializable, servlet, junit, junit5, entity, service, component,
+repository, controller, android_*.
 
 The `entity` template carries @Entity and an @Id id, and annotates each
 prompt field with `@Column(name = "<snake_case>")`. Imports are left to
 organize-imports (run automatically after creation), so it works for both
 `jakarta.*` and `javax.*` projects.
+
+The `serializable` template implements Serializable and declares a freshly
+generated serialVersionUID above the fields. An `implements` given in the
+DSL is merged with the template's own, so
+serializable:/p.Money implements Comparable<Money> keeps Serializable too.
 
 The `repository` template is a spring-data interface over the entity its
 name implies: repository:/p.UserRepository ->
