@@ -118,3 +118,48 @@ describe("move destination derivation", function()
     assert.are.equal("file:///home/u/app/src/main/java/com/app/other", d.uri)
   end)
 end)
+
+describe("move destinations", function()
+  local refactor = require("jc.refactor")
+
+  local MAIN = {
+    project = "app",
+    displayName = "com.example",
+    path = "/app/src/main/java/com/example",
+    uri = "file:///w/app/src/main/java/com/example",
+  }
+  local TEST = {
+    project = "app",
+    displayName = "com.example",
+    path = "/app/src/test/java/com/example",
+    uri = "file:///w/app/src/test/java/com/example",
+  }
+  local TEST_DTO = {
+    project = "app",
+    displayName = "com.example.dto",
+    path = "/app/src/test/java/com/example/dto",
+    uri = "file:///w/app/src/test/java/com/example/dto",
+  }
+  local ALL = { MAIN, TEST, TEST_DTO }
+
+  it("names the source root a destination lives in", function()
+    assert.are.equal("src/main/java", refactor._source_root_label("/app/src/main/java"))
+    assert.are.equal("src/test/java", refactor._source_root_label("/w/mod/src/test/java"))
+  end)
+
+  it("keeps the picked entry when the package name is confirmed unchanged", function()
+    -- the same name exists in both roots: the pick must win, not the last match
+    assert.are.same(MAIN, refactor._resolve_destination(ALL, MAIN, "com.example"))
+    assert.are.same(TEST, refactor._resolve_destination(ALL, TEST, "com.example"))
+  end)
+
+  it("resolves an edited name within the source root that was picked", function()
+    assert.are.same(TEST_DTO, refactor._resolve_destination(ALL, TEST, "com.example.dto"))
+    -- no com.example.dto under src/main: nil, so the caller creates it there
+    assert.is_nil(refactor._resolve_destination(ALL, MAIN, "com.example.dto"))
+  end)
+
+  it("reports nothing for a package that exists nowhere", function()
+    assert.is_nil(refactor._resolve_destination(ALL, MAIN, "com.example.brand.new"))
+  end)
+end)

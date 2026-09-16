@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Move-class always landed in the test source root** - when a package existed
+  in both `src/main/java` and `src/test/java`, the picker entries looked
+  identical and the destination was looked up by package name alone, so the
+  entry picked in the list was discarded in favour of whichever root jdtls
+  listed last. The pick is now honoured, an edited package name resolves within
+  the same source root (and is created there when missing), and every entry says
+  which root it belongs to: `com.example  [app/src/test/java]`.
+
 ### Added
 
 - **`serializable` template** - a class implementing `Serializable` with a

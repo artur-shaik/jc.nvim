@@ -182,6 +182,34 @@ function M._strip_package(location, display_name)
   return (location:gsub("/" .. vim.pesc(rel) .. "$", ""))
 end
 
+-- "…/pers-account-model/src/test/java" -> "src/test/java": what distinguishes
+-- two destinations that carry the same package name.
+function M._source_root_label(root)
+  if not root or root == "" then
+    return nil
+  end
+  return root:match("(src/[^/]+/[^/]+)$") or root:match("(src/[^/]+)$") or root:match("([^/]+)$")
+end
+
+-- The destination for `pkg` once the user has confirmed or edited the package
+-- name of the entry they picked. Unchanged name -> exactly that entry (never a
+-- same-named package from another source root); an edited name -> an existing
+-- package under the SAME source root; otherwise nil, and the caller creates it
+-- there.
+function M._resolve_destination(destinations, chosen, pkg)
+  local chosen_name = chosen.displayName or ""
+  if pkg == chosen_name then
+    return chosen
+  end
+  local root = M._strip_package(chosen.path, chosen_name)
+  for _, d in ipairs(destinations) do
+    if (d.displayName or "") == pkg and M._strip_package(d.path, d.displayName) == root then
+      return d
+    end
+  end
+  return nil
+end
+
 -- Build a destination for a not-yet-existing package by deriving both the
 -- workspace path and the absolute uri from `base` (they strip to different
 -- roots, so keep them separate). Returns nil when they can't be derived.
@@ -229,13 +257,14 @@ function M.move()
       return
     end
     local destinations = result.destinations
-    local by_name = {}
     local items = {}
     for _, d in ipairs(destinations) do
       local name = d.isDefaultPackage and "" or (d.displayName or "")
-      by_name[name] = d
       local label = d.isDefaultPackage and "(default package)" or (name ~= "" and name or d.path)
-      items[#items + 1] = string.format("%s  [%s]", label, d.project or "?")
+      -- the same package usually exists in both main and test: say which is which
+      local root = M._source_root_label(M._strip_package(d.path, name))
+      local where = root and ((d.project or "?") .. "/" .. root) or (d.project or "?")
+      items[#items + 1] = string.format("%s  [%s]", label, where)
     end
 
     local filename = vim.fn.fnamemodify(vim.uri_to_fname(uri), ":t")
@@ -300,8 +329,9 @@ function M.move()
             return
           end
           local pkg = vim.trim(input)
-          if by_name[pkg] then
-            send_move(by_name[pkg])
+          local existing = M._resolve_destination(destinations, destinations[idx], pkg)
+          if existing then
+            send_move(existing)
             return
           end
           local destination = M._derive_destination(pkg, destinations[idx])
