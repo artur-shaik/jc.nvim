@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A class name was mistaken for a template** - `MyDto:lombokGetter` parsed as
+  the template `MyDto` with `lombokGetter` as the class, and was rejected with
+  "no class name given (looks like a package)". A leading `word:` is now read as
+  a template only when that template exists and the word is not capitalised, so
+  a relative class name with flags works like the absolute form already did.
 - **Move-class always landed in the test source root** - when a package existed
   in both `src/main/java` and `src/test/java`, the picker entries looked
   identical and the destination was looked up by package name alone, so the

@@ -326,9 +326,12 @@ function M.parse_input(userinput)
   local rest = userinput
   local result = {}
 
-  -- template: leading "word:"
+  -- template: leading "word:" — only when the word actually names a template.
+  -- Otherwise "MyDto:lombokGetter" would read as template "MyDto" with the flag
+  -- as the class name. Templates are lower-case, class names are not, so a
+  -- capitalised word is always the class.
   local template, after = rest:match("^([%w_]+):(.*)$")
-  if template then
+  if template and not template:match("^%u") and require("jc.templates").get(template) then
     result.template = template
     rest = after
   end
