@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A run that cannot start now says why, in plain words** - when the precompile
+  failed (or jdtls had no classpath), the adapter returned nothing and neotest
+  answered with "jc returned no data to run tests" over a lua traceback. The
+  tests are now reported as failed with the real cause and what to do about it:
+  fix the quickfix errors, or - when the failing task needs something you don't
+  have at hand, such as a live database for a code generator - turn the
+  build-tool precompile off with `:JCtestPrecompile` and let jdtls compile.
 - **A class name was mistaken for a template** - `MyDto:lombokGetter` parsed as
   the template `MyDto` with `lombokGetter` as the class, and was rejected with
   "no class name given (looks like a package)". A leading `word:` is now read as

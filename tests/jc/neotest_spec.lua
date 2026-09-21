@@ -129,3 +129,26 @@ describe("build failure reason", function()
     end
   end)
 end)
+
+describe("failure explanations", function()
+  local ok, adapter = pcall(require, "jc.neotest")
+
+  it("tells the user what failed and what to do about it", function()
+    if not ok then
+      return -- bare CI has no neotest.lib
+    end
+    local msg = adapter._build_failed_message("Execution failed for task ':card:generateJooq'.")
+    assert.is_truthy(msg:find("no tests were run", 1, true))
+    assert.is_truthy(msg:find("generateJooq", 1, true))
+    -- the two ways out: fix it, or stop precompiling
+    assert.is_truthy(msg:find(":copen", 1, true))
+    assert.is_truthy(msg:find(":JCtestPrecompile", 1, true))
+  end)
+
+  it("survives a build that produced no output", function()
+    if not ok then
+      return
+    end
+    assert.is_truthy(adapter._build_failed_message(nil):find("no output captured", 1, true))
+  end)
+end)

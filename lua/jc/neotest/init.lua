@@ -611,6 +611,37 @@ local function precompile(file)
   return res.code == 0, table.concat(chunks)
 end
 
+-- When the run can't start, neotest still needs a spec: returning nil makes it
+-- raise "jc returned no data to run tests" over a lua traceback, which says
+-- nothing about the real cause. So hand it a command that prints the
+-- explanation and exits non-zero - results() then marks the tests failed and
+-- the text is one :JCtestOutput away.
+local function explain_spec(root, message)
+  local note = vim.fn.tempname()
+  vim.fn.writefile(vim.split(message, "\n"), note)
+  local cmd = vim.fn.has("win32") == 1 and { "cmd", "/c", "type " .. note .. " & exit 1" }
+    or { "sh", "-c", "cat " .. vim.fn.shellescape(note) .. "; exit 1" }
+  local headline = vim.split(message, "\n")[1]
+  return { command = cmd, cwd = root, context = { failed_to_start = headline .. " - see :JCtestOutput" } }
+end
+
+-- what the user should do about a build that failed before the tests ran
+local function build_failed_message(reason)
+  return table.concat({
+    "The build failed, so no tests were run.",
+    "",
+    vim.trim(reason or "(no output captured)"),
+    "",
+    "What to do:",
+    "  - fix the errors in the quickfix list (:copen), then run again;",
+    "  - if the failing task needs something you don't have right now (a live",
+    "    database for a code generator, a VPN, credentials), turn the build-tool",
+    "    precompile off with :JCtestPrecompile and let jdtls compile instead.",
+  }, "\n")
+end
+
+adapter._build_failed_message = build_failed_message
+
 -- precompile result per module, persisted across the (broken-down) build_spec
 -- calls of one run so a module is built once and a failure reported once.
 -- Cleared at the start of each user-initiated run (jc.test).
@@ -653,6 +684,10 @@ function adapter.build_spec(args)
     build_workspace()
   end
 
+  -- set when a precompile fails, so the run can explain itself instead of
+  -- looking like a classpath problem
+  local build_failed, build_reason = false, nil
+
   -- compile the module of `file` (build-tool precompile) if enabled; returns
   -- whether the module built. Shared by the DAP and normal paths.
   local function compile_module(file)
@@ -662,17 +697,17 @@ function adapter.build_spec(args)
     local module = module_dir(file) or file
     if precompile_cache[module] == nil then
       local ok, out = precompile(file)
-      precompile_cache[module] = { ok = ok }
+      precompile_cache[module] = { ok = ok, reason = (not ok) and build_failure_reason(out) or nil }
       if not ok then
         report_build_errors(module, out)
       end
     end
+    build_reason = build_reason or precompile_cache[module].reason
     return precompile_cache[module].ok
   end
 
   -- one spec per file, each with that file's module classpath and project JDK
   local specs = {}
-  local build_failed = false
   for file, selectors in pairs(by_file) do
     -- precompile the module with its build tool once per run (cached across the
     -- run's build_spec calls); a failed module isn't retried and reports once
@@ -699,25 +734,28 @@ function adapter.build_spec(args)
   if #specs == 0 then
     -- a failed precompile already reported itself (quickfix + notification), so
     -- say what actually stopped the run instead of blaming the classpath
+    local message = build_failed and build_failed_message(build_reason)
+      or table.concat({
+        "jdtls could not resolve the test classpath.",
+        "",
+        "The project may still be importing (e.g. just after :JCutilWipeWorkspace).",
+        "",
+        "What to do:",
+        "  - wait for jdtls to finish indexing, then run again;",
+        "  - check :JCtestDebugClasspath to see what it resolves to;",
+        "  - if jdtls keeps leaving classes out, :JCutilWipeWorkspace and restart.",
+      }, "\n")
     if not empty_reported then
       empty_reported = true
       vim.schedule(function()
-        if build_failed then
-          vim.notify(
-            "jc: build failed — nothing was run. Fix the errors in the quickfix list, then re-run.",
-            vim.log.levels.ERROR
-          )
-        else
-          vim.notify(
-            "jc: jdtls couldn't resolve the test classpath — the project may still be "
-              .. "importing (e.g. just after :JCutilWipeWorkspace). Wait for jdtls to "
-              .. "finish, then re-run.",
-            vim.log.levels.WARN
-          )
-        end
+        vim.notify(
+          build_failed and "jc: build failed - no tests were run, see :JCtestOutput"
+            or "jc: jdtls couldn't resolve the test classpath - see :JCtestOutput",
+          build_failed and vim.log.levels.ERROR or vim.log.levels.WARN
+        )
       end)
     end
-    return nil
+    return explain_spec(adapter.root(vim.fn.expand("%:p")) or vim.fn.getcwd(), message)
   end
 
   notify_start()
@@ -768,7 +806,11 @@ function adapter.results(spec, result, tree)
       elseif runner_failed then
         results[d.id] = {
           status = "failed",
-          short = "test runner produced no report (exit " .. tostring(result.code) .. ") — see :JCtestOutput",
+          -- a run that never started explains itself; a real runner crash gets
+          -- the generic note
+          short = spec.context and spec.context.failed_to_start
+            or ("test runner produced no report (exit " .. tostring(result.code) .. ") - see :JCtestOutput"),
+          -- the full explanation is the command's own output
           output = result.output,
         }
         -- count these so the run isn't treated as all-green (no auto-close)
