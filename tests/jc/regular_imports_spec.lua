@@ -9,8 +9,22 @@ describe("regular_imports", function()
     imports = require("jc.regular_imports")()
   end)
 
-  it("creates the workspace dir", function()
+  it("creates the workspace dir when something is written", function()
+    -- constructing alone must not need the dir: the project (and so the dir)
+    -- can still change within the session
+    imports:add("java.util.List")
     assert.are.equal(1, vim.fn.isdirectory(require("jc.path").get_workspace_dir()))
+  end)
+
+  it("writes into the current project's dir, not the one seen at construction", function()
+    -- the module is a singleton, so a second project in the same session used to
+    -- write into a directory nobody had created: E482 out of choose_imports
+    vim.g.jc_basedir = vim.fn.tempname()
+    package.loaded["jc.path"] = nil
+    local moved = require("jc.path").get_workspace_dir()
+    imports:add("java.util.Map")
+    assert.are.equal(1, vim.fn.isdirectory(moved))
+    assert.are.same({ "java.util.Map" }, imports:load())
   end)
 
   it("loads empty list when nothing was saved", function()

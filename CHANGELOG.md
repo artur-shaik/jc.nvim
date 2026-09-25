@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Remembered imports broke in a second project** - the workspace directory was
+  created once, when the module was first used, but the file path is resolved
+  per project. Opening a file from another project in the same session then
+  failed with `E482: Can't open file .../.regular_imports for writing`, and
+  since that happens inside the synchronous `choose_imports` handler, jdtls got
+  a -32603 instead of the picked candidate. The directory is now created at
+  write time, and a failed write warns instead of throwing.
 - **A run that cannot start now says why, in plain words** - when the precompile
   failed (or jdtls had no classpath), the adapter returned nothing and neotest
   answered with "jc returned no data to run tests" over a lua traceback. The

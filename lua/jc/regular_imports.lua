@@ -2,14 +2,22 @@ local paths = require("jc.path")
 
 local RegularImports = {}
 
-function RegularImports.new()
-  local workspace_dir = paths.get_workspace_dir()
-  if vim.fn.isdirectory(workspace_dir) ~= 1 then
-    local ok, err = pcall(vim.fn.mkdir, workspace_dir, "p")
-    if not ok then
-      vim.notify("jc: couldn't create workspace dir " .. workspace_dir .. ": " .. tostring(err), vim.log.levels.WARN)
-    end
+-- The workspace dir depends on the current project, so it can change within one
+-- nvim session (open a file from another project) - create it right before a
+-- write instead of once at construction.
+local function ensure_dir()
+  local dir = paths.get_workspace_dir()
+  if vim.fn.isdirectory(dir) == 1 then
+    return true
   end
+  local ok, err = pcall(vim.fn.mkdir, dir, "p")
+  if not ok then
+    vim.notify("jc: couldn't create workspace dir " .. dir .. ": " .. tostring(err), vim.log.levels.WARN)
+  end
+  return ok
+end
+
+function RegularImports.new()
   return setmetatable({}, { __index = RegularImports })
 end
 
@@ -25,10 +33,25 @@ function RegularImports:load()
   return {}
 end
 
+-- Never let a write throw: this runs inside the synchronous
+-- workspace/executeClientCommand handler for choose_imports, where an error
+-- turns into a -32603 back to jdtls instead of a chosen candidate.
+function RegularImports:write(lines)
+  if not ensure_dir() then
+    return false
+  end
+  local file = self.filename()
+  local ok, err = pcall(vim.fn.writefile, lines, file)
+  if not ok then
+    vim.notify("jc: couldn't save " .. file .. ": " .. tostring(err), vim.log.levels.WARN)
+  end
+  return ok
+end
+
 function RegularImports:add(class_name)
   local loaded = self:load()
   table.insert(loaded, class_name)
-  vim.fn.writefile(loaded, self.filename())
+  self:write(loaded)
 end
 
 function RegularImports:remove(class_name)
@@ -41,7 +64,7 @@ function RegularImports:remove(class_name)
     end
   end
   if removed then
-    vim.fn.writefile(loaded, self.filename())
+    self:write(loaded)
   end
 end
 
