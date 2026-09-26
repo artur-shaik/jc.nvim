@@ -152,3 +152,34 @@ describe("failure explanations", function()
     assert.is_truthy(adapter._build_failed_message(nil):find("no output captured", 1, true))
   end)
 end)
+
+describe("console launcher version", function()
+  local launcher = require("jc.neotest.launcher")
+
+  local function cp(...)
+    return { ... }
+  end
+
+  it("maps junit 5 onto the platform 1.x jar", function()
+    local v = launcher.launcher_version(cp("/m2/junit-jupiter-api-5.11.3.jar", "/m2/spring-test-6.1.0.jar"))
+    assert.are.equal("1.11.3", v)
+  end)
+
+  it("keeps the version as-is from junit 6 on (numbering merged)", function()
+    assert.are.equal("6.0.3", launcher.launcher_version(cp("/m2/junit-jupiter-api-6.0.3.jar")))
+  end)
+
+  it("falls back to the platform engine when jupiter is absent", function()
+    assert.are.equal("1.9.2", launcher.launcher_version(cp("/m2/junit-platform-engine-1.9.2.jar")))
+  end)
+
+  it("reports nothing when the classpath carries no junit", function()
+    assert.is_nil(launcher.launcher_version(cp("/m2/guava-33.0.jar")))
+    assert.is_nil(launcher.launcher_version({}))
+  end)
+
+  it("names the artifact for a version, defaulting when none is given", function()
+    assert.are.equal("org.junit.platform:junit-platform-console-standalone:6.0.3", launcher.artifact("6.0.3"))
+    assert.is_truthy(launcher.artifact(nil):find(launcher.DEFAULT_VERSION, 1, true))
+  end)
+end)

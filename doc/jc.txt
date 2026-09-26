@@ -139,7 +139,8 @@ with defaults.
   :JCtestSummary             toggle the neotest summary panel
   :JCtestOutput              open the output of the test at the cursor
   :JCtestPrecompile          toggle build-tool precompile before a run
-  :JCtestInstall             download the JUnit console launcher via maven
+  :JCtestInstall [version]   download the JUnit console launcher matching
+                             the project's junit (or the given version)
   :JCtoggleAutoformat        toggle autoformat on save
   :JCdebugAttach             attach debugger (dap or vimspector)
   :JCdebugLaunch             launch debug session
@@ -365,9 +366,16 @@ Wire the adapter into your neotest setup: >lua
     adapters = { require("jc").neotest_adapter() },
   })
 <
-The launcher jar is resolved from `~/.m2`. If absent, run `:JCtestInstall`
-once to download `org.junit.platform:junit-platform-console-standalone`
-via maven, or set it explicitly: >lua
+The launcher jar is resolved from `~/.m2`. The jar bundles its own JUnit
+engines and they win over the project's, so jc picks the version matching the
+junit on the test classpath: junit 5.11.3 needs the 1.11.3 jar, junit 6.0.3
+needs 6.0.3 (junit 6 merged the numbering). A mismatch fails inside the
+framework, typically NoSuchMethodError from SpringExtension. If the jar is
+absent, run `:JCtestInstall` to download the version this project needs (or
+`:JCtestInstall 6.0.3` for a specific one). It goes through maven when
+available and otherwise downloads from Maven Central with curl/wget; the same
+fallback covers a corporate mirror that cannot serve the artifact. Progress is
+shown in the cmdline. The jar can also be set explicitly: >lua
 
   require("jc").setup({
     test = { console_launcher_path = "/path/to/launcher.jar" },

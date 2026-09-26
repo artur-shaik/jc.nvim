@@ -45,15 +45,17 @@ function M.run(selector, label)
   end
   local launcher = require("jc.neotest.launcher")
   local adapter = require("jc.neotest")
-  local jar = launcher.resolve_jar()
-  if not jar then
-    vim.notify("jc: junit console launcher jar not found — run :JCtestInstall", vim.log.levels.ERROR)
-    return
-  end
   local file = vim.fn.expand("%:p")
   local classpath = adapter.resolve_classpath(file, false)
   if not classpath then
     vim.notify("jc: couldn't resolve the test classpath from jdtls", vim.log.levels.ERROR)
+    return
+  end
+  -- the launcher has to match the project's junit, same as for a normal run
+  local wanted = launcher.launcher_version(classpath)
+  local jar = launcher.resolve_jar(wanted)
+  if not jar then
+    vim.notify("jc: no console launcher for junit " .. (wanted or "?") .. " - run :JCtestInstall", vim.log.levels.ERROR)
     return
   end
   local java = adapter.resolve_java(file, false)

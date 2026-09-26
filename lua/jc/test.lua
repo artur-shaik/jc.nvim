@@ -318,14 +318,40 @@ function M.toggle_precompile()
   vim.notify("jc: test precompile " .. (jc.config.test.precompile and "ON (gradle/maven)" or "OFF (jdtls)"))
 end
 
--- download the JUnit Platform Console Standalone jar via maven
-function M.install()
+-- Download the JUnit Platform Console Standalone jar via maven. The version has
+-- to match the junit the project runs on (the jar brings its own engines), so
+-- it is read off the test classpath; an explicit argument wins.
+function M.install(version)
   local launcher = require("jc.neotest.launcher")
-  if launcher.resolve_jar() then
-    vim.notify("jc: launcher already present: " .. launcher.console_launcher_path, vim.log.levels.INFO)
+  if version and version ~= "" then
+    if launcher.find_jar(version) then
+      vim.notify("jc: launcher already present: " .. launcher.find_jar(version), vim.log.levels.INFO)
+      return
+    end
+    launcher.install_jar(version)
     return
   end
-  launcher.install_jar(function() end)
+  require("jc.tools").classpaths_for(
+    vim.uri_from_bufnr(0),
+    function(classpath)
+      local wanted = launcher.launcher_version(classpath)
+      local present = launcher.find_jar(wanted)
+      if present then
+        vim.notify("jc: launcher already present: " .. present, vim.log.levels.INFO)
+        return
+      end
+      launcher.install_jar(wanted)
+    end,
+    "test",
+    function()
+      -- no classpath (no jdtls, not a java buffer): fall back to the default
+      if launcher.resolve_jar() then
+        vim.notify("jc: launcher already present: " .. launcher.console_launcher_path, vim.log.levels.INFO)
+        return
+      end
+      launcher.install_jar(nil)
+    end
+  )
 end
 
 return M

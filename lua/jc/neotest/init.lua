@@ -665,18 +665,6 @@ function adapter.build_spec(args)
     return nil
   end
 
-  local jar = launcher.resolve_jar()
-  if not jar then
-    vim.schedule(function()
-      vim.notify(
-        "jc: junit-platform-console-standalone jar not found — run :JCtestInstall or set "
-          .. "require('jc.neotest.launcher').console_launcher_path",
-        vim.log.levels.ERROR
-      )
-    end)
-    return nil
-  end
-
   local pre = precompile_enabled()
   if not pre then
     -- force jdtls to (incrementally) compile the workspace so its bin output is
@@ -687,6 +675,8 @@ function adapter.build_spec(args)
   -- set when a precompile fails, so the run can explain itself instead of
   -- looking like a classpath problem
   local build_failed, build_reason = false, nil
+  -- set when the console-standalone jar for the project's junit isn't cached
+  local missing_launcher = nil
 
   -- compile the module of `file` (build-tool precompile) if enabled; returns
   -- whether the module built. Shared by the DAP and normal paths.
@@ -714,7 +704,14 @@ function adapter.build_spec(args)
     local ok_compile = compile_module(file)
     build_failed = build_failed or not ok_compile
     local classpath = ok_compile and resolve_classpath(file, pre)
-    if classpath then
+    -- the launcher must match the junit the project runs on, so it is picked
+    -- from the classpath rather than "whatever is cached"
+    local wanted = classpath and launcher.launcher_version(classpath)
+    local jar = classpath and launcher.resolve_jar(wanted)
+    if classpath and not jar then
+      missing_launcher = wanted or launcher.DEFAULT_VERSION
+    end
+    if classpath and jar then
       local reports_dir = vim.fn.tempname()
       vim.fn.mkdir(reports_dir, "p")
       specs[#specs + 1] = {
@@ -733,9 +730,30 @@ function adapter.build_spec(args)
 
   if #specs == 0 then
     -- a failed precompile already reported itself (quickfix + notification), so
-    -- say what actually stopped the run instead of blaming the classpath
-    local message = build_failed and build_failed_message(build_reason)
-      or table.concat({
+    -- say what actually stopped the run instead of blaming the classpath. The
+    -- notification carries the command to run: having to open :JCtestOutput
+    -- just to learn the next step is a step too many.
+    local message, notice, level
+    if build_failed then
+      message = build_failed_message(build_reason)
+      notice = "jc: build failed, no tests ran - fix the quickfix errors, or :JCtestPrecompile "
+        .. "to compile with jdtls instead"
+      level = vim.log.levels.ERROR
+    elseif missing_launcher then
+      message = table.concat({
+        "The JUnit console launcher for this project is not installed.",
+        "",
+        "The project runs on junit " .. missing_launcher .. ", and the launcher bundles its own",
+        "engines, so a different one breaks inside the test framework.",
+        "",
+        "What to do:",
+        "  - run :JCtestInstall to fetch junit-platform-console-standalone " .. missing_launcher .. ";",
+        "  - or point test.console_launcher_path at a jar you already have.",
+      }, "\n")
+      notice = "jc: no console launcher for junit " .. missing_launcher .. " - run :JCtestInstall"
+      level = vim.log.levels.ERROR
+    else
+      message = table.concat({
         "jdtls could not resolve the test classpath.",
         "",
         "The project may still be importing (e.g. just after :JCutilWipeWorkspace).",
@@ -745,14 +763,14 @@ function adapter.build_spec(args)
         "  - check :JCtestDebugClasspath to see what it resolves to;",
         "  - if jdtls keeps leaving classes out, :JCutilWipeWorkspace and restart.",
       }, "\n")
+      notice = "jc: jdtls has no test classpath yet - wait for indexing, then re-run "
+        .. "(:JCtestDebugClasspath to inspect)"
+      level = vim.log.levels.WARN
+    end
     if not empty_reported then
       empty_reported = true
       vim.schedule(function()
-        vim.notify(
-          build_failed and "jc: build failed - no tests were run, see :JCtestOutput"
-            or "jc: jdtls couldn't resolve the test classpath - see :JCtestOutput",
-          build_failed and vim.log.levels.ERROR or vim.log.levels.WARN
-        )
+        vim.notify(notice, level)
       end)
     end
     return explain_spec(adapter.root(vim.fn.expand("%:p")) or vim.fn.getcwd(), message)

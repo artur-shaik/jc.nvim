@@ -283,7 +283,7 @@ passed to `setup`.
 | `JCtestStop` | stop the running test |
 | `JCtestSummary` / `JCtestOutput` | toggle summary / open the test's output |
 | `JCtestPrecompile` | toggle build-tool precompile before a run |
-| `JCtestInstall` | download the JUnit console launcher via maven |
+| `JCtestInstall` | download the JUnit console launcher matching the project's junit (optional version argument) |
 
 **Build runner**
 
@@ -555,6 +555,19 @@ layouts all work the same way. Wire it as in
 The launcher jar is looked up in `~/.m2`; if missing, run `:JCtestInstall` once
 (downloads `org.junit.platform:junit-platform-console-standalone` via maven) or
 set `test.console_launcher_path`.
+
+The jar bundles its own JUnit engines and they take precedence over the
+project's, so jc picks the version matching the junit on the test classpath:
+junit 5.11.3 needs the 1.11.3 jar, junit 6.0.3 needs 6.0.3 (junit 6 merged the
+two numbering schemes). Running a JUnit 6 project on a 1.x jar fails inside the
+framework - typically `NoSuchMethodError` from `SpringExtension`. `:JCtestInstall`
+fetches the version the current project needs; pass one explicitly with
+`:JCtestInstall 6.0.3`. A `test.console_launcher_path` always wins.
+
+The download goes through maven when it is on PATH, and falls back to a direct
+fetch from Maven Central (curl or wget) when maven cannot get the jar - a
+corporate mirror in `settings.xml` intercepts every maven request and such
+mirrors often lag behind on new artifacts. Progress is echoed in the cmdline.
 
 Run tests with `:JCtestRun` (cursor), `:JCtestFile`, `:JCtestSuite`,
 `:JCtestPick`, `:JCtestLast`, or the `<p>T*` mappings; neotest paints the gutter

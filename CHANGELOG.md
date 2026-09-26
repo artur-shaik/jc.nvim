@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Installing the launcher shows progress and no longer depends on maven** -
+  `:JCtestInstall` echoes the download in the cmdline instead of going quiet,
+  and when maven cannot fetch the jar (a corporate mirror in `settings.xml`
+  intercepts every request and often lags behind on new artifacts) it falls back
+  to a direct download from Maven Central with curl or wget.
+- **JUnit 6 projects could not run at all** - the console launcher was pinned to
+  `1.11.3`, and since the jar's own engines take precedence over the project's,
+  a Spring Boot 4 / JUnit 6 project died inside the framework with
+  `NoSuchMethodError: ExtensionContext$Store.computeIfAbsent` from
+  `SpringExtension`, reporting zero tests started. jc now picks the launcher
+  version off the test classpath (junit 5.11.3 -> jar 1.11.3, junit 6.0.3 ->
+  6.0.3) and refuses to substitute another one; `:JCtestInstall` fetches what the
+  current project needs and takes an optional version argument.
 - **Remembered imports broke in a second project** - the workspace directory was
   created once, when the module was first used, but the file path is resolved
   per project. Opening a file from another project in the same session then
