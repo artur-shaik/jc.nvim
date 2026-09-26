@@ -50,6 +50,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Sealed types** - `sealed` and `sealed_class` templates, plus a `permits`
+  slot in the DSL next to `extends`/`implements`
+  (`sealed:/com.app.Shape permits Circle, Square`). `permits` on a plain
+  interface or class adds the `sealed` modifier by itself, and the wizard asks
+  for the subtypes when a sealed template is chosen. Completion covers the
+  keyword and the type names after it.
 - **`serializable` template** - a class implementing `Serializable` with a
   freshly generated 18-digit `serialVersionUID` declared above the fields.
 - Members a template puts before the prompt fields (an entity's `@Id`, the

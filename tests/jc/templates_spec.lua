@@ -334,3 +334,42 @@ describe("serializable template", function()
     assert.is_truthy(out:find("implements Serializable {\nprivate static final long serialVersionUID", 1, true))
   end)
 end)
+
+describe("sealed types", function()
+  local templates = require("jc.templates")
+
+  local function render(name, opts)
+    opts = opts or {}
+    opts.name, opts.package, opts.fields = opts.name or "Shape", "p", opts.fields or {}
+    return templates.render(name, opts)
+  end
+
+  it("seals an interface and lists what it permits", function()
+    local out = render("sealed", { permits = "Circle, Square" })
+    assert.is_truthy(out:find("public sealed interface Shape permits Circle, Square {", 1, true))
+  end)
+
+  it("seals a class the same way", function()
+    local out = render("sealed_class", { name = "Base", permits = "A, B" })
+    assert.is_truthy(out:find("public sealed class Base permits A, B {", 1, true))
+  end)
+
+  it("adds the sealed modifier when permits is given to a plain type", function()
+    -- permits is only legal on a sealed type, so asking for one implies the other
+    assert.is_truthy(
+      render("interface", { name = "X", permits = "A" }):find("public sealed interface X permits A", 1, true)
+    )
+    assert.is_truthy(render("class", { name = "Y", permits = "A" }):find("public sealed class Y permits A", 1, true))
+  end)
+
+  it("never doubles the modifier", function()
+    local out = render("sealed", { permits = "A" })
+    assert.is_nil(out:find("sealed sealed", 1, true))
+  end)
+
+  it("leaves permits off the kinds that cannot be sealed", function()
+    local out = render("record", { name = "R", permits = "A" })
+    assert.is_nil(out:find("permits", 1, true))
+    assert.is_nil(out:find("sealed", 1, true))
+  end)
+end)

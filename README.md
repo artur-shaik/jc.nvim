@@ -348,7 +348,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 `:JCgenerateClass` (`<p>n`) opens a one-line prompt. The scheme, slot by slot:
 
 ```
- template : [subdir] : /package.ClassName  extends X implements Y  (fields) :flags
+ template : [subdir] : /package.ClassName  extends X implements Y permits Z  (fields) :flags
  └── 1 ─┘   └── 2 ─┘   └─────── 3 ──────┘  └──────── 4 ─────────┘  └── 5 ─┘  └ 6 ┘
 ```
 
@@ -358,6 +358,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | 2 | `[subdir]:` | *(optional)* a source-set or subproject (see below) |
 | 3 | `/package.Name` | class name and package. Leading `/` = absolute in the source root; without it, relative to the current file's package |
 | 4 | `extends`/`implements` | *(optional)* supertypes, imported automatically |
+| 4b | `permits` | *(optional)* sealed subtypes; implies the `sealed` modifier |
 | 5 | `(fields)` | *(optional)* `type name`, comma-separated, `private` by default. Drop the name and it is derived from the type (`final RiTypeEvent` → `private final RiTypeEvent riTypeEvent`). For `enum` this slot lists the constants |
 | 6 | `:flags` | *(optional)* code-gen and lombok flags (see below) |
 
@@ -376,6 +377,7 @@ Absolute (leading `/`) — the package is taken literally:
 | `entity:/com.app.Order(String number)` | an `@Entity` with an `@Id` id and `@Column` fields |
 | `interface:/com.app.OrderRepo extends CrudRepository` | an interface extending `CrudRepository` |
 | `enum:/com.app.Status(NEW, PAID, SHIPPED)` | an enum with those constants |
+| `sealed:/com.app.Shape permits Circle, Square` | a `sealed interface` naming its subtypes |
 | `service:/com.app.OrderService` | an `@Service` class |
 | `/com.app.UserDto(String id, String name):lombokData` | a class annotated `@Data` |
 | `service:/com.app.JobRunner(final RiTypeEvent, final DictionaryService)` | an `@Service` whose fields are named after their types |
@@ -457,8 +459,9 @@ creating it.
 ## 🧩 Templates
 
 Built-in: `class`, `interface`, `enum`, `record`, `annotation`, `exception`,
-`main`, `singleton`, `serializable`, `servlet`, `junit`, `junit5`, `entity`,
-`service`, `component`, `repository`, `controller` and the `android_*` family.
+`main`, `singleton`, `serializable`, `sealed`, `sealed_class`, `servlet`,
+`junit`, `junit5`, `entity`, `service`, `component`, `repository`, `controller`
+and the `android_*` family.
 
 The `entity` template carries `@Entity` and an `@Id` id, and annotates each
 prompt field with `@Column(name = "<snake_case>")`. Imports are left to
@@ -470,6 +473,11 @@ The `controller` template maps the path its name implies
 to `/my-file`, `exception` declares the four conventional constructors, and
 `junit`/`junit5` scaffold a `@Test`. Fields given to `interface` or `annotation`
 become members (`String name();`), not fields.
+
+`sealed` and `sealed_class` produce a sealed interface or class; name the
+subtypes with `permits`, and the wizard asks for them as an extra step. A
+`permits` clause on a plain `interface`/`class` adds the `sealed` modifier by
+itself, since the two only make sense together.
 
 The `serializable` template implements `Serializable` and declares a freshly
 generated `serialVersionUID` above the fields. An `implements` given in the DSL

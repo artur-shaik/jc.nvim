@@ -1,6 +1,6 @@
 -- New class generator, ported from autoload/class_generator.vim.
 -- Parses the one-line DSL
---   [template:][[subdir]:][/|/.]package.Class [extends X] [implements Y](fields):flags
+--   [template:][[subdir]:][/|/.]package.Class [extends X] [implements Y] [permits Z](fields):flags
 -- resolves the target file path/package, renders a template and queues the
 -- follow-up code generation (constructor/accessors/toString/...).
 local templates = require("jc.templates")
@@ -357,7 +357,12 @@ function M.parse_input(userinput)
     rest = rest:sub(1, rest:find("%b()%s*$") - 1)
   end
 
-  -- implements / extends
+  -- permits / implements / extends, peeled off from the right
+  local permits_at = rest:find("%s+permits%s+")
+  if permits_at then
+    result.permits = trim(rest:sub(permits_at):gsub("%s+permits%s+", "", 1))
+    rest = rest:sub(1, permits_at - 1)
+  end
   local impl_at = rest:find("%s+implements%s+")
   if impl_at then
     result.implements = trim(rest:sub(impl_at):gsub("%s+implements%s+", "", 1))
@@ -451,6 +456,7 @@ local function decorate(data, parsed)
   -- "<>" there is a user error caught by the wizard validator)
   data.extends = parsed.extends
   data.implements = parsed.implements
+  data.permits = parsed.permits
   if parsed.fields_str then
     if parsed.template == "enum" then
       -- for an enum the "(...)" slot lists the constants, not fields
@@ -490,6 +496,9 @@ function M.build_dsl(p)
   if p.implements then
     s = s .. " implements " .. p.implements
   end
+  if p.permits then
+    s = s .. " permits " .. p.permits
+  end
   if p.fields_str then
     s = s .. p.fields_str
   end
@@ -518,6 +527,7 @@ local function template_options(data)
     fields = data.fields,
     extends = data.extends,
     implements = data.implements,
+    permits = data.permits, -- sealed subtypes, if any
     annotations = data.annotations, -- lombok @-annotations, if any
     imports = data.imports,
     values = data.values, -- enum constants, if any
@@ -607,7 +617,7 @@ end
 
 -- ---- prompt completion (ported from class_generator#Completion) ----
 
-local KEYWORDS = { "extends", "implements" }
+local KEYWORDS = { "extends", "implements", "permits" }
 local METHOD_FLAGS = { "constructor", "toString", "hashCode", "equals" }
 
 -- all flag names for completion: jdtls code-gen flags first, then lombok
@@ -707,7 +717,12 @@ function M.modules()
 end
 
 -- LSP SymbolKind: Class=5, Enum=10, Interface=11
-local TYPE_KINDS = { extends = { [5] = true, [11] = true }, implements = { [11] = true } }
+local TYPE_KINDS = {
+  extends = { [5] = true, [11] = true },
+  implements = { [11] = true },
+  -- a sealed type permits classes, interfaces and enums alike
+  permits = { [5] = true, [10] = true, [11] = true },
+}
 local FIELD_TYPE_KINDS = { [5] = true, [10] = true, [11] = true }
 
 -- package segments that mark non-API / internal types you can't import
@@ -1451,6 +1466,9 @@ end
 function M.complete_implements(_arglead, line, pos)
   return complete_type_segment(line, pos, { [11] = true })
 end
+function M.complete_permits(_arglead, line, pos)
+  return complete_type_segment(line, pos, { [5] = true, [10] = true, [11] = true })
+end
 
 -- method-flag completion for the wizard (space-separated): the current word
 -- against the known flags, minus the ones already typed
@@ -1539,40 +1557,52 @@ function M.generate_class_wizard()
             end
             -- 5/6. extends / implements (jdtls type completion), 7/8 fields/flags;
             -- each step validates and re-prompts the same value on error
+            -- only a sealed template needs the permits step; everyone else
+            -- would just be pressing enter on it
+            local sealed = template == "sealed" or template == "sealed_class"
+            local function ask_permits(next_step)
+              if not sealed then
+                return next_step(nil)
+              end
+              type_input("permits, e.g. Circle, Square (optional): ", "complete_permits", next_step, VALIDATE.type)
+            end
             type_input("extends (optional): ", "complete_extends", function(extends)
               type_input("implements (optional): ", "complete_implements", function(implements)
-                type_input("fields, e.g. String a, int b (optional): ", "complete_fields", function(fields)
-                  type_input("flags, e.g. constructor toString equals (optional): ", "complete_flags", function(flags)
-                    local parsed = {
-                      template = template ~= "class" and template or nil,
-                      subdir = module,
-                      path_str = "/" .. (package and (package .. ".") or "") .. name,
-                      extends = extends,
-                      implements = implements,
-                      fields_str = fields and ("(" .. fields .. ")") or nil,
-                      -- flags entered space- or comma-separated -> ":a:b:c"
-                      flags = flags and (":" .. vim.trim(flags):gsub("[%s,]+", ":")) or nil,
-                    }
-                    -- show the assembled DSL for a final edit (with completion)
-                    -- before generating; empty/cancel aborts
-                    local saved = suppress_cmdline_pairs()
-                    local ok, edited = pcall(vim.fn.input, {
-                      prompt = "confirm: ",
-                      default = M.build_dsl(parsed),
-                      completion = "customlist,v:lua.require'jc.class_generator'.complete",
-                    })
-                    restore_cmdline_pairs(saved)
-                    if not ok or edited == "" then
-                      return
-                    end
-                    local final = M.parse_input(edited)
-                    if not final then
-                      vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
-                      return
-                    end
-                    resolve_and_create(final)
-                  end, VALIDATE.flags)
-                end, VALIDATE.fields)
+                ask_permits(function(permits)
+                  type_input("fields, e.g. String a, int b (optional): ", "complete_fields", function(fields)
+                    type_input("flags, e.g. constructor toString equals (optional): ", "complete_flags", function(flags)
+                      local parsed = {
+                        template = template ~= "class" and template or nil,
+                        subdir = module,
+                        path_str = "/" .. (package and (package .. ".") or "") .. name,
+                        extends = extends,
+                        implements = implements,
+                        permits = permits,
+                        fields_str = fields and ("(" .. fields .. ")") or nil,
+                        -- flags entered space- or comma-separated -> ":a:b:c"
+                        flags = flags and (":" .. vim.trim(flags):gsub("[%s,]+", ":")) or nil,
+                      }
+                      -- show the assembled DSL for a final edit (with completion)
+                      -- before generating; empty/cancel aborts
+                      local saved = suppress_cmdline_pairs()
+                      local ok, edited = pcall(vim.fn.input, {
+                        prompt = "confirm: ",
+                        default = M.build_dsl(parsed),
+                        completion = "customlist,v:lua.require'jc.class_generator'.complete",
+                      })
+                      restore_cmdline_pairs(saved)
+                      if not ok or edited == "" then
+                        return
+                      end
+                      local final = M.parse_input(edited)
+                      if not final then
+                        vim.notify("jc: could not parse input line", vim.log.levels.ERROR)
+                        return
+                      end
+                      resolve_and_create(final)
+                    end, VALIDATE.flags)
+                  end, VALIDATE.fields)
+                end)
               end, VALIDATE.type)
             end, VALIDATE.type)
           end, VALIDATE.class)

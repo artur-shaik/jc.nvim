@@ -750,3 +750,20 @@ describe("template prefix vs class name", function()
     assert.are.equal(":lombokData:toString", p.flags)
   end)
 end)
+
+describe("permits slot", function()
+  local cg = require("jc.class_generator")
+
+  it("parses permits next to extends and implements", function()
+    local p = cg.parse_input("/p.Node extends Base implements Cloneable permits A, B")
+    assert.are.equal("/p.Node", p.path_str)
+    assert.are.equal("Base", p.extends)
+    assert.are.equal("Cloneable", p.implements)
+    assert.are.equal("A, B", p.permits)
+  end)
+
+  it("survives a round trip through build_dsl", function()
+    local dsl = "sealed:/p.Shape permits Circle, Square"
+    assert.are.equal(dsl, cg.build_dsl(cg.parse_input(dsl)))
+  end)
+end)

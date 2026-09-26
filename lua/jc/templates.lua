@@ -10,12 +10,14 @@
 --   fields     array of { mod, type, name } (mod defaults to "private")
 --   extends    optional superclass (from user input, overrides spec default)
 --   implements optional interface list (from user input)
+--   permits    optional sealed subtype list (implies the sealed modifier)
 --
 -- Spec fields (all optional):
 --   kind        "class" | "interface" | "enum" | "annotation" | "record"
 --   modifiers   declaration modifiers (default "public")
 --   extends     default superclass when the user gives none
 --   implements  default interface list
+--   permits     default sealed subtype list
 --   imports     string | {string} | function(opts) -> string|{string}
 --   annotations string | {string} | function(opts) -> string|{string}
 --   body        string | function(opts) -> string ; members after the fields
@@ -26,12 +28,21 @@ local M = {}
 
 -- which declaration parts each kind allows (Java rules)
 local KINDS = {
-  class = { keyword = "class", extends = true, implements = true },
-  interface = { keyword = "interface", extends = true, implements = false },
+  class = { keyword = "class", extends = true, implements = true, permits = true },
+  interface = { keyword = "interface", extends = true, implements = false, permits = true },
   enum = { keyword = "enum", extends = false, implements = true },
   annotation = { keyword = "@interface", extends = false, implements = false },
   record = { keyword = "record", extends = false, implements = true, record = true },
 }
+
+-- "permits" is only legal on a sealed type, and naming the subtypes is the
+-- whole point of sealing, so a permits clause implies the modifier.
+local function with_sealed(modifiers)
+  if modifiers:match("%f[%w]sealed%f[%W]") then
+    return modifiers
+  end
+  return modifiers .. " sealed"
+end
 
 -- package declaration, or "" for the default (empty) package — emitting
 -- "package ;" produces invalid Java and pushes organize_imports above it
@@ -179,7 +190,11 @@ local function assemble(spec, opts)
     out = out .. annotation .. "\n"
   end
 
-  out = out .. (spec.modifiers or "public") .. " " .. kind.keyword .. " " .. opts.name
+  local modifiers = spec.modifiers or "public"
+  if kind.permits and opts.permits and opts.permits ~= "" then
+    modifiers = with_sealed(modifiers)
+  end
+  out = out .. modifiers .. " " .. kind.keyword .. " " .. opts.name
 
   if kind.record then
     local comp = {}
@@ -198,6 +213,12 @@ local function assemble(spec, opts)
     local impl = merge_implements(resolve_str(spec.implements, opts), opts.implements)
     if impl then
       out = out .. " implements " .. impl
+    end
+  end
+  if kind.permits then
+    local permits = opts.permits or resolve_str(spec.permits, opts)
+    if permits and permits ~= "" then
+      out = out .. " permits " .. permits
     end
   end
 
@@ -323,6 +344,11 @@ local templates = {
       return { "@RestController", '@RequestMapping("' .. url_path(opts.name, "Controller") .. '")' }
     end,
   },
+
+  -- sealed hierarchies (java 17+): the permits list comes from the DSL, e.g.
+  -- sealed:/com.app.Shape permits Circle, Square
+  sealed = { kind = "interface", modifiers = "public sealed" },
+  sealed_class = { kind = "class", modifiers = "public sealed" },
 
   -- spring-data repository: an interface over the entity its name implies
   -- (UserRepository -> JpaRepository<User, Long>). No @Repository — spring-data

@@ -234,7 +234,8 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 
 Prompt scheme (every part but the class name is optional): >
 
-  template:[subdir]:/package.Name extends X implements Y (fields):flags
+  template:[subdir]:/package.Name extends X implements Y permits Z
+  (fields):flags
 <
 - template (optional): junit5, record, entity, service, ... (|jc-templates|);
 - subdir (optional): source-set or subproject. `[test]` -> current
@@ -299,13 +300,18 @@ class in; a brand-new package goes to the current module.
 7. TEMPLATES                                                     *jc-templates*
 
 Built-in: class, interface, enum, record, annotation, exception, main,
-singleton, serializable, servlet, junit, junit5, entity, service, component,
-repository, controller, android_*.
+singleton, serializable, sealed, sealed_class, servlet, junit, junit5, entity,
+service, component, repository, controller, android_*.
 
 The `entity` template carries @Entity and an @Id id, and annotates each
 prompt field with `@Column(name = "<snake_case>")`. Imports are left to
 organize-imports (run automatically after creation), so it works for both
 `jakarta.*` and `javax.*` projects.
+
+`sealed` and `sealed_class` produce a sealed interface or class; the subtypes
+go in the `permits` slot (sealed:/p.Shape permits Circle, Square) and the
+wizard asks for them as an extra step. Giving `permits` to a plain
+interface/class adds the sealed modifier on its own.
 
 The `serializable` template implements Serializable and declares a freshly
 generated serialVersionUID above the fields. An `implements` given in the
