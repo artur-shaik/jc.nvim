@@ -190,15 +190,34 @@ function M.install_jar(version, on_done)
   )
 end
 
+-- Subcommands arrived in Platform 1.10; older launchers take their options flat
+-- and reject "execute" as an unmatched argument.
+function M.supports_execute(version)
+  local major, minor = tostring(version or ""):match("^(%d+)%.(%d+)")
+  if not major then
+    return true
+  end
+  major, minor = tonumber(major), tonumber(minor)
+  return major > 1 or minor >= 10
+end
+
+function M.version_of(jar)
+  return tostring(jar or ""):match("junit%-platform%-console%-standalone%-([%d%.]+)%.jar")
+end
+
 -- build the java command. opts:
 --   java        java executable (default "java")
 --   jar         console-standalone jar path
 --   classpath   list of classpath entries
 --   selectors   list of "--select-..." strings
 --   reports_dir directory for the XML report
+--   version     the jar's version (defaults to the one in its filename)
 function M.build_command(opts)
   local sep = vim.fn.has("win32") == 1 and ";" or ":"
-  local cmd = { opts.java or "java", "-jar", opts.jar, "execute" }
+  local cmd = { opts.java or "java", "-jar", opts.jar }
+  if M.supports_execute(opts.version or M.version_of(opts.jar)) then
+    cmd[#cmd + 1] = "execute"
+  end
   vim.list_extend(cmd, { "--classpath", table.concat(opts.classpath or {}, sep) })
   vim.list_extend(cmd, opts.selectors or {})
   vim.list_extend(cmd, { "--reports-dir", opts.reports_dir })

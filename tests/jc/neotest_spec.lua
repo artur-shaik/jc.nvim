@@ -79,6 +79,48 @@ describe("neotest launcher", function()
       "--disable-banner",
     }, cmd)
   end)
+
+  it("drops the execute subcommand for launchers older than 1.10", function()
+    local cmd = launcher.build_command({
+      jar = "/jars/junit-platform-console-standalone-1.8.2.jar",
+      classpath = { "/a.jar" },
+      selectors = { "--select-class=p.FooTest" },
+      reports_dir = "/tmp/rep",
+      version = "1.8.2",
+    })
+    assert.are.same({
+      "java",
+      "-jar",
+      "/jars/junit-platform-console-standalone-1.8.2.jar",
+      "--classpath",
+      "/a.jar",
+      "--select-class=p.FooTest",
+      "--reports-dir",
+      "/tmp/rep",
+      "--details",
+      "none",
+      "--disable-banner",
+    }, cmd)
+  end)
+
+  it("takes the launcher version from the jar name when none is given", function()
+    assert.is_false(launcher.supports_execute(launcher.version_of("/m2/junit-platform-console-standalone-1.9.3.jar")))
+    local cmd = launcher.build_command({
+      jar = "/m2/junit-platform-console-standalone-1.9.3.jar",
+      classpath = { "/a.jar" },
+      reports_dir = "/tmp/rep",
+    })
+    assert.are_not.equal("execute", cmd[4])
+  end)
+
+  it("keeps the execute subcommand from 1.10 on", function()
+    for _, version in ipairs({ "1.10.0", "1.11.3", "6.0.3" }) do
+      assert.is_true(launcher.supports_execute(version))
+    end
+    for _, version in ipairs({ "1.0.0", "1.9.3" }) do
+      assert.is_false(launcher.supports_execute(version))
+    end
+  end)
 end)
 
 describe("build failure reason", function()

@@ -381,7 +381,9 @@ absent, run `:JCtestInstall` to download the version this project needs (or
 `:JCtestInstall 6.0.3` for a specific one). It goes through maven when
 available and otherwise downloads from Maven Central with curl/wget; the same
 fallback covers a corporate mirror that cannot serve the artifact. Progress is
-shown in the cmdline. The jar can also be set explicitly: >lua
+shown in the cmdline. Launchers older than 1.10 have no subcommands, so jc
+calls them with the flat option list they expect. The jar can also be set
+explicitly: >lua
 
   require("jc").setup({
     test = { console_launcher_path = "/path/to/launcher.jar" },

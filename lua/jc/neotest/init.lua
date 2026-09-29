@@ -721,6 +721,7 @@ function adapter.build_spec(args)
           classpath = classpath,
           selectors = selectors,
           reports_dir = reports_dir,
+          version = wanted,
         }),
         cwd = adapter.root(file) or vim.fn.getcwd(),
         context = { reports_dir = reports_dir },

@@ -72,14 +72,18 @@ function M.run(selector, label)
     "-cp",
     cp,
     "org.junit.platform.console.ConsoleLauncher",
-    "execute",
+  }
+  if launcher.supports_execute(wanted or launcher.version_of(jar)) then
+    cmd[#cmd + 1] = "execute"
+  end
+  vim.list_extend(cmd, {
     selector,
     "--reports-dir",
     reports_dir,
     "--details",
     "none",
     "--disable-banner",
-  }
+  })
 
   M._register_attach_adapter(dap)
   local attached = false

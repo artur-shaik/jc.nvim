@@ -4,6 +4,17 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Projects on JUnit 5.9 and older could not run tests** - picking the launcher
+  off the classpath (1.5.0) brought back jars older than Platform 1.10, which
+  have no subcommands: the run died with `Error parsing command-line arguments:
+  Unmatched argument at index 0: 'execute'`. The `execute` subcommand is now
+  added only for launchers that know it, and older jars get the flat option list
+  they expect. Same for `:JCtestDebug`.
+
 ## [1.5.0]
 
 ### Fixed
