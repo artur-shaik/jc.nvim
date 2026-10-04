@@ -416,6 +416,17 @@ precompile runs asynchronously with progress in the cmdline; a compile failure
 fills the quickfix list with the javac/maven errors (file:line) and skips the
 test run.
 
+Classes in `bin` carry no method parameter names: the Eclipse compiler has
+javac's `-parameters` off by default. Spring Data reads those names by
+reflection, so a repository with named query parameters that is green from the
+CLI fails here with "For queries with named parameters you need to provide
+names for method parameters". Fix it in the project with `@Param("...")`, or
+turn the flag on for jdtls with
+`org.eclipse.jdt.core.compiler.codegen.methodParameters=generate` in the
+module's `.settings/org.eclipse.jdt.core.prefs` or in the file
+`java.settings.url` points at. `precompile = true` avoids it as well, the
+bytecode then being javac's.
+
 That build runs on the project's own JDK — the one the tests launch with —
 rather than the JAVA_HOME nvim inherited, since an older gradle on a JDK 16+
 fails with "IllegalAccessError: ... jdk.compiler does not export

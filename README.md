@@ -640,6 +640,17 @@ The classpath is built from jdtls and augmented for correctness:
   over an 11-target main still runs on 17, as gradle does), falling back to
   `resolveJavaExecutable` then PATH `java`.
 
+- jdtls compiles with the Eclipse compiler, whose equivalent of javac
+  `-parameters` is off by default, so classes in `bin` carry no method parameter
+  names. Spring Data reads those names by reflection, so a repository with
+  named query parameters that works from the CLI fails here with "For queries
+  with named parameters you need to provide names for method parameters". Fix it
+  in the project with `@Param("...")` (compiler-independent), or turn the flag on
+  for jdtls - `org.eclipse.jdt.core.compiler.codegen.methodParameters=generate`
+  in the module's `.settings/org.eclipse.jdt.core.prefs`, or in the file
+  `java.settings.url` points at. `precompile = true` sidesteps it too, since the
+  bytecode then comes from javac.
+
 If jdtls keeps dropping classes from `bin`, a `:JCutilWipeWorkspace` + restart
 (clean re-import) often makes `bin` complete again, keeping you on the fast
 `precompile = false` path.
