@@ -767,3 +767,46 @@ describe("permits slot", function()
     assert.are.equal(dsl, cg.build_dsl(cg.parse_input(dsl)))
   end)
 end)
+
+describe("accessor generation after create", function()
+  local cg = require("jc.class_generator")
+
+  it("skips records, interfaces and @interfaces", function()
+    for _, template in ipairs({ "record", "interface", "sealed", "repository", "annotation" }) do
+      assert.is_false(cg._wants_accessors({ template = template, fields = "final String name" }))
+    end
+  end)
+
+  it("still runs for classes and enums", function()
+    for _, template in ipairs({ "class", "sealed_class", "entity", "enum" }) do
+      assert.is_true(cg._wants_accessors({ template = template, fields = "final String name" }))
+    end
+    -- the default template is "class"
+    assert.is_true(cg._wants_accessors({ fields = "int count" }))
+  end)
+
+  it("skips a class with no fields", function()
+    assert.is_false(cg._wants_accessors({ template = "class" }))
+    assert.is_false(cg._wants_accessors({ template = "class", fields = "" }))
+  end)
+end)
+
+describe("members a record gets from the compiler", function()
+  local cg = require("jc.class_generator")
+
+  it("reports the flags a record does not need", function()
+    local data = {
+      template = "record",
+      methods = { constructor = true, equals = true, hashCode = true, toString = true },
+    }
+    assert.are.same({ "constructor", "equals", "hashCode", "toString" }, cg._compiler_provided(data))
+    assert.are.same({ "toString" }, cg._compiler_provided({ template = "record", methods = { toString = true } }))
+  end)
+
+  it("reports nothing without those flags, or for a class", function()
+    assert.are.same({}, cg._compiler_provided({ template = "record" }))
+    assert.are.same({}, cg._compiler_provided({ template = "record", methods = {} }))
+    assert.are.same({}, cg._compiler_provided({ template = "class", methods = { toString = true, equals = true } }))
+    assert.are.same({}, cg._compiler_provided({ methods = { constructor = true } }))
+  end)
+end)

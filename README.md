@@ -406,6 +406,10 @@ flags go through jdtls:
 | `hashCode` | `hashCode()` |
 | `equals` | `equals()` |
 
+On a record these four are skipped, and so is the accessor step that otherwise
+runs whenever a class is created with fields: the compiler writes all of them
+for the components. Same for the accessors on an interface or `@interface`.
+
 **Lombok** flags add the annotation (and its import, resolved by
 organize-imports) instead of generating code:
 

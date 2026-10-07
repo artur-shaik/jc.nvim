@@ -4,6 +4,19 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Creating a record no longer offers to generate accessors** - the follow-up
+  code generation skipped that step for the `interface` template only, by name,
+  so a record (whose components are final and already have accessors) got the
+  accessor picker anyway. The step now goes by the declaration kind the
+  template produces, which also covers `@interface` and the interface-shaped
+  templates `sealed` and `repository`. A `constructor`, `equals`, `hashCode` or
+  `toString` flag on a record is skipped for the same reason, with one message
+  naming what was skipped so the flag does not just look broken.
+
 ## [1.5.1]
 
 ### Fixed

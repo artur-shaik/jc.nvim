@@ -534,11 +534,53 @@ local function template_options(data)
   }
 end
 
+-- accessors only make sense where fields are mutable state: a record's
+-- components already come with accessors and are final, and interface or
+-- @interface members are constants/elements
+local ACCESSOR_KINDS = { class = true, enum = true }
+
+function M._wants_accessors(data)
+  if not data.fields or data.fields == "" then
+    return false
+  end
+  return ACCESSOR_KINDS[require("jc.templates").kind(data.template)] == true
+end
+
+-- a record also gets these from the compiler, so an explicit flag asking for
+-- one is skipped (and reported, or the flag would look broken). Order follows
+-- the generation order below.
+local COMPILER_PROVIDED = { "constructor", "equals", "hashCode", "toString" }
+
+-- the flags among COMPILER_PROVIDED that `data` asks for and a record already
+-- has; empty for anything that is not a record
+function M._compiler_provided(data)
+  if require("jc.templates").kind(data.template) ~= "record" then
+    return {}
+  end
+  local methods = data.methods or {}
+  local found = {}
+  for _, name in ipairs(COMPILER_PROVIDED) do
+    if methods[name] then
+      found[#found + 1] = name
+    end
+  end
+  return found
+end
+
 -- queue the follow-up code generation in the same order as the vimscript
 local function queue_generation(data)
   local chains = require("jc.chains")()
-  local methods = data.methods or {}
-  local is_interface = data.template == "interface"
+  local methods = vim.tbl_extend("force", {}, data.methods or {})
+  local provided = M._compiler_provided(data)
+  if #provided > 0 then
+    vim.notify(
+      "jc: a record gets " .. table.concat(provided, ", ") .. " from the compiler, skipping",
+      vim.log.levels.INFO
+    )
+    for _, name in ipairs(provided) do
+      methods[name] = nil
+    end
+  end
 
   chains:add(function()
     require("jc.jdtls").organize_imports(0, false)
@@ -553,7 +595,7 @@ local function queue_generation(data)
   chains:add(function()
     require("jc.jdtls").generate_abstractMethods(has_supertype)
   end)
-  if not is_interface and data.fields then
+  if M._wants_accessors(data) then
     chains:add(function()
       require("jc.jdtls").generate_accessors()
     end)

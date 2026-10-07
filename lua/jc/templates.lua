@@ -429,6 +429,15 @@ function M.get(name)
   return custom[name] or templates[name or "class"]
 end
 
+-- the java declaration kind a template produces ("class" when it sets none)
+function M.kind(name)
+  local template = M.get(name)
+  if type(template) == "table" then
+    return template.kind or "class"
+  end
+  return "class"
+end
+
 function M.names()
   local names = {}
   for name in pairs(templates) do

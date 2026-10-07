@@ -256,6 +256,9 @@ Prompt scheme (every part but the class name is optional): >
 
 Trailing `:flag` segments run after the class is created.
 Code-generation flags (via jdtls): constructor, toString, hashCode, equals.
+On a record all four are skipped - the compiler writes them for the
+components - as is the accessor generation that otherwise follows creating a
+class with fields (also skipped for an interface or @interface).
 Lombok flags (add the annotation + import instead of generating code):
   lombok / lombokData   -> @Data
   lombokValue           -> @Value
