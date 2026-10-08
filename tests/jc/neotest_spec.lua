@@ -225,3 +225,41 @@ describe("console launcher version", function()
     assert.is_truthy(launcher.artifact(nil):find(launcher.DEFAULT_VERSION, 1, true))
   end)
 end)
+
+describe("refresh before a run", function()
+  local refresh = require("jc.neotest.refresh")
+
+  it("keeps only readable files, without duplicates", function()
+    local file = vim.fn.tempname() .. ".java"
+    vim.fn.writefile({ "class A {}" }, file)
+    assert.are.same({ file }, refresh._targets({ file, file, "", "/nope/Missing.java", 42 }))
+    assert.are.same({}, refresh._targets(nil))
+    vim.fn.delete(file)
+    assert.are.same({}, refresh._targets({ file }))
+  end)
+
+  it("starts the run even with nothing to refresh", function()
+    local started = 0
+    refresh.before_run({}, function()
+      started = started + 1
+    end)
+    refresh.before_run({ "/nope/Missing.java" }, function()
+      started = started + 1
+    end)
+    assert.are.equal(2, started)
+  end)
+
+  it("leaves a buffer with unsaved changes alone", function()
+    local file = vim.fn.tempname() .. ".java"
+    vim.fn.writefile({ "class A {}" }, file)
+    vim.cmd("edit " .. vim.fn.fnameescape(file))
+    local buf = vim.fn.bufnr(file)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "class B {}" })
+    vim.fn.writefile({ "class C {}" }, file) -- changed underneath the buffer
+    refresh._reload_buf(file)
+    assert.are.same({ "class B {}" }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+    vim.bo[buf].modified = false
+    vim.cmd("bwipeout! " .. buf)
+    vim.fn.delete(file)
+  end)
+end)

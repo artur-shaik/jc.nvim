@@ -23,7 +23,12 @@ local function autoclose_delay()
   return type(v) == "number" and v or 2000
 end
 
+-- neotest hands the client to its consumers; jc.neotest.refresh needs it to
+-- reparse a file before a run
+M.client = nil
+
 function M.consumer(client)
+  M.client = client
   client.listeners.results = function(_adapter_id, results, partial)
     if partial then
       return -- the final call carries this run's complete results

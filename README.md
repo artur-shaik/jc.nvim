@@ -593,6 +593,15 @@ The adapter toasts `running…` at the start and `N passed, M failed, K skipped`
 at the end. Knobs: `test.notify`, `test.open_summary`, `test.autoclose_summary`
 (`false`, or a delay in ms).
 
+Before a focused run jc reloads the target file and has neotest reparse it, so
+a test written to disk from outside the editor (an agent, a `git checkout`) is
+picked up without saving the buffer by hand — neotest itself rediscovers a file
+only on `BufAdd`/`BufWritePost`. A buffer with unsaved changes is left alone,
+and the reparse needs the jc consumer wired in (that is where the neotest
+client comes from). `:JCtestSuite` is not refreshed: it runs off the tree as it
+stands, so a brand-new test file joins it only once neotest rescans the
+directory.
+
 **Debugging tests** — `:JCtestDebug` (`<p>Td`) debugs the test at the cursor.
 Set your breakpoints first. Needs [nvim-dap](https://github.com/mfussenegger/nvim-dap)
 and the [java-debug](https://github.com/microsoft/java-debug) bundle in jdtls

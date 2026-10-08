@@ -47,6 +47,21 @@ local function reset_run_state(suite)
   end)
 end
 
+-- target files of the last jc-initiated run, so :JCtestLast can reload them too
+local last_paths = {}
+
+-- reload the run targets and have neotest reparse them, then start the run.
+-- Without this a test written straight to disk (by an agent, a checkout) is
+-- missing from a rerun until the buffer is saved by hand.
+local function with_refresh(paths, run)
+  last_paths = paths
+  local ok, refresh = pcall(require, "jc.neotest.refresh")
+  if not ok then
+    return run()
+  end
+  refresh.before_run(paths, run)
+end
+
 -- open the neotest summary on a run (unless disabled) and expand the run
 -- target so the launched tests are visible without unfolding by hand. target
 -- is the file/dir position id; expansion is deferred so the tree is rendered.
@@ -75,13 +90,16 @@ function M.run_at_cursor()
   end
   reset_run_state(false)
   local counterpart = counterpart_test_file()
-  if counterpart then
-    vim.notify("jc: not a test file — running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
-    nt.run.run(counterpart)
-  else
-    nt.run.run()
-  end
-  maybe_open_summary(nt, counterpart or vim.fn.expand("%:p"))
+  local target = counterpart or vim.fn.expand("%:p")
+  with_refresh({ target }, function()
+    if counterpart then
+      vim.notify("jc: not a test file — running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
+      nt.run.run(counterpart)
+    else
+      nt.run.run()
+    end
+    maybe_open_summary(nt, target)
+  end)
 end
 
 function M.run_file()
@@ -91,8 +109,10 @@ function M.run_file()
   end
   reset_run_state(false)
   local file = counterpart_test_file() or vim.fn.expand("%:p")
-  nt.run.run(file)
-  maybe_open_summary(nt, file)
+  with_refresh({ file }, function()
+    nt.run.run(file)
+    maybe_open_summary(nt, file)
+  end)
 end
 
 -- delegate to nvim-jdtls / nvim-java's own test debugger. Returns true if one
@@ -153,8 +173,13 @@ function M.run_last()
     return
   end
   reset_run_state(false)
-  nt.run.run_last()
-  maybe_open_summary(nt, vim.fn.expand("%:p"))
+  -- the files the previous jc run targeted; after a restart there are none, so
+  -- fall back to the current buffer (usually the test being rerun)
+  local paths = #last_paths > 0 and last_paths or { vim.fn.expand("%:p") }
+  with_refresh(paths, function()
+    nt.run.run_last()
+    maybe_open_summary(nt, vim.fn.expand("%:p"))
+  end)
 end
 
 -- project root: the outermost gradle settings (multi-module) or nearest build

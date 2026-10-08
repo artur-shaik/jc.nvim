@@ -16,6 +16,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   templates `sealed` and `repository`. A `constructor`, `equals`, `hashCode` or
   `toString` flag on a record is skipped for the same reason, with one message
   naming what was skipped so the flag does not just look broken.
+- **A test written to disk from outside the editor needed a manual `:w`** -
+  neotest rediscovers a file only on `BufAdd`/`BufWritePost`, so a test an
+  agent or a checkout wrote behind nvim's back was missing from a rerun (and
+  `precompile` did not help: the stale part was the position tree, not the
+  bytecode). `:JCtestRun`, `:JCtestFile` and `:JCtestLast` now reload the
+  target file, tell jdtls it changed and have neotest reparse it before the
+  run. Buffers with unsaved changes are left untouched.
 
 ## [1.5.1]
 

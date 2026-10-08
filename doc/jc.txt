@@ -405,6 +405,13 @@ set the delay in ms. On multi-module projects prefer the focused commands —
 `:JCtestSuite` is best-effort (neotest can reset a failed class to running in
 the summary across sub-runs).
 
+Before a focused run jc reloads the target file and has neotest reparse it:
+neotest rediscovers a file only on BufAdd/BufWritePost, so a test written to
+disk from outside the editor would otherwise be missing from a rerun until
+the buffer was saved by hand. A buffer with unsaved changes is left alone,
+and the reparse needs the jc consumer wired into neotest. `:JCtestSuite`
+runs off the tree as it stands.
+
 The classpath comes from jdtls, with the test and runtime scopes unioned
 (jdtls' test scope omits runtimeOnly deps that ByteBuddy/Mockito need).
 
