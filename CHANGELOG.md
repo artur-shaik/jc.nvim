@@ -4,6 +4,19 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A test run could hang instead of starting (regression in 1.5.2)** - the
+  pre-run reparse called neotest's `_update_positions`, which on a client
+  neotest had not started yet spawns its child process over a blocking
+  `rpcrequest`; where that child cannot load its plugins
+  (`module 'nvim-treesitter' not found` in the neotest log) the run never
+  began. jc now reparses only for a client that is already running - a cold one
+  discovers the file by itself - and starts the run after 2s regardless of what
+  the reparse is doing.
+
 ## [1.5.2]
 
 ### Fixed

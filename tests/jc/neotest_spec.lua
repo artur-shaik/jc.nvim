@@ -249,6 +249,76 @@ describe("refresh before a run", function()
     assert.are.equal(2, started)
   end)
 
+  local consumer = require("jc.neotest.consumer")
+
+  -- a readable java file to pass as a target
+  local function target()
+    local file = vim.fn.tempname() .. "Test.java"
+    vim.fn.writefile({ "class FooTest {}" }, file)
+    return file
+  end
+
+  it("leaves a client neotest has not started alone", function()
+    local file = target()
+    local saved_client, saved_nio = consumer.client, package.loaded["nio"]
+    local reparsed, started = 0, 0
+    package.loaded["nio"] = {
+      run = function(fn, cb)
+        fn()
+        cb()
+      end,
+    }
+    -- a cold client: _update_positions would spawn neotest's child process
+    -- over a blocking rpcrequest and stall the run
+    consumer.client = {
+      _started = false,
+      _update_positions = function()
+        reparsed = reparsed + 1
+      end,
+    }
+    refresh.before_run({ file }, function()
+      started = started + 1
+    end)
+    assert.are.equal(0, reparsed)
+    assert.are.equal(1, started)
+
+    consumer.client._started = true
+    refresh.before_run({ file }, function()
+      started = started + 1
+    end)
+    assert.are.equal(1, reparsed)
+    -- the run is started from the reparse callback, via vim.schedule
+    vim.wait(500, function()
+      return started > 1
+    end)
+    assert.are.equal(2, started)
+
+    consumer.client, package.loaded["nio"] = saved_client, saved_nio
+    vim.fn.delete(file)
+  end)
+
+  it("starts the run once even if the reparse never comes back", function()
+    local file = target()
+    local saved_client, saved_nio = consumer.client, package.loaded["nio"]
+    local started = 0
+    package.loaded["nio"] = { run = function() end } -- never calls back
+    consumer.client = { _started = true, _update_positions = function() end }
+
+    refresh.before_run({ file }, function()
+      started = started + 1
+    end)
+    assert.are.equal(0, started) -- waiting on the reparse
+    vim.wait(2500, function()
+      return started > 0
+    end)
+    assert.are.equal(1, started) -- the timeout started it
+    vim.wait(300)
+    assert.are.equal(1, started) -- and only once
+
+    consumer.client, package.loaded["nio"] = saved_client, saved_nio
+    vim.fn.delete(file)
+  end)
+
   it("leaves a buffer with unsaved changes alone", function()
     local file = vim.fn.tempname() .. ".java"
     vim.fn.writefile({ "class A {}" }, file)
