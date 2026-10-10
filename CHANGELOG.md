@@ -29,6 +29,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ambiguous name (`javax` vs `jakarta` and friends) and wiped the answer, which
   also left `:JCimportsOrganizeSmart` with nothing to go on. That pass is a
   smart organize now, so the pick is made once per project.
+- **Choosing an import in the picker did not replace the remembered one** - the
+  picker appended the pick, leaving the class remembered before under the same
+  simple name (`lombok.Value` next to spring's, two `Query`, two `NonNull`) and
+  letting the stale one win a later smart organize. It now goes through the
+  same bookkeeping as `:JCimportsReplace`, which drops the competitor. Where a
+  file already holds several, the most recently picked one wins, and a class is
+  no longer remembered twice.
 
 ## [1.5.1]
 

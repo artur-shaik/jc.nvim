@@ -35,19 +35,29 @@ end
 -- organize takes it silently; a plain one instead forgets it and asks again,
 -- which is how a past choice gets revised. Returns the candidate, or nil plus
 -- the names to forget.
+--
+-- A pick is appended to the file, so when several candidates are remembered -
+-- which older versions allowed for one simple name - the last one written is
+-- the most recent pick and wins.
 function M._remembered_choice(candidates, known, smart)
-  local remembered = {}
-  for _, name in ipairs(known or {}) do
-    remembered[name] = true
+  local rank = {}
+  for i, name in ipairs(known or {}) do
+    rank[name] = i
   end
+  local chosen, chosen_rank
   local to_forget = {}
   for _, candidate in ipairs(candidates or {}) do
-    if remembered[candidate.fullyQualifiedName] then
-      if smart then
-        return candidate, {}
+    local r = rank[candidate.fullyQualifiedName]
+    if r then
+      if not smart then
+        to_forget[#to_forget + 1] = candidate.fullyQualifiedName
+      elseif not chosen_rank or r > chosen_rank then
+        chosen, chosen_rank = candidate, r
       end
-      to_forget[#to_forget + 1] = candidate.fullyQualifiedName
     end
+  end
+  if smart then
+    return chosen, {}
   end
   return nil, to_forget
 end
@@ -72,7 +82,10 @@ local function choose_imports(params, _)
   local choice = tonumber(vim.fn.input(prompt .. "Your choice: "))
 
   if candidates[choice] ~= nil then
-    regulars:add(candidates[choice].fullyQualifiedName)
+    local fqn = candidates[choice].fullyQualifiedName
+    -- not a plain add: that left the previously remembered class of the same
+    -- simple name in place, and the stale one could then win a smart organize
+    M._remember_regular(fqn:match("[^.]+$"), fqn)
   end
   return { candidates[choice] }
 end
@@ -725,7 +738,7 @@ M._set_import = set_import
 -- remember `fqn` as the preferred import for the simple type `name` in
 -- smart-organize: drop any other remembered FQN with the same simple name and
 -- add the chosen one
-local function remember_regular(name, fqn)
+function M._remember_regular(name, fqn)
   local regulars = regular_imports()
   local known = regulars:load()
   local already = false
@@ -834,7 +847,7 @@ function M.replace_import()
       if choice then
         set_import(bufnr, name, choice)
         -- remember it for smart organize-imports
-        remember_regular(name, choice)
+        M._remember_regular(name, choice)
       end
     end)
   end, true)
@@ -971,7 +984,7 @@ function M.add_annotation(target)
     -- shift the buffer down consistently so `@Name` stays in place
     vim.api.nvim_buf_set_lines(bufnr, row, row, false, { indent .. "@" .. simple })
     set_import(bufnr, simple, fqn)
-    remember_regular(simple, fqn)
+    M._remember_regular(simple, fqn)
   end
 
   -- live telescope picker (type -> results on the fly), else input -> select

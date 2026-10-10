@@ -50,6 +50,11 @@ end
 
 function RegularImports:add(class_name)
   local loaded = self:load()
+  for _, value in ipairs(loaded) do
+    if value == class_name then
+      return -- already remembered; a second copy would just be noise
+    end
+  end
   table.insert(loaded, class_name)
   self:write(loaded)
 end

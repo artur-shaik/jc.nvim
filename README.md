@@ -244,7 +244,9 @@ passed to `setup`.
 A pick for an ambiguous name is remembered per project (a file next to the
 jdtls workspace), and the smart commands above apply it without asking again.
 Organizing the imports of a newly created class counts as a smart run, so a
-`javax` vs `jakarta` choice is made once, not on every new class.
+`javax` vs `jakarta` choice is made once, not on every new class. One class is
+remembered per simple name: picking another one, in the picker or with
+`JCimportsReplace`, replaces it rather than piling up next to it.
 | `JCgenerateToString` | generate `toString()` with field selection |
 | `JCgenerateHashCodeAndEquals` | generate `hashCode()` and `equals()` |
 | `JCgenerateAccessors` | choose fields for accessor generation |

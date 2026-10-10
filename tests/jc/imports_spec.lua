@@ -209,10 +209,42 @@ describe("remembered import choice", function()
     assert.is_nil(jdtls._remembered_choice(candidates, nil, true))
   end)
 
-  it("takes the first remembered candidate when several are known", function()
-    local known = { "jakarta.persistence.Entity", "javax.persistence.Entity" }
-    local chosen = jdtls._remembered_choice(candidates, known, true)
-    -- candidate order wins, not the order they were remembered in
+  it("takes the most recent pick when several are remembered", function()
+    -- older versions could leave both competitors in the file; a pick is
+    -- appended, so the last line is the newest answer and must win
+    local chosen = jdtls._remembered_choice(candidates, {
+      "javax.persistence.Entity",
+      "jakarta.persistence.Entity",
+    }, true)
+    assert.are.equal("jakarta.persistence.Entity", chosen.fullyQualifiedName)
+    chosen = jdtls._remembered_choice(candidates, {
+      "jakarta.persistence.Entity",
+      "javax.persistence.Entity",
+    }, true)
     assert.are.equal("javax.persistence.Entity", chosen.fullyQualifiedName)
+  end)
+
+  it("drops the competing class of the same simple name on a pick", function()
+    local dir = vim.fn.tempname() .. "/"
+    vim.fn.mkdir(dir, "p")
+    local path = require("jc.path")
+    local orig = path.get_workspace_dir
+    path.get_workspace_dir = function()
+      return dir
+    end
+    local regulars = require("jc.regular_imports")()
+    vim.fn.writefile({ "lombok.Value", "java.util.List" }, dir .. ".regular_imports")
+
+    jdtls._remember_regular("Value", "org.springframework.beans.factory.annotation.Value")
+    assert.are.same({ "java.util.List", "org.springframework.beans.factory.annotation.Value" }, regulars:load())
+    -- and the same pick again changes nothing
+    jdtls._remember_regular("Value", "org.springframework.beans.factory.annotation.Value")
+    assert.are.same({ "java.util.List", "org.springframework.beans.factory.annotation.Value" }, regulars:load())
+
+    regulars:add("java.util.List")
+    assert.are.same({ "java.util.List", "org.springframework.beans.factory.annotation.Value" }, regulars:load())
+
+    path.get_workspace_dir = orig
+    vim.fn.delete(dir, "rf")
   end)
 end)
