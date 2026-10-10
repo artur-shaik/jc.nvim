@@ -178,3 +178,41 @@ describe("type query narrowing", function()
     assert.are.same(FQNS, jdtls._narrow_types(FQNS, {}))
   end)
 end)
+
+describe("remembered import choice", function()
+  local jdtls = require("jc.jdtls")
+
+  local candidates = {
+    { fullyQualifiedName = "javax.persistence.Entity" },
+    { fullyQualifiedName = "jakarta.persistence.Entity" },
+  }
+
+  it("takes the remembered candidate in a smart organize", function()
+    local chosen, forget = jdtls._remembered_choice(candidates, { "jakarta.persistence.Entity" }, true)
+    assert.are.equal("jakarta.persistence.Entity", chosen.fullyQualifiedName)
+    assert.are.same({}, forget)
+  end)
+
+  it("forgets it in a plain organize, so the pick is asked again", function()
+    local chosen, forget = jdtls._remembered_choice(candidates, { "jakarta.persistence.Entity" }, false)
+    assert.is_nil(chosen)
+    assert.are.same({ "jakarta.persistence.Entity" }, forget)
+  end)
+
+  it("asks when nothing is remembered", function()
+    for _, smart in ipairs({ true, false }) do
+      local chosen, forget = jdtls._remembered_choice(candidates, { "com.other.Entity" }, smart)
+      assert.is_nil(chosen)
+      assert.are.same({}, forget)
+    end
+    assert.is_nil(jdtls._remembered_choice(candidates, {}, true))
+    assert.is_nil(jdtls._remembered_choice(candidates, nil, true))
+  end)
+
+  it("takes the first remembered candidate when several are known", function()
+    local known = { "jakarta.persistence.Entity", "javax.persistence.Entity" }
+    local chosen = jdtls._remembered_choice(candidates, known, true)
+    -- candidate order wins, not the order they were remembered in
+    assert.are.equal("javax.persistence.Entity", chosen.fullyQualifiedName)
+  end)
+end)

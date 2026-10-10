@@ -31,26 +31,40 @@ local function request_status(method, build, on_ok, tries)
   end)
 end
 
+-- the remembered candidate among `candidates`, if there is one. A smart
+-- organize takes it silently; a plain one instead forgets it and asks again,
+-- which is how a past choice gets revised. Returns the candidate, or nil plus
+-- the names to forget.
+function M._remembered_choice(candidates, known, smart)
+  local remembered = {}
+  for _, name in ipairs(known or {}) do
+    remembered[name] = true
+  end
+  local to_forget = {}
+  for _, candidate in ipairs(candidates or {}) do
+    if remembered[candidate.fullyQualifiedName] then
+      if smart then
+        return candidate, {}
+      end
+      to_forget[#to_forget + 1] = candidate.fullyQualifiedName
+    end
+  end
+  return nil, to_forget
+end
+
 local function choose_imports(params, _)
   local candidates = params.arguments[2][1].candidates
   local regulars = regular_imports()
-  local known = regulars:load()
-  local to_forget = {}
-  local prompt = "Choose candidate:\n"
-  for i, candidate in ipairs(candidates) do
-    prompt = prompt .. i .. ". " .. candidate.fullyQualifiedName .. "\n"
-    for _, value in ipairs(known) do
-      if value == candidate.fullyQualifiedName then
-        if M.organize_imports_smart then
-          return { candidate }
-        else
-          table.insert(to_forget, candidate.fullyQualifiedName)
-        end
-      end
-    end
+  local chosen, to_forget = M._remembered_choice(candidates, regulars:load(), M.organize_imports_smart)
+  if chosen then
+    return { chosen }
   end
   for _, name in ipairs(to_forget) do
     regulars:remove(name)
+  end
+  local prompt = "Choose candidate:\n"
+  for i, candidate in ipairs(candidates) do
+    prompt = prompt .. i .. ". " .. candidate.fullyQualifiedName .. "\n"
   end
   -- blocking input is intentional: this runs inside the synchronous
   -- workspace/executeClientCommand handler and must return the chosen

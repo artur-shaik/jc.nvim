@@ -27,7 +27,9 @@ server (jdtls). It never starts or installs the server itself — it hooks
 into whatever `jdtls` LSP client attaches (nvim-java, nvim-jdtls,
 nvim-lspconfig) and provides:
 
-- organize imports with smart selection of remembered classes;
+- organize imports with smart selection of remembered classes (the pick for
+  an ambiguous name is kept per project, and organizing a freshly created
+  class applies it instead of asking again);
 - code generation: `toString`, `hashCode`/`equals`, constructors,
   accessors, with interactive field selection;
 - adding unimplemented (abstract) methods;
@@ -106,7 +108,8 @@ with defaults.
 
   :JCimportsOrganizeSmart    organize imports, auto-pick remembered
                              candidates
-  :JCimportsOrganize         organize imports with manual selection
+  :JCimportsOrganize         organize imports with manual selection (forgets
+                             the remembered pick, to revise it)
   :JCimportsReplace          replace the import of the type under the cursor,
                              picking among same-named classes
   :JCimportsRemoveUnused     remove all unused imports (no reordering)

@@ -583,7 +583,9 @@ local function queue_generation(data)
   end
 
   chains:add(function()
-    require("jc.jdtls").organize_imports(0, false)
+    -- smart: apply the candidates picked before instead of asking again on
+    -- every new class (and, worse, forgetting them)
+    require("jc.jdtls").organize_imports(0, true)
   end)
   if methods.constructor then
     chains:add(function()

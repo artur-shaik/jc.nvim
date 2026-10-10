@@ -23,6 +23,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bytecode). `:JCtestRun`, `:JCtestFile` and `:JCtestLast` now reload the
   target file, tell jdtls it changed and have neotest reparse it before the
   run. Buffers with unsaved changes are left untouched.
+- **Creating a class kept asking which import to use** - the import pass that
+  follows a create ran as a plain organize, which does not apply a remembered
+  pick, and worse, forgets it. So every new class asked again about the same
+  ambiguous name (`javax` vs `jakarta` and friends) and wiped the answer, which
+  also left `:JCimportsOrganizeSmart` with nothing to go on. That pass is a
+  smart organize now, so the pick is made once per project.
 
 ## [1.5.1]
 

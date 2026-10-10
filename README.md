@@ -234,12 +234,17 @@ passed to `setup`.
 | Command | Action |
 |---|---|
 | `JCimportsOrganizeSmart` | organize imports, auto-picking remembered classes |
-| `JCimportsOrganize` | organize imports, choosing from the candidate list |
+| `JCimportsOrganize` | organize imports, choosing from the candidate list (and forgetting the remembered pick, which is how you revise it) |
 | `JCimportsReplace` | replace the import of the type under the cursor (pick among same-named, e.g. `lombok.Value` vs spring's) |
 | `JCimportsRemoveUnused` | remove all unused imports (no reordering) |
 | `JCimportsAddMissing` | add all missing imports (no reordering; smart-picks ambiguous names) |
 | `JCimportsOrganizeNoSort` | add missing + remove unused, without reordering the rest |
 | `JCimportsStyle` | pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per project |
+
+A pick for an ambiguous name is remembered per project (a file next to the
+jdtls workspace), and the smart commands above apply it without asking again.
+Organizing the imports of a newly created class counts as a smart run, so a
+`javax` vs `jakarta` choice is made once, not on every new class.
 | `JCgenerateToString` | generate `toString()` with field selection |
 | `JCgenerateHashCodeAndEquals` | generate `hashCode()` and `equals()` |
 | `JCgenerateAccessors` | choose fields for accessor generation |
