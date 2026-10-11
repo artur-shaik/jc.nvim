@@ -519,7 +519,13 @@ local function build_java_home(file)
   if override == false then
     return nil
   end
-  local java = resolve_java(file, false)
+  -- build_only: judge by the build tool's own output, not by jdtls' bin. The
+  -- two disagree when jdtls imports a project at a higher level than the build
+  -- (`sourceCompatibility = 11` but an eclipse compliance of 17, say), and
+  -- taking the higher of the two made the build JDK depend on whether jdtls
+  -- had written bin yet - so it differed between nvim sessions, and gradle
+  -- keeps one daemon per JDK.
+  local java = resolve_java(file, true)
   -- a bare "java" means it wasn't resolved: leave the environment alone
   if type(java) == "string" and java ~= "" and java ~= "java" then
     return vim.fn.fnamemodify(java, ":h:h")

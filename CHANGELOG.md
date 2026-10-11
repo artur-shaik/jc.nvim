@@ -4,6 +4,18 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The precompile picked its JDK off jdtls' output, so it changed between
+  sessions** - the build JDK was the highest bytecode version found in both the
+  build tool's `build/` and jdtls' `bin/`. Those disagree whenever jdtls imports
+  a project at a higher level than the build produces, and which one won then
+  depended on whether jdtls had written `bin` yet, so one nvim session built on
+  11 and the next on 17 - and gradle keeps a separate daemon per JDK. The
+  precompile now goes by the build tool's own output.
+
 ## [1.5.3]
 
 ### Fixed

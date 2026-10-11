@@ -333,3 +333,34 @@ describe("refresh before a run", function()
     vim.fn.delete(file)
   end)
 end)
+
+describe("module java version", function()
+  -- the adapter pulls in neotest.lib, which bare CI doesn't have; skip there
+  local ok, adapter = pcall(require, "jc.neotest")
+
+  -- a class file is only read for its major version; craft the 8-byte header
+  local function class_file(dir, major)
+    vim.fn.mkdir(dir, "p")
+    local header = string.char(0xCA, 0xFE, 0xBA, 0xBE, 0, 0, 0, major)
+    local path = dir .. "/Probe.class"
+    local fd = assert(io.open(path, "wb"))
+    fd:write(header)
+    fd:close()
+  end
+
+  it("ignores jdtls' bin when asked for the build output only", function()
+    if not ok then
+      return
+    end
+    local module = vim.fn.tempname()
+    class_file(module .. "/build/classes/java/main", 55) -- gradle: java 11
+    class_file(module .. "/bin/main", 61) -- jdtls: java 17
+
+    -- the build tool's own output decides the JDK the build runs on
+    assert.are.equal(55, adapter._module_java_version(module, true))
+    -- the run instead has to cope with the highest level on the classpath
+    assert.are.equal(61, adapter._module_java_version(module, false))
+
+    vim.fn.delete(module, "rf")
+  end)
+end)
