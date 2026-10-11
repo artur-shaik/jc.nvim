@@ -113,6 +113,37 @@ function M.check()
   else
     health.error("data dir not writable: " .. tostring(basedir))
   end
+
+  -- does the editor see this project at the level the build produces?
+  local project = require("jc.project_jdk")
+  local findings, facts = project.diagnose()
+  if not facts then
+    health.info("not inside a gradle/maven project — no project JDK checks")
+  else
+    local declared = facts.declared and (facts.declared.level .. " (" .. facts.declared.where .. ")") or "not declared"
+    health.info(
+      ("project %s: declares java %s, eclipse compliance %s, build output java %s"):format(
+        vim.fn.fnamemodify(facts.root, ":t"),
+        declared,
+        tostring(facts.compliance or "?"),
+        tostring(facts.build_level or "not built yet")
+      )
+    )
+    if #findings == 0 then
+      health.ok("project java levels agree")
+    end
+    for _, f in ipairs(findings) do
+      local text = f.message .. "\n" .. f.hint
+      if f.fix then
+        text = text .. "\n:JCutilFixJdk applies this one"
+      end
+      if f.severity == "info" then
+        health.info(text)
+      else
+        health.warn(text)
+      end
+    end
+  end
 end
 
 return M

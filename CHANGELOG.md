@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`:checkhealth jc` now checks whether the editor sees the project at the
+  level the build produces** - the level the build declares (and where it
+  declares it), eclipse's compliance, the JDK jdtls syncs gradle with, and the
+  level of both output trees. Each mismatch is reported with its consequence:
+  gradle keeps one daemon per JDK, the LSP otherwise checks the code at the
+  wrong level, and jdtls without method parameter names breaks spring-data
+  named queries. **`:JCutilFixJdk`** applies the one repair jc can make on its
+  own - `java.home` in `.settings/org.eclipse.buildship.core.prefs`, after a
+  confirmation. Build files are never rewritten; for a level set on the compile
+  task, where the gradle Tooling API cannot see it, jc explains the move to
+  `java { sourceCompatibility = ... }` instead.
+
 ### Fixed
 
 - **The precompile picked its JDK off jdtls' output, so it changed between

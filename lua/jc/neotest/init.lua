@@ -297,19 +297,6 @@ local function module_dir(file)
   return file:match("^(.*)[/\\]src[/\\][^/\\]+[/\\]java[/\\]")
 end
 
-local function class_major(path)
-  local fd = io.open(path, "rb")
-  if not fd then
-    return nil
-  end
-  local head = fd:read(8)
-  fd:close()
-  if head and #head >= 8 then
-    return head:byte(7) * 256 + head:byte(8) - 44 -- feature version: 52->8, 61->17
-  end
-  return nil
-end
-
 -- the HIGHEST java feature version among a module's compiled classes. The JVM
 -- must be >= every bytecode version on the run classpath (Java is backward
 -- compatible), and jdtls' bin output is often compiled to a newer level than
@@ -322,48 +309,17 @@ function adapter._module_java_version(module, build_only)
   -- only the build/ bytecode (the project's real target) matters
   local subs = build_only and { "/build/classes/java/main", "/build/classes/java/test" }
     or { "/build/classes/java/main", "/bin/main", "/build/classes/java/test", "/bin/test" }
-  local max
+  local dirs = {}
   for _, sub in ipairs(subs) do
-    local hits = vim.fs.find(function(n)
-      return n:match("%.class$")
-    end, { path = module .. sub, type = "file", limit = 1 })
-    local v = hits[1] and class_major(hits[1])
-    if v and (not max or v > max) then
-      max = v
-    end
+    dirs[#dirs + 1] = module .. sub
   end
-  return max
-end
-
-local function runtime_version(name)
-  local v = name and name:match("^JavaSE%-(.+)$")
-  if not v then
-    return nil
-  end
-  return v == "1.8" and 8 or tonumber(v:match("^(%d+)"))
+  return require("jc.jdk").level_of(dirs)
 end
 
 -- a configured jdtls runtime that can run feature version `ver`: the exact
 -- match, else the smallest configured runtime >= ver (backward compatible).
 function adapter._runtime_for_version(ver)
-  local client = require("jc.lsp").get_jdtls_client()
-  local runtimes = client and vim.tbl_get(client.config or {}, "settings", "java", "configuration", "runtimes")
-  if type(runtimes) ~= "table" then
-    return nil
-  end
-  local best, best_v
-  for _, r in ipairs(runtimes) do
-    local rv = runtime_version(r.name)
-    if rv and type(r.path) == "string" and r.path ~= "" then
-      if rv == ver then
-        return r.path .. "/bin/java"
-      end
-      if rv > ver and (not best_v or rv < best_v) then
-        best, best_v = r.path .. "/bin/java", rv
-      end
-    end
-  end
-  return best
+  return require("jc.jdk").java_for_version(ver)
 end
 
 -- the JDK to run a module's tests on. resolveJavaExecutable only ever returns

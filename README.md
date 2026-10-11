@@ -310,6 +310,7 @@ remembered per simple name: picking another one, in the picker or with
 | `JCtoggleAutoformat` | toggle format-on-save |
 | `JCutilUpdateConfig` | re-read the project configuration (pom/gradle) |
 | `JCutilWipeWorkspace` | delete the jdtls workspace and restart (works even if jdtls failed to start) |
+| `JCutilFixJdk` | point jdtls' gradle sync at the JDK the build targets (reported by `:checkhealth jc`) |
 | `JCutilJshell` | java shell with the project classpath |
 | `JCutilBytecode` | bytecode of the current class (javap) |
 | `JCutilJol` | object layout (jol) |
@@ -670,6 +671,28 @@ The classpath is built from jdtls and augmented for correctness:
   in the module's `.settings/org.eclipse.jdt.core.prefs`, or in the file
   `java.settings.url` points at. `precompile = true` sidesteps it too, since the
   bytecode then comes from javac.
+
+### Does the editor agree with the build?
+
+`:checkhealth jc` ends with the project's java levels: what the build declares,
+what eclipse compliance jdtls settled on, and what level the build output
+actually is. When they disagree it says how that bites and what to do:
+
+- **jdtls syncs gradle on another JDK than the build targets.** Gradle keeps one
+  daemon per JDK, so the editor's sync and jc's precompile each hold their own
+  (~1GB apiece). `:JCutilFixJdk` rewrites `java.home` in the project's
+  `.settings/org.eclipse.buildship.core.prefs` after a confirmation; re-sync
+  with `:JCutilUpdateConfig` afterwards.
+- **Eclipse compliance differs from the build's level.** The LSP then checks the
+  code at the wrong language level. The usual cause is a build that sets the
+  level where the gradle Tooling API cannot see it - `compileJava {
+  sourceCompatibility = 11 }` instead of `java { sourceCompatibility = 11 }` -
+  and jc says so when it recognises that shape. It never rewrites `build.gradle`
+  itself.
+- **`bin` and `build/classes` sit at different levels**, which is what the test
+  runner has to launch over.
+- **jdtls compiles without method parameter names**, which breaks spring-data
+  repositories with named query parameters (see the paragraph above).
 
 If jdtls keeps dropping classes from `bin`, a `:JCutilWipeWorkspace` + restart
 (clean re-import) often makes `bin` complete again, keeping you on the fast

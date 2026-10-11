@@ -153,6 +153,8 @@ with defaults.
   :JCutilUpdateConfig        re-read project configuration (pom/gradle)
   :JCutilWipeWorkspace       delete jdtls workspace (index), restart LSP
                              (works even if jdtls failed to start / no client)
+  :JCutilFixJdk              point jdtls' gradle sync at the JDK the build
+                             targets (reported by :checkhealth jc)
   :JCrefactorExtractVar      extract variable (all occurrences)
   :JCrefactorExtractMethod   extract method (visual range)
   :JCrefactorStaticImport    convert call at cursor to a static import
@@ -428,6 +430,16 @@ with ClassNotFoundException; then set `setup{ test = { precompile = true } }`
 precompile runs asynchronously with progress in the cmdline; a compile failure
 fills the quickfix list with the javac/maven errors (file:line) and skips the
 test run.
+
+`:checkhealth jc` ends with this project's java levels: the level the build
+declares, the eclipse compliance jdtls settled on, and the level its output
+actually is. A mismatch is reported with what it costs - gradle keeps one
+daemon per JDK, and the LSP otherwise checks the code at the wrong level - and
+`:JCutilFixJdk` repairs the one case jc can: the JDK jdtls syncs gradle with,
+in `.settings/org.eclipse.buildship.core.prefs`. A level the build sets on the
+compile task (`compileJava { sourceCompatibility = 11 }`) is invisible to the
+gradle Tooling API, so eclipse falls back to the JDK that ran the import; move
+it to `java { sourceCompatibility = 11 }`. jc never rewrites build files.
 
 Classes in `bin` carry no method parameter names: the Eclipse compiler has
 javac's `-parameters` off by default. Spring Data reads those names by
