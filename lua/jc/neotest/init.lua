@@ -131,22 +131,34 @@ local function schedule_notify(tally)
   end)
 end
 
--- Root at the OUTERMOST project marker so a multi-module build is one neotest
+-- Root at the outermost project marker so a multi-module build is one neotest
 -- tree, not one per submodule (each submodule's own build.gradle would
 -- otherwise split the same project into several roots in the summary).
 function adapter.root(dir)
-  local settings = vim.fs.find(
-    { "settings.gradle", "settings.gradle.kts" },
-    { path = dir, upward = true, type = "file", limit = math.huge }
-  )
-  if #settings > 0 then
-    return vim.fs.dirname(settings[#settings])
-  end
-  return vim.fs.root(dir, { "build.gradle", "build.gradle.kts", "pom.xml", ".git" }) or dir
+  return require("jc.project").root(dir)
 end
 
-function adapter.filter_dir(name)
-  return name ~= "build" and name ~= "target" and name ~= ".git" and name ~= "bin"
+local SKIP_DIRS = { build = true, target = true, bin = true, out = true }
+
+-- Keep discovery inside this project. Besides the output dirs, a checkout
+-- nested in the tree is skipped: a git worktree under `.claude/worktrees`
+-- holds the same test files, and once the outer tree discovers them a run on
+-- a worktree file is served by the outer adapter, which then builds the outer
+-- project's module.
+function adapter.filter_dir(name, rel_path, root)
+  if SKIP_DIRS[name] or name:sub(1, 1) == "." then
+    return false
+  end
+  if not rel_path or rel_path == "" then
+    return true
+  end
+  local dir = root .. "/" .. rel_path
+  for _, marker in ipairs({ "/.git", "/settings.gradle", "/settings.gradle.kts" }) do
+    if vim.uv.fs_stat(dir .. marker) then
+      return false
+    end
+  end
+  return true
 end
 
 function adapter.is_test_file(file_path)

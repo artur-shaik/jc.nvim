@@ -4,6 +4,28 @@ All notable changes to jc.nvim are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A test run from a nested checkout built the wrong project** - the root was
+  the outermost `settings.gradle` above the file, so a git worktree kept inside
+  the project (`.claude/worktrees/<branch>`, say) resolved to the outer
+  checkout, and the module path handed to gradle became
+  `:.claude:worktrees:<branch>:<module>` - a project the outer build never
+  included, so the precompile died with `Project '.claude' not found in root
+  project '<name>'`. The climb to the reactor root now stops as soon as a
+  settings file does not include the directory below it, which keeps
+  multi-module builds on one root and leaves a nested checkout on its own.
+- **A run started from a nested checkout showed up in the outer project's
+  tree** - neotest matches a path to an adapter by walking its adapters and
+  taking the first whose root is a prefix of the path, so with nvim's working
+  directory in the outer checkout the worktree's test files were served by the
+  outer project's adapter. jc now names the adapter that owns the target when
+  it starts a run, and reparses the file into that tree, so each checkout keeps
+  its own tree in the summary. Discovery also stops at a nested checkout
+  instead of listing its tests twice.
+
 ## [1.6.0]
 
 ### Added

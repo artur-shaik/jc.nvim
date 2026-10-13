@@ -722,7 +722,9 @@ compile errors are parsed into the quickfix list.
 
 Commands run from the **reactor root** (outermost contiguous pom /
 settings.gradle), so multi-module builds resolve paths and the reactor
-correctly.
+correctly. A checkout nested inside the project - a git worktree under
+`.claude/worktrees`, say - keeps its own root: the climb stops where a
+`settings.gradle` does not include the directory below it.
 
 ## 🧭 Go to file by FQN
 

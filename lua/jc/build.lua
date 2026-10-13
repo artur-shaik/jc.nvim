@@ -33,12 +33,9 @@ local function find_root()
   if here == "" then
     here = vim.fn.getcwd()
   end
-  local settings_files = vim.fs.find(
-    { "settings.gradle", "settings.gradle.kts" },
-    { upward = true, path = here, type = "file", limit = math.huge }
-  )
-  if #settings_files > 0 then
-    return vim.fs.dirname(settings_files[#settings_files])
+  local gradle = require("jc.project").gradle_root(here)
+  if gradle then
+    return gradle
   end
   local pom = vim.fs.root(here, { "pom.xml" })
   if pom then

@@ -59,7 +59,18 @@ local function with_refresh(paths, run)
   if not ok then
     return run()
   end
-  refresh.before_run(paths, run)
+  local ok_target, target = pcall(require, "jc.neotest.target")
+  local adapter_id = ok_target and target.adapter_id(paths[1]) or nil
+  refresh.before_run(paths, run, adapter_id)
+end
+
+-- run args pinned to the adapter that owns the target (see jc.neotest.target)
+local function run_args(position, path)
+  local ok, target = pcall(require, "jc.neotest.target")
+  if not ok then
+    return position and { position } or nil
+  end
+  return target.run_args(position, path)
 end
 
 -- open the neotest summary on a run (unless disabled) and expand the run
@@ -94,9 +105,9 @@ function M.run_at_cursor()
   with_refresh({ target }, function()
     if counterpart then
       vim.notify("jc: not a test file — running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
-      nt.run.run(counterpart)
+      nt.run.run(run_args(counterpart, counterpart))
     else
-      nt.run.run()
+      nt.run.run(run_args(nil, vim.fn.expand("%:p")))
     end
     maybe_open_summary(nt, target)
   end)
@@ -110,7 +121,7 @@ function M.run_file()
   reset_run_state(false)
   local file = counterpart_test_file() or vim.fn.expand("%:p")
   with_refresh({ file }, function()
-    nt.run.run(file)
+    nt.run.run(run_args(file, file))
     maybe_open_summary(nt, file)
   end)
 end
@@ -163,7 +174,7 @@ function M.run_all()
   }
   reset_run_state(true)
   local root = vim.fs.root(0, markers) or vim.fn.getcwd()
-  nt.run.run(root)
+  nt.run.run(run_args(root, root))
   maybe_open_summary(nt, root)
 end
 
@@ -188,12 +199,9 @@ local function project_root()
   if here == "" then
     here = vim.fn.getcwd()
   end
-  local sg = vim.fs.find(
-    { "settings.gradle", "settings.gradle.kts" },
-    { upward = true, path = here, type = "file", limit = math.huge }
-  )
-  if #sg > 0 then
-    return vim.fs.dirname(sg[#sg])
+  local gradle = require("jc.project").gradle_root(here)
+  if gradle then
+    return gradle
   end
   return vim.fs.root(here, { "pom.xml", "build.gradle", "build.gradle.kts", ".git" }) or vim.fn.getcwd()
 end
@@ -227,7 +235,7 @@ function M.pick()
   }, function(item)
     if item then
       reset_run_state(false)
-      nt.run.run(item.path)
+      nt.run.run(run_args(item.path, item.path))
       maybe_open_summary(nt, item.path)
     end
   end)

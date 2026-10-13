@@ -60,7 +60,9 @@ end
 -- right away when there is nothing to do, when the jc consumer is not wired
 -- into neotest (that is where the client comes from), or when nio is missing;
 -- and after TIMEOUT_MS regardless. The run must start either way.
-function M.before_run(paths, done)
+-- `adapter_id` names the tree to reparse into, so a file in a checkout nested
+-- in another project does not land in the outer project's tree.
+function M.before_run(paths, done, adapter_id)
   paths = M._targets(paths)
   for _, path in ipairs(paths) do
     M._reload_buf(path)
@@ -84,9 +86,19 @@ function M.before_run(paths, done)
   vim.defer_fn(start_run, TIMEOUT_MS)
 
   local ok = pcall(nio.run, function()
+    -- a checkout nested in another project has no adapter of its own until
+    -- neotest meets its root; without one the file is grafted onto whichever
+    -- adapter matched by prefix, which is the outer project's
+    local known = type(client._adapters) == "table"
+    if adapter_id and known and not client._adapters[adapter_id] then
+      pcall(function()
+        client:_update_adapters(vim.fs.dirname(paths[1]))
+      end)
+    end
+    local into = (adapter_id and known and client._adapters[adapter_id]) and { adapter = adapter_id } or nil
     for _, path in ipairs(paths) do
       pcall(function()
-        client:_update_positions(path)
+        client:_update_positions(path, into)
       end)
     end
   end, function()
