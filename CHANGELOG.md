@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`test.precompile_exclude`** - gradle tasks to keep out of the precompile
+  (passed as `-x`). A precompile can fail on a task the tests do not need: a
+  jOOQ or similar code generator that wants a live database, credentials or a
+  VPN. When its output is already on disk, naming the task here is what makes
+  the precompile usable at all. The build-failure message now names the task
+  it tripped on, so it can be copied straight into the option.
+
 ### Fixed
 
 - **A test run from a nested checkout built the wrong project** - the root was

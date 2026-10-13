@@ -501,6 +501,26 @@ local function build_java_home(file)
   return nil
 end
 
+-- gradle tasks to keep out of the precompile, from
+-- setup{ test = { precompile_exclude = { "generateJooq" } } }. For a task that
+-- cannot run here (a code generator wanting a live database) but whose output
+-- is already on disk, skipping it is what makes the precompile usable at all.
+function adapter._precompile_excludes()
+  local ok, jc = pcall(require, "jc")
+  local list = ok and jc.config and jc.config.test and jc.config.test.precompile_exclude
+  local out = {}
+  if type(list) == "string" then
+    list = { list }
+  end
+  for _, name in ipairs(type(list) == "table" and list or {}) do
+    if type(name) == "string" and name ~= "" then
+      out[#out + 1] = "-x"
+      out[#out + 1] = name
+    end
+  end
+  return out
+end
+
 local function precompile(file)
   local root = adapter.root(file)
   local module = module_dir(file)
@@ -517,6 +537,7 @@ local function precompile(file)
     cmd = vim.fn.executable(gw) == 1 and { gw } or { "gradle" }
     local gp = gradle_path(root, module)
     table.insert(cmd, gp and (gp .. ":testClasses") or "testClasses")
+    vim.list_extend(cmd, adapter._precompile_excludes())
     vim.list_extend(cmd, { "--console=plain" })
   elseif vim.fn.filereadable(root .. "/pom.xml") == 1 then
     tool = "maven"
@@ -601,17 +622,24 @@ end
 
 -- what the user should do about a build that failed before the tests ran
 local function build_failed_message(reason)
-  return table.concat({
+  local task = (reason or ""):match("Execution failed for task '[:%w%-%._]-:([%w%-%._]+)'")
+  local lines = {
     "The build failed, so no tests were run.",
     "",
     vim.trim(reason or "(no output captured)"),
     "",
     "What to do:",
     "  - fix the errors in the quickfix list (:copen), then run again;",
-    "  - if the failing task needs something you don't have right now (a live",
-    "    database for a code generator, a VPN, credentials), turn the build-tool",
-    "    precompile off with :JCtestPrecompile and let jdtls compile instead.",
-  }, "\n")
+  }
+  if task then
+    lines[#lines + 1] = "  - if " .. task .. " cannot run here (a code generator wanting a live"
+    lines[#lines + 1] = "    database, say) but its output is already on disk, keep it out of the"
+    lines[#lines + 1] = '    precompile: setup{ test = { precompile_exclude = { "' .. task .. '" } } };'
+  end
+  lines[#lines + 1] = "  - if the failing task needs something you don't have right now (a live"
+  lines[#lines + 1] = "    database for a code generator, a VPN, credentials), turn the build-tool"
+  lines[#lines + 1] = "    precompile off with :JCtestPrecompile and let jdtls compile instead."
+  return table.concat(lines, "\n")
 end
 
 adapter._build_failed_message = build_failed_message

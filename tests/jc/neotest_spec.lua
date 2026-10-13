@@ -187,11 +187,79 @@ describe("failure explanations", function()
     assert.is_truthy(msg:find(":JCtestPrecompile", 1, true))
   end)
 
+  it("points at the option that skips a task that cannot run here", function()
+    if not ok then
+      return
+    end
+    local msg = adapter._build_failed_message("Execution failed for task ':refunds-model:generateJooq'.")
+    assert.is_truthy(msg:find('precompile_exclude = { "generateJooq" }', 1, true))
+  end)
+
+  it("leaves out the skip hint when no task is named", function()
+    if not ok then
+      return
+    end
+    local msg = adapter._build_failed_message("error: cannot find symbol")
+    assert.is_nil(msg:find("precompile_exclude", 1, true))
+  end)
+
   it("survives a build that produced no output", function()
     if not ok then
       return
     end
     assert.is_truthy(adapter._build_failed_message(nil):find("no output captured", 1, true))
+  end)
+end)
+
+describe("precompile excludes", function()
+  local ok, adapter = pcall(require, "jc.neotest")
+
+  local function with_config(value, fn)
+    local ok_jc, jc = pcall(require, "jc")
+    if not ok_jc then
+      return
+    end
+    local saved = jc.config.test
+    jc.config.test = { precompile_exclude = value }
+    local done, err = pcall(fn)
+    jc.config.test = saved
+    assert(done, err)
+  end
+
+  it("turns configured task names into gradle -x flags", function()
+    if not ok then
+      return
+    end
+    with_config({ "generateJooq", "npmBuild" }, function()
+      assert.are.same({ "-x", "generateJooq", "-x", "npmBuild" }, adapter._precompile_excludes())
+    end)
+  end)
+
+  it("takes a single task name as a string", function()
+    if not ok then
+      return
+    end
+    with_config("generateJooq", function()
+      assert.are.same({ "-x", "generateJooq" }, adapter._precompile_excludes())
+    end)
+  end)
+
+  it("ignores anything that is not a task name", function()
+    if not ok then
+      return
+    end
+    with_config({ "", 7, "ok" }, function()
+      assert.are.same({ "-x", "ok" }, adapter._precompile_excludes())
+    end)
+  end)
+
+  it("excludes nothing by default", function()
+    if not ok then
+      return
+    end
+    with_config(nil, function()
+      assert.are.same({}, adapter._precompile_excludes())
+    end)
   end)
 end)
 

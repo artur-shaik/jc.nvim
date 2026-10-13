@@ -174,6 +174,7 @@ require("jc").setup({
   on_attach = nil,                  -- function(client, bufnr) extra hook
   test = {                          -- test runner (see Test runner)
     precompile = false,             -- compile with gradle/maven before a run
+    precompile_exclude = nil,       -- gradle tasks to keep out of it, e.g. { "generateJooq" }
     build_java_home = nil,          -- JDK for that build (default: the project's; false = inherit)
     notify = true,                  -- toast run start / result
     open_summary = true,            -- open the neotest summary on a run
@@ -651,6 +652,11 @@ The classpath is built from jdtls and augmented for correctness:
   compile is async (editor stays responsive, progress in the cmdline), cached
   per module for the run, and on failure the javac/maven errors go to the
   quickfix list instead of running the tests.
+- A precompile can also fail on a task that has nothing to do with the tests -
+  a code generator that wants a live database, say. When its output is already
+  on disk, keep the task out of the precompile with
+  `test.precompile_exclude = { "generateJooq" }` (gradle `-x`); the failure
+  message names the task to put there.
 - That build runs on the **project's** JDK (the same one the tests launch with),
   not on whatever `JAVA_HOME` nvim inherited — an older gradle on a JDK 16+
   otherwise dies with `IllegalAccessError: ... jdk.compiler does not export
