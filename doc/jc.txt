@@ -436,7 +436,9 @@ A precompile can fail on a task unrelated to the tests - a code generator
 that wants a live database, say. When its output is already on disk, keep the
 task out of the build with `setup{ test = { precompile_exclude =
 { "generateJooq" } } }` (passed to gradle as `-x`); the failure message names
-the task to put there.
+the task to put there. The option is global, the task is not: a project
+without that task would fail on the `-x` itself, so jc drops the name for
+that project and builds again.
 
 `:checkhealth jc` ends with this project's java levels: the level the build
 declares, the eclipse compliance jdtls settled on, and the level its output

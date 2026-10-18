@@ -501,31 +501,73 @@ local function build_java_home(file)
   return nil
 end
 
+-- Excluded tasks the project turned out not to have, per root. The option is
+-- global, so a task named for one project reaches every other one, and gradle
+-- fails a build on `-x` for a task it cannot find - before compiling anything.
+local no_such_task = {}
+
+function adapter._mark_missing_task(root, name)
+  no_such_task[root] = no_such_task[root] or {}
+  no_such_task[root][name] = true
+end
+
 -- gradle tasks to keep out of the precompile, from
 -- setup{ test = { precompile_exclude = { "generateJooq" } } }. For a task that
 -- cannot run here (a code generator wanting a live database) but whose output
 -- is already on disk, skipping it is what makes the precompile usable at all.
-function adapter._precompile_excludes()
+function adapter._precompile_names(root)
   local ok, jc = pcall(require, "jc")
   local list = ok and jc.config and jc.config.test and jc.config.test.precompile_exclude
+  local missing = root and no_such_task[root] or nil
   local out = {}
   if type(list) == "string" then
     list = { list }
   end
   for _, name in ipairs(type(list) == "table" and list or {}) do
-    if type(name) == "string" and name ~= "" then
-      out[#out + 1] = "-x"
+    if type(name) == "string" and name ~= "" and not (missing and missing[name]) then
       out[#out + 1] = name
     end
   end
   return out
 end
 
+function adapter._precompile_excludes(root)
+  local out = {}
+  for _, name in ipairs(adapter._precompile_names(root)) do
+    out[#out + 1] = "-x"
+    out[#out + 1] = name
+  end
+  return out
+end
+
+-- The excluded task gradle could not find, if that is what the build died on.
+-- Gradle words it three ways: "Task 'x' not found in root project 'p'.",
+-- "Task 'x' not found in project ':m'." and "Cannot locate excluded tasks
+-- that match ':m:x' as project 'm' not found ...".
+function adapter._unknown_task(output, names)
+  local candidates = {}
+  for name in (output or ""):gmatch("[Tt]ask '([^']+)' not found") do
+    candidates[#candidates + 1] = name
+  end
+  for path in (output or ""):gmatch("Cannot locate excluded tasks that match '([^']+)'") do
+    candidates[#candidates + 1] = path
+  end
+  for _, cand in ipairs(candidates) do
+    local short = cand:match("([^:]+)$")
+    for _, name in ipairs(names or {}) do
+      if name == cand or name == short or name:match("([^:]+)$") == short then
+        return name
+      end
+    end
+  end
+  return nil
+end
+
 local function precompile(file)
   local root = adapter.root(file)
   local module = module_dir(file)
   local label = module and vim.fn.fnamemodify(module, ":t") or "project"
-  local tool, cmd
+  local tool, cmd, rebuild
   if
     vim.fn.filereadable(root .. "/settings.gradle") == 1
     or vim.fn.filereadable(root .. "/settings.gradle.kts") == 1
@@ -534,11 +576,16 @@ local function precompile(file)
   then
     tool = "gradle"
     local gw = root .. "/gradlew"
-    cmd = vim.fn.executable(gw) == 1 and { gw } or { "gradle" }
     local gp = gradle_path(root, module)
-    table.insert(cmd, gp and (gp .. ":testClasses") or "testClasses")
-    vim.list_extend(cmd, adapter._precompile_excludes())
-    vim.list_extend(cmd, { "--console=plain" })
+    -- rebuildable: the excludes can shrink between attempts (see below)
+    rebuild = function()
+      local c = vim.fn.executable(gw) == 1 and { gw } or { "gradle" }
+      table.insert(c, gp and (gp .. ":testClasses") or "testClasses")
+      vim.list_extend(c, adapter._precompile_excludes(root))
+      vim.list_extend(c, { "--console=plain" })
+      return c
+    end
+    cmd = rebuild()
   elseif vim.fn.filereadable(root .. "/pom.xml") == 1 then
     tool = "maven"
     local mw = root .. "/mvnw"
@@ -583,18 +630,37 @@ local function precompile(file)
 
   -- run async: a future yields the neotest nio task instead of blocking the UI
   -- (vim.system():wait() would freeze the editor for the whole compile)
-  local future = nio.control.future()
   local java_home = build_java_home(file)
   local env = java_home and { JAVA_HOME = java_home } or nil
-  vim.system(cmd, { cwd = root, env = env, text = true, stdout = on_data, stderr = on_data }, function(r)
-    -- resolve on the main loop: vim.system's callback is a fast event context,
-    -- and resuming the task there would run the rest of build_spec (vim.fn.*)
-    -- where vimscript calls are forbidden (E5560)
-    vim.schedule(function()
-      future.set(r)
+  local function run(command)
+    chunks = {}
+    local future = nio.control.future()
+    vim.system(command, { cwd = root, env = env, text = true, stdout = on_data, stderr = on_data }, function(r)
+      -- resolve on the main loop: vim.system's callback is a fast event context,
+      -- and resuming the task there would run the rest of build_spec (vim.fn.*)
+      -- where vimscript calls are forbidden (E5560)
+      vim.schedule(function()
+        future.set(r)
+      end)
     end)
-  end)
-  local res = future.wait()
+    return future.wait(), table.concat(chunks)
+  end
+
+  local res, output = run(cmd)
+  -- A precompile_exclude task the project does not have fails the build on
+  -- selection, before anything is compiled. Drop it for this root and build
+  -- again: the option is global, the task is not.
+  while res.code ~= 0 and rebuild do
+    local unknown = adapter._unknown_task(output, adapter._precompile_names(root))
+    if not unknown then
+      break
+    end
+    adapter._mark_missing_task(root, unknown)
+    vim.schedule(function()
+      vim.notify("jc: no " .. unknown .. " task here, precompiling without it", vim.log.levels.INFO)
+    end)
+    res, output = run(rebuild())
+  end
 
   if timer then
     timer:stop()
@@ -603,7 +669,7 @@ local function precompile(file)
   vim.schedule(function()
     vim.api.nvim_echo({ { "", "" } }, false, {})
   end)
-  return res.code == 0, table.concat(chunks)
+  return res.code == 0, output
 end
 
 -- When the run can't start, neotest still needs a spec: returning nil makes it

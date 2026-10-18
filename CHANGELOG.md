@@ -13,7 +13,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jOOQ or similar code generator that wants a live database, credentials or a
   VPN. When its output is already on disk, naming the task here is what makes
   the precompile usable at all. The build-failure message now names the task
-  it tripped on, so it can be copied straight into the option.
+  it tripped on, so it can be copied straight into the option. The list is
+  global while the task is not, so a project that has no such task - where
+  gradle fails on the `-x` itself - gets it dropped and built again.
 
 ### Fixed
 

@@ -261,6 +261,51 @@ describe("precompile excludes", function()
       assert.are.same({}, adapter._precompile_excludes())
     end)
   end)
+
+  it("stops excluding a task the project does not have", function()
+    if not ok then
+      return
+    end
+    with_config({ "generateJooq", "npmBuild" }, function()
+      adapter._mark_missing_task("/p/one", "generateJooq")
+      assert.are.same({ "-x", "npmBuild" }, adapter._precompile_excludes("/p/one"))
+      assert.are.same({ "-x", "generateJooq", "-x", "npmBuild" }, adapter._precompile_excludes("/p/two"))
+    end)
+  end)
+
+  it("recognizes every wording gradle uses for an unknown excluded task", function()
+    if not ok then
+      return
+    end
+    local names = { "generateJooq" }
+    assert.are.equal(
+      "generateJooq",
+      adapter._unknown_task(
+        "Selection failed\n  Task 'generateJooq' not found in root project 'finmate-backend'.",
+        names
+      )
+    )
+    assert.are.equal(
+      "generateJooq",
+      adapter._unknown_task("Task 'generateJooq' not found in project ':refunds-model'.", names)
+    )
+    assert.are.equal(
+      "generateJooq",
+      adapter._unknown_task(
+        "Cannot locate excluded tasks that match ':sub:generateJooq' as project 'sub' not found in root project 'p'.",
+        names
+      )
+    )
+  end)
+
+  it("does not blame the excludes for an ordinary build failure", function()
+    if not ok then
+      return
+    end
+    assert.is_nil(adapter._unknown_task("error: cannot find symbol", { "generateJooq" }))
+    assert.is_nil(adapter._unknown_task("Task 'npmBuild' not found in root project 'p'.", { "generateJooq" }))
+    assert.is_nil(adapter._unknown_task(nil, nil))
+  end)
 end)
 
 describe("console launcher version", function()

@@ -656,7 +656,9 @@ The classpath is built from jdtls and augmented for correctness:
   a code generator that wants a live database, say. When its output is already
   on disk, keep the task out of the precompile with
   `test.precompile_exclude = { "generateJooq" }` (gradle `-x`); the failure
-  message names the task to put there.
+  message names the task to put there. The option is global, the task is not:
+  in a project that has no such task jc drops it and builds again, so one list
+  can name the generators of every project you work on.
 - That build runs on the **project's** JDK (the same one the tests launch with),
   not on whatever `JAVA_HOME` nvim inherited — an older gradle on a JDK 16+
   otherwise dies with `IllegalAccessError: ... jdk.compiler does not export
