@@ -596,7 +596,10 @@ green/red and a failed test's diagnostic points at the failing line. Runs open
 the summary panel and, via the optional `jc` consumer, auto-close it after an
 all-green **focused** run (cursor/file/class) — runs with failures stay open.
 `JCtestRun`/`JCtestFile` also work from a production class: they run its paired
-`<Class>Test` (the same counterpart `JCgotoTest` uses) when it exists.
+`<Class>Test` (the same counterpart `JCgotoTest` uses) when it exists. Without
+one, the test classes of the class's own package are offered in a picker - a
+class is often covered by a test named after the scenario rather than after the
+class. With no tests in the package either, jc says so and starts no run.
 
 The adapter toasts `running…` at the start and `N passed, M failed, K skipped`
 at the end. Knobs: `test.notify`, `test.open_summary`, `test.autoclose_summary`

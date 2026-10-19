@@ -17,6 +17,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   global while the task is not, so a project that has no such task - where
   gradle fails on the `-x` itself - gets it dropped and built again.
 
+- **The package's tests as a fallback for a class with no paired test** -
+  `:JCtestRun`/`:JCtestFile` on a production class run its `<Class>Test` when
+  that file exists; now, when it does not, the test classes of the class's own
+  package (same module, exact package) are offered in a picker instead, since a
+  class is often covered by a test named after the scenario. Only test classes
+  by name, so fixtures and helpers living beside them stay out.
+
 ### Fixed
 
 - **A run on a file with no tests in it spun forever** - the summary showed the

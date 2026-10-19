@@ -495,7 +495,10 @@ falls back to jc-native when neither is installed.
 
 `:JCtestRun`/`:JCtestFile` also work from a production class: if the current
 buffer is not a test file, jc runs its paired `<Class>Test` file (the same
-counterpart `:JCgotoTest` uses) when it exists.
+counterpart `:JCgotoTest` uses) when it exists. Without one it offers the test
+classes of the class's own package (same module, exact package) in a picker,
+since a class is often covered by a test named after the scenario. With none
+there either jc says so and starts no run.
 
 The adapter toasts `running...` on start and `N passed, M failed, K skipped`
 on completion (neotest itself only paints signs/diagnostics). The per-class

@@ -41,9 +41,38 @@ end
 
 local function warn_nothing_to_run(path)
   vim.notify(
-    "jc: no tests in " .. vim.fn.fnamemodify(path, ":t") .. ", no test file for it either - :JCgotoTest creates one",
+    "jc: no tests in "
+      .. vim.fn.fnamemodify(path, ":t")
+      .. ", no test file for it and none in its package - :JCgotoTest creates one",
     vim.log.levels.WARN
   )
+end
+
+-- the test source dir holding the same package as `path`, in the same module
+local function package_test_dir(path)
+  local dir = vim.fn.fnamemodify(path, ":h")
+  local test_dir = dir:gsub("([/\\])src([/\\])main([/\\])java", "%1src%2test%3java")
+  return test_dir ~= dir and test_dir or nil
+end
+
+-- Test classes sharing the package of `path` within its module. The paired
+-- <Class>Test is what jc runs when it exists; these are the fallback, since a
+-- class is often covered by a test named after the scenario, not the class.
+-- The exact package only: a test one package down covers something else.
+function M._package_tests(path)
+  local dir = package_test_dir(path)
+  if not dir then
+    return {}
+  end
+  local ok, project = pcall(require, "jc.project")
+  local out = {}
+  for _, file in ipairs(vim.fn.glob(dir .. "/*.java", true, true)) do
+    if not ok or project.is_test_class(file) then
+      out[#out + 1] = file
+    end
+  end
+  table.sort(out)
+  return out
 end
 
 -- auto-close is reliable only for a focused run (one neotest run); a suite is
@@ -109,6 +138,38 @@ local function maybe_open_summary(nt, target)
   end
 end
 
+-- run every test in one file
+local function run_test_file(nt, file)
+  reset_run_state(false)
+  with_refresh({ file }, function()
+    nt.run.run(run_args(file, file))
+    maybe_open_summary(nt, file)
+  end)
+end
+
+-- No paired test file for this class: offer the tests of its own package, and
+-- say there is nothing to run only when the package holds none either.
+local function offer_package_tests(nt, path)
+  local files = M._package_tests(path)
+  if #files == 0 then
+    return warn_nothing_to_run(path)
+  end
+  local items = {}
+  for _, file in ipairs(files) do
+    items[#items + 1] = { label = vim.fn.fnamemodify(file, ":t:r"), path = file }
+  end
+  vim.ui.select(items, {
+    prompt = "No test for " .. vim.fn.fnamemodify(path, ":t:r") .. " - run from its package:",
+    format_item = function(item)
+      return item.label
+    end,
+  }, function(item)
+    if item then
+      run_test_file(nt, item.path)
+    end
+  end)
+end
+
 function M.run_at_cursor()
   local nt = neotest()
   if not nt then
@@ -117,7 +178,7 @@ function M.run_at_cursor()
   local counterpart = counterpart_test_file()
   local target = counterpart or vim.fn.expand("%:p")
   if not counterpart and M._nothing_to_run(target) then
-    return warn_nothing_to_run(target)
+    return offer_package_tests(nt, target)
   end
   reset_run_state(false)
   with_refresh({ target }, function()
@@ -138,13 +199,9 @@ function M.run_file()
   end
   local file = counterpart_test_file() or vim.fn.expand("%:p")
   if M._nothing_to_run(file) then
-    return warn_nothing_to_run(file)
+    return offer_package_tests(nt, file)
   end
-  reset_run_state(false)
-  with_refresh({ file }, function()
-    nt.run.run(run_args(file, file))
-    maybe_open_summary(nt, file)
-  end)
+  run_test_file(nt, file)
 end
 
 -- delegate to nvim-jdtls / nvim-java's own test debugger. Returns true if one
