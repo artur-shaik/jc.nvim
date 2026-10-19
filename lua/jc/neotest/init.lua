@@ -162,14 +162,7 @@ function adapter.filter_dir(name, rel_path, root)
 end
 
 function adapter.is_test_file(file_path)
-  if not vim.endswith(file_path, ".java") then
-    return false
-  end
-  local base = file_path:match("([^/\\]+)%.java$") or ""
-  if base:match("Test$") or base:match("Tests$") or base:match("^Test") or base:match("IT$") then
-    return true
-  end
-  return file_path:find("[/\\]src[/\\]test[/\\]") ~= nil
+  return require("jc.project").is_test_file(file_path)
 end
 
 function adapter.discover_positions(file_path)
@@ -727,10 +720,22 @@ end
 adapter.resolve_classpath = resolve_classpath
 adapter.resolve_java = resolve_java
 
+-- A position with no tests under it: a production class, or a helper that
+-- lives in src/test. Returning nil here would send neotest into
+-- _run_broken_down_tree, which finds no test children, runs nothing and
+-- reports nothing - and a run without results never clears the running flag,
+-- so the summary spins forever. A spec that exits at once ends the run.
+local function no_tests_spec(tree)
+  local pos = tree:data()
+  local root = (pos.path and adapter.root(pos.path)) or vim.fn.getcwd()
+  local cmd = vim.fn.has("win32") == 1 and { "cmd", "/c", "exit 0" } or { "sh", "-c", "exit 0" }
+  return { command = cmd, cwd = root, context = { no_tests = true } }
+end
+
 function adapter.build_spec(args)
   local by_file = selectors_by_file(args.tree)
   if not next(by_file) then
-    return nil
+    return no_tests_spec(args.tree)
   end
 
   local pre = precompile_enabled()
@@ -851,6 +856,16 @@ function adapter.build_spec(args)
 end
 
 function adapter.results(spec, result, tree)
+  -- nothing ran: hand back a status for every position neotest marked running
+  -- (it clears the flag only for ids it gets results for)
+  if spec.context and spec.context.no_tests then
+    local skipped = {}
+    for _, node in tree:iter_nodes() do
+      skipped[node:data().id] = { status = "skipped" }
+    end
+    return skipped
+  end
+
   local reports_dir = spec.context and spec.context.reports_dir
   local xml_files = reports_dir and vim.fn.glob(reports_dir .. "/*.xml", false, true) or {}
   local cases = {}

@@ -73,4 +73,24 @@ function M.root(dir)
   return M.gradle_root(dir) or vim.fs.root(dir, { "build.gradle", "build.gradle.kts", "pom.xml", ".git" }) or dir
 end
 
+-- a java file whose name follows the junit conventions for a test class
+function M.is_test_class(path)
+  if type(path) ~= "string" or not vim.endswith(path, ".java") then
+    return false
+  end
+  local base = path:match("([^/\\]+)%.java$") or ""
+  return base:match("Test$") ~= nil
+    or base:match("Tests$") ~= nil
+    or base:match("^Test") ~= nil
+    or base:match("IT$") ~= nil
+end
+
+-- a java file that can hold tests, by name or by living under src/test
+function M.is_test_file(path)
+  if type(path) ~= "string" or not vim.endswith(path, ".java") then
+    return false
+  end
+  return M.is_test_class(path) or path:find("[/\\]src[/\\]test[/\\]") ~= nil
+end
+
 return M

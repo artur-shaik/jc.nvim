@@ -31,13 +31,18 @@ local function notify_jdtls(paths)
   end
 end
 
--- the paths worth refreshing: readable files, no duplicates
+-- the paths worth refreshing: readable test files, no duplicates. A
+-- production class is left alone: _update_positions parses whatever it is
+-- given, so reparsing one adds a position with no tests under it to the tree.
 function M._targets(paths)
+  local ok, project = pcall(require, "jc.project")
   local seen, out = {}, {}
   for _, path in ipairs(paths or {}) do
     if type(path) == "string" and path ~= "" and not seen[path] and vim.fn.filereadable(path) == 1 then
       seen[path] = true
-      out[#out + 1] = path
+      if not ok or project.is_test_file(path) then
+        out[#out + 1] = path
+      end
     end
   end
   return out

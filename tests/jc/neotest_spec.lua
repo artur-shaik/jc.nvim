@@ -308,6 +308,58 @@ describe("precompile excludes", function()
   end)
 end)
 
+describe("a position with no tests", function()
+  local ok, adapter = pcall(require, "jc.neotest")
+
+  -- a tree neotest would hand build_spec: a file position with no children
+  local function fake_tree(data, nodes)
+    return {
+      data = function()
+        return data
+      end,
+      iter_nodes = function()
+        local i = 0
+        return function()
+          i = i + 1
+          if nodes[i] then
+            return i, nodes[i]
+          end
+        end
+      end,
+    }
+  end
+
+  local function node(id)
+    return {
+      data = function()
+        return { id = id, type = "file" }
+      end,
+    }
+  end
+
+  it("still returns a spec, so the run ends", function()
+    if not ok then
+      return
+    end
+    -- nil would send neotest looking for test children, find none, run
+    -- nothing and report nothing - and the summary spins on forever
+    local file = "/p/src/main/java/a/FallbackController.java"
+    local spec = adapter.build_spec({ tree = fake_tree({ type = "file", path = file, id = file }, {}) })
+    assert.is_truthy(spec)
+    assert.is_truthy(spec.command)
+    assert.is_true(spec.context.no_tests)
+  end)
+
+  it("reports a status for every position neotest marked running", function()
+    if not ok then
+      return
+    end
+    local tree = fake_tree({ type = "file", path = "/p/A.java", id = "/p/A.java" }, { node("/p/A.java") })
+    local results = adapter.results({ context = { no_tests = true } }, {}, tree)
+    assert.are.same({ ["/p/A.java"] = { status = "skipped" } }, results)
+  end)
+end)
+
 describe("console launcher version", function()
   local launcher = require("jc.neotest.launcher")
 
@@ -343,12 +395,21 @@ describe("refresh before a run", function()
   local refresh = require("jc.neotest.refresh")
 
   it("keeps only readable files, without duplicates", function()
-    local file = vim.fn.tempname() .. ".java"
-    vim.fn.writefile({ "class A {}" }, file)
-    assert.are.same({ file }, refresh._targets({ file, file, "", "/nope/Missing.java", 42 }))
+    local file = vim.fn.tempname() .. "Test.java"
+    vim.fn.writefile({ "class ATest {}" }, file)
+    assert.are.same({ file }, refresh._targets({ file, file, "", "/nope/MissingTest.java", 42 }))
     assert.are.same({}, refresh._targets(nil))
     vim.fn.delete(file)
     assert.are.same({}, refresh._targets({ file }))
+  end)
+
+  it("leaves a production class out of the reparse", function()
+    -- _update_positions parses whatever it is handed, so reparsing a class
+    -- with no tests would park a position for it in the summary
+    local prod = vim.fn.tempname() .. ".java"
+    vim.fn.writefile({ "class Fallback {}" }, prod)
+    assert.are.same({}, refresh._targets({ prod }))
+    vim.fn.delete(prod)
   end)
 
   it("starts the run even with nothing to refresh", function()

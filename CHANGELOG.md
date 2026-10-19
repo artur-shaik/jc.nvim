@@ -19,6 +19,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A run on a file with no tests in it spun forever** - the summary showed the
+  file with a running spinner that never resolved. neotest clears the running
+  flag only for positions it gets a result for, and a position with no tests
+  under it produced no results at all: the adapter returned no spec, neotest
+  looked for test children to run instead, found none and reported nothing.
+  The adapter now returns a spec that ends the run and reports the position as
+  skipped. On top of that jc no longer reparses a production class before a
+  run (which is what put the file in the tree to begin with), and
+  `:JCtestRun`/`:JCtestFile` on a class with no paired test file say so
+  instead of starting that run.
 - **A test run from a nested checkout built the wrong project** - the root was
   the outermost `settings.gradle` above the file, so a git worktree kept inside
   the project (`.claude/worktrees/<branch>`, say) resolved to the outer

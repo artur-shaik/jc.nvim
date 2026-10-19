@@ -1,3 +1,28 @@
+describe("test file names", function()
+  local project = require("jc.project")
+
+  it("takes the junit naming conventions and src/test", function()
+    assert.is_true(project.is_test_file("/p/src/test/java/a/FooTest.java"))
+    assert.is_true(project.is_test_file("/p/src/main/java/a/FooTests.java"))
+    assert.is_true(project.is_test_file("/p/src/main/java/a/TestFoo.java"))
+    assert.is_true(project.is_test_file("/p/src/main/java/a/FooIT.java"))
+    assert.is_true(project.is_test_file("/p/src/test/java/a/Fixtures.java"))
+  end)
+
+  it("leaves a production class out", function()
+    assert.is_false(project.is_test_file("/p/src/main/java/a/FallbackController.java"))
+    assert.is_false(project.is_test_file("/p/src/main/java/a/Contest.java"))
+    assert.is_false(project.is_test_file("/p/src/main/resources/a.yml"))
+    assert.is_false(project.is_test_file(nil))
+  end)
+
+  it("judges a test class by its name alone", function()
+    -- src/test holds helpers and fixtures too, which hold no tests
+    assert.is_true(project.is_test_class("/p/src/test/java/a/FooTest.java"))
+    assert.is_false(project.is_test_class("/p/src/test/java/a/Fixtures.java"))
+  end)
+end)
+
 describe("gradle build root", function()
   local project = require("jc.project")
 

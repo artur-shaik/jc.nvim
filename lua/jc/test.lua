@@ -31,6 +31,21 @@ local function counterpart_test_file()
   return nil
 end
 
+-- Nothing to run: a production class whose paired test file does not exist.
+-- Starting a run on it would park a position with no tests in the summary,
+-- and jc says so instead.
+function M._nothing_to_run(path)
+  local ok, project = pcall(require, "jc.project")
+  return ok and not project.is_test_file(path)
+end
+
+local function warn_nothing_to_run(path)
+  vim.notify(
+    "jc: no tests in " .. vim.fn.fnamemodify(path, ":t") .. ", no test file for it either - :JCgotoTest creates one",
+    vim.log.levels.WARN
+  )
+end
+
 -- auto-close is reliable only for a focused run (one neotest run); a suite is
 -- split into independent sub-runs, so suppress it there
 local function set_suppress_autoclose(on)
@@ -99,12 +114,15 @@ function M.run_at_cursor()
   if not nt then
     return
   end
-  reset_run_state(false)
   local counterpart = counterpart_test_file()
   local target = counterpart or vim.fn.expand("%:p")
+  if not counterpart and M._nothing_to_run(target) then
+    return warn_nothing_to_run(target)
+  end
+  reset_run_state(false)
   with_refresh({ target }, function()
     if counterpart then
-      vim.notify("jc: not a test file — running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
+      vim.notify("jc: not a test file - running " .. vim.fn.fnamemodify(counterpart, ":t"), vim.log.levels.INFO)
       nt.run.run(run_args(counterpart, counterpart))
     else
       nt.run.run(run_args(nil, vim.fn.expand("%:p")))
@@ -118,8 +136,11 @@ function M.run_file()
   if not nt then
     return
   end
-  reset_run_state(false)
   local file = counterpart_test_file() or vim.fn.expand("%:p")
+  if M._nothing_to_run(file) then
+    return warn_nothing_to_run(file)
+  end
+  reset_run_state(false)
   with_refresh({ file }, function()
     nt.run.run(run_args(file, file))
     maybe_open_summary(nt, file)
