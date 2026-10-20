@@ -151,6 +151,8 @@ function M.install_mappings(conf, bufnr)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "ri", "<Cmd>JCimportsAddMissing<CR>", opts)
   -- pick an IDE import-sort preset (remembered per project) and organize with it
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "ro", "<Cmd>JCimportsStyle<CR>", opts)
+  -- expand the `pkg.*` imports of the buffer into single-type ones
+  vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rw", "<Cmd>JCimportsExpandStars<CR>", opts)
   -- flip the receiver and argument of the call at the cursor: a.equals(b) -> b.equals(a)
   vim.api.nvim_buf_set_keymap(bufnr, "n", prefix .. "rf", "<Cmd>JCrefactorFlipArgs<CR>", opts)
   -- add an annotation to the enclosing method / class (search jdtls by name)

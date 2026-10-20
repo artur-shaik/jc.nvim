@@ -434,10 +434,14 @@ function M.static_import_enum()
 end
 
 -- push the project's remembered IDE import-sort preset to jdtls (a no-op when
--- none is set); organize-imports then sorts the way that IDE would
-function M.push_import_style()
+-- none is set); organize-imports then sorts the way that IDE would.
+-- `opts.no_wildcards` raises the wildcard thresholds for this push only, which
+-- is how a one-off expand run gets single-type imports out of a preset that
+-- collapses them.
+function M.push_import_style(opts)
   local style = require("jc.import_style")
-  local settings = style.settings_for(style.load() or "")
+  local no_wildcards = (opts and opts.no_wildcards) or style.no_wildcards()
+  local settings = style.settings_for(style.load() or "", no_wildcards)
   if settings then
     set_configuration(settings)
   end
@@ -449,21 +453,55 @@ function M.organize_imports(bn, smart)
   lsp.jdtls_request(bn, "java/organizeImports", make_range_params(), apply_edit)
 end
 
--- pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / …), remember it for
--- the project, and organize the current buffer with it right away
+-- Expand the `pkg.*` imports of the buffer into single-type ones. jdtls
+-- rebuilds the whole import list from the types the file references, so the
+-- wildcards go away once the thresholds that produce them are out of reach;
+-- the project's own settings go back right after.
+function M.expand_star_imports()
+  M.organize_imports_smart = true
+  M.push_import_style({ no_wildcards = true })
+  lsp.jdtls_request(0, "java/organizeImports", make_range_params(), function(err, response, ctx)
+    apply_edit(err, response, ctx)
+    M.push_import_style()
+  end)
+end
+
+-- the wildcard toggle shown under the presets in the style picker
+local NO_WILDCARDS_ITEM = "no wildcards"
+
+-- Pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / ...), remember it
+-- for the project, and organize the current buffer with it right away. The
+-- last entry toggles wildcards off for the project instead, keeping the group
+-- order of the preset: a preset like IDEA's collapses a package into `pkg.*`
+-- at five imports, and not every project wants that.
 function M.set_import_style()
   local style = require("jc.import_style")
   local current = style.load()
-  vim.ui.select(style.order, {
+  local no_wildcards = style.no_wildcards()
+  local items = vim.list_extend({}, style.order)
+  items[#items + 1] = NO_WILDCARDS_ITEM
+  vim.ui.select(items, {
     prompt = "Import sort style:",
     format_item = function(name)
+      if name == NO_WILDCARDS_ITEM then
+        return (no_wildcards and "[x] " or "[ ] ") .. name .. " (single-type imports only)"
+      end
       return name == current and (name .. "  (current)") or name
     end,
   }, function(choice)
-    if choice then
-      style.save(choice)
-      M.organize_imports(0, false)
+    if not choice then
+      return
     end
+    if choice == NO_WILDCARDS_ITEM then
+      if not current then
+        vim.notify("jc: pick an import style first, the toggle applies to it", vim.log.levels.WARN)
+        return
+      end
+      style.save(current, not no_wildcards)
+    else
+      style.save(choice, no_wildcards)
+    end
+    M.organize_imports(0, false)
   end)
 end
 

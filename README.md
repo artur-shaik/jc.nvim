@@ -240,7 +240,8 @@ passed to `setup`.
 | `JCimportsRemoveUnused` | remove all unused imports (no reordering) |
 | `JCimportsAddMissing` | add all missing imports (no reordering; smart-picks ambiguous names) |
 | `JCimportsOrganizeNoSort` | add missing + remove unused, without reordering the rest |
-| `JCimportsStyle` | pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per project |
+| `JCimportsStyle` | pick an IDE import-sort preset (Eclipse / IntelliJ IDEA / VS Code / Google), remembered per project; its last entry toggles wildcards off for the project |
+| `JCimportsExpandStars` | expand the `pkg.*` imports of the buffer into single-type ones |
 
 A pick for an ambiguous name is remembered per project (a file next to the
 jdtls workspace), and the smart commands above apply it without asking again.
@@ -248,6 +249,14 @@ Organizing the imports of a newly created class counts as a smart run, so a
 `javax` vs `jakarta` choice is made once, not on every new class. One class is
 remembered per simple name: picking another one, in the picker or with
 `JCimportsReplace`, replaces it rather than piling up next to it.
+
+A preset also decides when a package collapses into `pkg.*`: IntelliJ IDEA's
+does it at five imports from one package (three for static ones), Eclipse's
+never. `JCimportsExpandStars` organizes the buffer once with those thresholds
+out of reach, so jdtls rewrites every `pkg.*` into the types the file actually
+uses - the import list is rebuilt from the source, not patched. To keep them
+expanded for good, turn on `no wildcards` in the `JCimportsStyle` picker: the
+group order of the chosen preset stays, only the collapsing goes.
 | `JCgenerateToString` | generate `toString()` with field selection |
 | `JCgenerateHashCodeAndEquals` | generate `hashCode()` and `equals()` |
 | `JCgenerateAccessors` | choose fields for accessor generation |
@@ -348,6 +357,7 @@ Installed on jdtls attach when `default_mappings` is enabled. `<p>` is
 | n | `<p>rs` / `<p>rS` | static import — call / every enum constant |
 | n | `<p>rp` | replace the import of the type under the cursor |
 | n | `<p>ru` / `<p>ri` | remove unused / add missing imports (no reordering) |
+| n | `<p>rw` | expand `pkg.*` imports into single-type ones |
 | n | `<p>rf` | flip receiver and argument of the call (`a.equals(b)` → `b.equals(a)`) |
 | n | `<p>rM` | move the current class to another package (references updated) |
 | n | `<p>am` / `<p>ac` | add an annotation to the enclosing method / class |

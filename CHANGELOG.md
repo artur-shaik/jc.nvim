@@ -24,6 +24,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   class is often covered by a test named after the scenario. Only test classes
   by name, so fixtures and helpers living beside them stay out.
 
+- **`:JCimportsExpandStars` and a per-project wildcard toggle** - an import
+  sort preset also decides when a package collapses into `pkg.*`: IDEA's does
+  it at five imports from one package, three for static ones. The new command
+  organizes the buffer once with those thresholds out of reach, which makes
+  jdtls rewrite every `pkg.*` into the types the file uses (it rebuilds the
+  import list from the source rather than patching it). The last entry of the
+  `:JCimportsStyle` picker turns wildcards off for the project for good,
+  keeping the group order of the chosen preset.
+
 ### Fixed
 
 - **A run on a file with no tests in it spun forever** - the summary showed the
